@@ -93,7 +93,7 @@ namespace LLC
 
     private:
 
-        void sieve_offset(uint64_t origin, uint64_t p, uint32_t inv, uint32_t rem, uint32_t o);
+        void sieve_offset(uint64_t base_offsetted, uint32_t i, uint32_t o);
 
 
     private:

@@ -104,7 +104,7 @@ int main(int argc, char **argv)
     if(config::GetBoolArg(std::string("-prime")))
     {
 
-        if(config::GetBoolArg(std::string("-cpu")))
+        if(config::GetBoolArg(std::string("-cpu"), false))
         {
             /* Sieve */
             for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
