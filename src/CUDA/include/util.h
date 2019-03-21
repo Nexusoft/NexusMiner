@@ -5,9 +5,9 @@
 #define GPU_MAX 8
 #endif
 
+#include <Util/include/debug.h>
 #include <cstdint>
 #include <string>
-#include <Util/include/debug.h>
 
 #define CHECK(call)                                                            \
 {                                                                              \
@@ -23,6 +23,8 @@
 extern int device_map[GPU_MAX];
 
 extern "C" void cuda_driver_version(int &major, int &minor);
+
+extern "C" uint32_t cuda_device_multiprocessors(uint8_t index);
 
 extern "C" int cuda_num_devices();
 

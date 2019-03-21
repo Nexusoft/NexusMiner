@@ -33,7 +33,7 @@ namespace LLC
     HashCUDA::HashCUDA(uint8_t id, TAO::Ledger::Block *block)
     : Proof(id, block)
     , nTarget()
-    , nIntensity(20)
+    , nIntensity(0)
     {
     }
 
@@ -55,7 +55,7 @@ namespace LLC
 		uint32_t *pData = reinterpret_cast<uint32_t *>(&pBlock->nVersion);
 
         /* Calculate threads per block. */
-        uint32_t nThreadsPerBlock = 512;
+        uint32_t nThreadsPerBlock = 896;
 
         /* Calcluate the throughput for the cuda hash mining. */
         uint32_t nThroughput = 512 * nThreadsPerBlock * nIntensity;
@@ -123,6 +123,9 @@ namespace LLC
         /* Allocate memory associated with Device Hashing. */
         cuda_sk1024_init(nID);
 
+        /* Compute the intensity by determining number of multiprocessors. */
+        nIntensity = 2 * cuda_device_multiprocessors(nID);
+        debug::log(0, cuda_devicename(nID), " intensity set to ", nIntensity);
     }
 
     void HashCUDA::Shutdown()

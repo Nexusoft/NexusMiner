@@ -644,6 +644,8 @@ __forceinline__ __device__ void Skein1024(uint2 *p, uint2 *t, uint2 *b)
  *  Skein (2 rounds) = 229 MH/s
  *  Keccak (3 rounds) = 146 MH/s
  **/
+
+ __launch_bounds__(896, 1)
 __global__ void  sk1024_gpu_hash(
 	int threads,
 	uint64_t startNonce,
@@ -952,24 +954,7 @@ extern bool cuda_sk1024_hash(
 	uint64_t *ptarget = (uint64_t*)&TheTarget;
 
 	const uint64_t first_nonce = TheNonce;
-
 	const uint64_t Htarg = ptarget[15];
-
-	//static bool init[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-	//if (!init[thr_id])
-	//{
-	//	cudaSetDevice(device_map[thr_id]);
-	//	cudaDeviceReset();
-	//	cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
-
-	//	sk1024_init(thr_id);
-
-	//	init[thr_id] = true;
-	//}
-
-
-	//skein1024_setBlock((void*)TheData, nHeight);
-	//sk1024_set_Target(ptarget);
 
 	uint64_t foundNonce = sk1024_cpu_hash(thr_id,
 										  throughput,

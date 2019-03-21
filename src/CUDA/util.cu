@@ -39,6 +39,16 @@ extern "C" void cuda_driver_version(int &major, int &minor)
 	}
 }
 
+extern "C" uint32_t cuda_device_multiprocessors(uint8_t index)
+{
+    cudaDeviceProp props;
+
+	if (cudaGetDeviceProperties(&props, index) == cudaSuccess)
+		return props.multiProcessorCount;
+
+    return 0;
+}
+
 extern "C" int cuda_num_devices()
 {
     int GPU_N;
