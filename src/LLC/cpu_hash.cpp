@@ -58,6 +58,7 @@ namespace LLC
                 ++hashes;
                 break;
             }
+
             ++pBlock->nNonce;
             ++hashes;
         }
@@ -91,7 +92,7 @@ namespace LLC
 		target.SetCompact(pBlock->nBits);
         nTarget = target.getuint1024();
 
-        debug::log(1, "Target ", nTarget.ToString().substr(0, 20));
+        debug::log(3, "Target ", nTarget.ToString().substr(0, 20));
 
     }
 

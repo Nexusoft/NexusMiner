@@ -73,7 +73,6 @@ namespace LLP
                     if(!fReset.load())
                         pMiner->SubmitBlock(nBlockID);
                 }
-
             }
 
             if(fStop.load())

@@ -93,18 +93,19 @@ namespace LLC
 
     private:
 
-        void sieve_offset(uint64_t base_offsetted, uint32_t i, uint32_t o);
+        void sieve_offset(uint32_t i, uint32_t o);
 
 
     private:
 
-        std::vector<uint32_t> vBaseRemainders;
+        std::vector<uint64_t> vBaseRemainders;
         uint32_t nBitArraySize;
         uint32_t *pBitArraySieve;
         uint32_t nSieveIndex;
         mpz_t zPrimeOrigin;
         mpz_t zPrimorialMod;
         mpz_t zTempVar;
+        mpz_t zFirstSieveElement;
 
     };
 }

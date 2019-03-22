@@ -76,8 +76,8 @@ int main(int argc, char **argv)
     uint8_t nPrimeGPU = (uint8_t)primeIndices.size();
     uint8_t nHashGPU =  (uint8_t)hashIndices.size();
 
-    uint8_t nPrimeCPU = 0;
-    uint8_t nHashCPU = 0;
+    uint8_t nPrimeCPU = nThreadsCPU;
+    uint8_t nHashCPU = nThreadsCPU;
 
     uint8_t nPrimeWorkers = nPrimeGPU + nPrimeCPU;
     uint8_t nHashWorkers = nHashGPU + nHashCPU;
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
     if(nPrimeWorkers)
     {
         /* Load in GPU config files for prime mining. */
-        prime::load_config(nPrimeGPU);
+        prime::load_config(nPrimeWorkers);
         prime::load_offsets();
 
         /* Initialize primes used for prime mining. */

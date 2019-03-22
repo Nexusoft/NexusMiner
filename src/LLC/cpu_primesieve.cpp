@@ -34,6 +34,7 @@ namespace LLC
     , zPrimeOrigin()
     , zPrimorialMod()
     , zTempVar()
+    , zFirstSieveElement()
     {
     }
 
@@ -47,10 +48,11 @@ namespace LLC
         std::vector<uint64_t> vMeta;
 
         /* Clear the bit array. */
-        memset(pBitArraySieve, 0, nBitArraySize >> 3);
-
+        memset(pBitArraySieve, 0x00, nBitArraySize >> 3);
         uint64_t primorial_start = (uint64_t)nBitArraySize * (uint64_t)nSieveIndex;
-        uint64_t base_offsetted =  base_offset + nPrimorial * primorial_start;
+
+        mpz_add_ui(zFirstSieveElement, zFirstSieveElement, nBitArraySize * nPrimorial);
+
 
         /* Loop through and sieve with each sieving offset. */
         for(uint8_t j = 0; j < 6; ++j)
@@ -58,9 +60,13 @@ namespace LLC
             /* Loop through each sieving prime and sieve. */
             for(uint32_t i = nPrimorialEndPrime; i < nSievePrimeLimit && !fReset.load(); ++i)
             {
-                sieve_offset(base_offsetted, i, j);
+                sieve_offset(i, j);
             }
         }
+
+        /* Increment the sieve index. */
+        SievedBits += nBitArraySize;
+        ++nSieveIndex;
 
         /* Add nonce offsets to queue. */
         for(uint32_t i = 0; i < nBitArraySize && !fReset.load(); ++i)
@@ -81,10 +87,6 @@ namespace LLC
             g_work_queue.push_back(work_info(vNonces, vMeta, pBlock, nID));
         }
 
-        /* Increment the sieve index. */
-        SievedBits += nBitArraySize;
-        ++nSieveIndex;
-
         return false;
     }
 
@@ -96,9 +98,10 @@ namespace LLC
         mpz_init(zPrimeOrigin);
         mpz_init(zPrimorialMod);
         mpz_init(zTempVar);
+        mpz_init(zFirstSieveElement);
 
         /* Create the bit array sieve. */
-        pBitArraySieve = (uint32_t *)malloc((nBitArraySize >> 5) * sizeof(uint32_t));
+        pBitArraySieve = (uint32_t *)malloc(nBitArraySize >> 3);
 
         /* Create empty initial base remainders. */
         vBaseRemainders.assign(nSievePrimeLimit, 0);
@@ -127,18 +130,10 @@ namespace LLC
         mpz_mod(zPrimorialMod, zPrimeOrigin, zPrimorial);
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
         mpz_add(zTempVar, zPrimeOrigin, zPrimorialMod);
-        mpz_add_ui(zTempVar, zTempVar, base_offset);
 
+        /* Compute first sieving element. */
+        mpz_add_ui(zFirstSieveElement, zTempVar, base_offset);
 
-        /* Compute the base remainders. */
-        for(uint32_t i = nPrimorialEndPrime; i < nSievePrimeLimit; ++i)
-        {
-            /* Get the global prime. */
-            uint32_t p =   primesInverseInvk[i * 4 + 0];
-
-            /* Compute the base remainder. */
-            vBaseRemainders[i] = mpz_tdiv_ui(zTempVar, p);
-        }
     }
 
     void PrimeSieveCPU::Shutdown()
@@ -158,28 +153,32 @@ namespace LLC
         mpz_clear(zPrimeOrigin);
         mpz_clear(zPrimorialMod);
         mpz_clear(zTempVar);
+        mpz_clear(zFirstSieveElement);
 
         /* Free the bit array sieve memory. */
         free(pBitArraySieve);
     }
 
 
-    void PrimeSieveCPU::sieve_offset(uint64_t base_offsetted, uint32_t i, uint32_t o)
+    void PrimeSieveCPU::sieve_offset(uint32_t i, uint32_t o)
     {
         /* Get the global prime and inverse. */
         uint32_t p   = primesInverseInvk[i * 4 + 0];
         uint32_t inv = primesInverseInvk[i * 4 + 1];
 
+        /* Compute the base remainder. */
+        vBaseRemainders[i] = mpz_tdiv_ui(zFirstSieveElement, p);
+
         /* Compute remainder. */
-        uint32_t r = vBaseRemainders[i] + offsetsA[o];
+        uint32_t remainder = vBaseRemainders[i] + offsetsA[o];
 
-        if(p < r)
-            r -= p;
+        if(p < remainder)
+            remainder -= p;
 
-        r = (p - r) * inv;
+        uint64_t r = (uint64_t)(p - remainder) * (uint64_t)inv;
 
         /* Compute the starting sieve array index. */
-        uint64_t index = r % p;
+        uint32_t index = r % p;
 
         /* Sieve. */
         while (index < nBitArraySize)
