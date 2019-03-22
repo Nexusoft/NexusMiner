@@ -18,6 +18,14 @@ ________________________________________________________________________________
 #include <Util/include/print_colors.h>
 #include <functional>
 #include <numeric>
+#include <iomanip>
+
+const char *ChannelName[3] =
+{
+    "Stake",
+    "Prime",
+    "Hash"
+};
 
 namespace LLP
 {
@@ -34,6 +42,8 @@ namespace LLP
     , startTimer()
     , wpsTimer()
     , nBestHeight(0)
+    , nHashDifficulty(0.0)
+    , nPrimeDifficulty(0.0)
     , nAccepted(0)
     , nRejected(0)
     , nWorkers(0)
@@ -218,15 +228,23 @@ namespace LLP
 
             debug::log(1, FUNCTION, "Recieved new Block ",
                 pBlock->ProofHash().ToString().substr(0, 20), " on channel ", pBlock->nChannel);
+
+                /* Set the global difficulty. */
+                if(pBlock->nChannel == 1)
+                    nPrimeDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 1);
+                else if(pBlock->nChannel == 2)
+                    nHashDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 2);
+                else
+                {
+                    nPrimeDifficulty = 0;
+                    nHashDifficulty = 0;
+                }
         }
 
         /* Allow worker to continue work with new block. */
         for(uint8_t i = 0; i < nWorkers.load(); ++i)
             vWorkers[i]->Reset();
 
-
-        /* Set the global difficulty. */
-        LLC::nDifficulty = mapBlocks[0]->nBits;
 
         return true;
     }
@@ -275,21 +293,9 @@ namespace LLP
         if(have_submit == false || fReset.load())
             return;
 
-
         debug::log(0, "");
-        debug::log(0, "[MASTER] Submitting Block...");
+        debug::log(0, "[MASTER] Submitting ", ChannelName[mapBlocks[blockID]->nChannel], " Block...");
 
-
-        /* Check to make sure blockID is within bounds. */
-        uint32_t blockCount = (uint32_t)mapBlocks.size();
-        uint32_t bid = (uint32_t)blockID;
-        if(bid >= blockCount)
-        {
-            debug::error(FUNCTION, "Block ID: ", bid,
-                " out of range of blocks [0, ", blockCount, ")");
-
-            return;
-        }
 
         Packet REQUEST;
         Packet RESPONSE;
@@ -502,10 +508,8 @@ namespace LLP
 
             LLC::nHashes = 0;
 
-            double nDifficulty = TAO::Ledger::GetDifficulty(mapBlocks[0]->nBits, 2);
-
-            debug::log(0, "[METERS] ", nMHPerSecond, " MH/s | Height ", nBestHeight.load(),
-            " | Diff = ", nDifficulty,
+            debug::log(0, "[HASHES] ", nMHPerSecond, " MH/s ",
+            " | Diff = ", nHashDifficulty,
             " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
             " | "); //TODO: format time here);
 
@@ -539,16 +543,26 @@ namespace LLP
 
             uint32_t maxChToPrint = 9;
 
-            printf("\n[METERS] %-5.02f WPS | Largest %f | Diff = %f | Block(s) A=%u R=%u | %02dd-%02d:%02d:%02d\n",
+            /*
+            printf("\n[PRIMES] %-5.02f WPS | Largest %f | Diff = %f | Block(s) A=%u R=%u | %02dd-%02d:%02d:%02d\n",
                 WPS,
                 LLC::nLargest.load() / 10000000.0,
-                (double)LLC::nDifficulty.load() / 10000000.0,
+                nPrimeDifficulty,
                 nAccepted.load(),
                 nRejected.load(),
                 SecondsElapsed / 86400,     //days
                 (SecondsElapsed / 3600) % 24, //hours
                 (SecondsElapsed / 60) % 60,   //minutes
                 (SecondsElapsed) % 60);     //seconds
+            */
+            debug::log(0, "[PRIMES] ", std::left, std::setw(8), std::setprecision(7), WPS, " WPS",
+            " | Diff = ", nPrimeDifficulty,
+            " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
+            " | ", std::setfill('0'), std::setprecision(2),
+            SecondsElapsed / 86400, "d-",
+            (SecondsElapsed / 3600) % 24, ":",
+            (SecondsElapsed / 60) % 60, ":",
+            (SecondsElapsed) % 60);
 
             printf("\n-----------------------------------------------------------------------------------------------\nch  \t| ");
             for (uint32_t i = 3; i <= maxChToPrint; i++)
@@ -581,6 +595,8 @@ namespace LLP
                 tps_gpu,
                 tps_cpu,
                 pratio);
+
+            /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */
 
         }
 

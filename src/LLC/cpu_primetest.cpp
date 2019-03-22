@@ -30,7 +30,7 @@ namespace LLC
     {
         if (chain_length == chain_target)
         {
-            debug::log(0, "[METERS] ",
+            debug::log(0, "[PRIMES] ",
                 color, (int)chain_length, "-Chain Found: ",
                 (double)sieve_difficulty / 1e7,
                 KNRM, "  Nonce: ", std::hex, nonce, std::dec, " ", cuda_devicename(thr_id), "[", (uint32_t)thr_id, "]");
@@ -252,7 +252,7 @@ namespace LLC
                 /* Check Difficulty */
                 if (nPrimeDifficulty >= pBlock->nBits && !fReset.load() && nHeight == pBlock->nHeight)
                 {
-                    debug::log(0, "[MASTER] Found Block with Difficulty ", nPrimeDifficulty/1e7);
+                    debug::log(0, "[MASTER] Found Prime Block with Difficulty ", nPrimeDifficulty/1e7);
 
                     /* Set the block nonce and return. */
                     pBlock->nNonce = nNonce;

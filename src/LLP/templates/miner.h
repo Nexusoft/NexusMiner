@@ -168,6 +168,9 @@ namespace LLP
         std::atomic<uint32_t> nAccepted;
         std::atomic<uint32_t> nRejected;
 
+        double nHashDifficulty;
+        double nPrimeDifficulty;
+
         std::atomic<uint8_t> nWorkers;
         std::atomic<uint8_t> nReady;
         std::atomic<bool> fReset;

@@ -363,6 +363,17 @@ public:
         }
     }
 
+    uint32_t BitCount() const
+    {
+        uint32_t i = WIDTH << 5;
+        for(; i > 0; --i)
+        {
+            if(pn[i >> 5] & (1 << (i & 31)))
+                break;
+        }
+        return i;
+    }
+
     std::string ToString() const
     {
         return (GetHex());

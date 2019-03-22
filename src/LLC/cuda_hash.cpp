@@ -21,6 +21,7 @@ ________________________________________________________________________________
 
 
 #include <TAO/Ledger/types/block.h>
+#include <TAO/Ledger/include/difficulty.h>
 
 #include <Util/include/runtime.h>
 #include <Util/include/args.h>
@@ -58,7 +59,7 @@ namespace LLC
         uint32_t nThreadsPerBlock = 896;
 
         /* Calcluate the throughput for the cuda hash mining. */
-        uint32_t nThroughput = 512 * nThreadsPerBlock * nIntensity;
+        uint32_t nThroughput = 256 * nThreadsPerBlock * nIntensity;
 
 
         /* Do hashing on a CUDA device. */
@@ -79,18 +80,18 @@ namespace LLC
         /* If a nonce with the right diffulty was found, return true and submit block. */
 		if(fFound)
         {
+            /* Calculate the number of leading zero-bits and display. */
+            uint32_t nBits = pBlock->ProofHash().BitCount();
+            uint32_t nLeadingZeroes = 1024 - nBits - 1;
+            debug::log(0, "[MASTER] Found Hash Block with ",
+                nLeadingZeroes, " Leading Zero-Bits");
+
             fReset = true;
             return true;
         }
 
-
         return false;
     }
-
-    uint32_t *GetData(TAO::Ledger::Block *pBlock)
-	{
-		return &pBlock->nVersion;
-	}
 
     void HashCUDA::Init()
     {
@@ -98,7 +99,7 @@ namespace LLC
         fReset = false;
 
         /* Set the block for this device */
-        cuda_sk1024_setBlock(GetData(pBlock), pBlock->nHeight);
+        cuda_sk1024_setBlock(&pBlock->nVersion, pBlock->nHeight);
 
         /* Get the target difficulty. */
 		CBigNum target;

@@ -49,7 +49,6 @@ namespace LLC
 
     std::atomic<uint32_t> nLargest;
     std::atomic<uint32_t> nBestHeight;
-    std::atomic<uint32_t> nDifficulty;
 
     std::atomic<uint64_t> SievedBits;
     std::atomic<uint64_t> Tests_CPU;

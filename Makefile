@@ -109,7 +109,7 @@ build/CUDA_prime_fermat.o:	src/CUDA/prime/fermat.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=128 -rdc=true -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_hash_sk1024.o:	src/CUDA/hash/sk1024.cu
-	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=128 -o $@ -c $< $(CUDA_INC)
+	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=72 -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_%.o:	src/CUDA/%.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) -o $@ -c $< $(CUDA_INC)

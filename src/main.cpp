@@ -24,6 +24,7 @@ ________________________________________________________________________________
 #include <Util/include/debug.h>
 #include <Util/include/signals.h>
 #include <Util/include/prime_config.h>
+#include <Util/include/csv.h>
 
 #include <vector>
 #include <thread>
@@ -57,40 +58,32 @@ int main(int argc, char **argv)
     uint8_t nThreadsGPU = config::GetArg(std::string("-devices"), cuda_num_devices());
     uint8_t nThreadsCPU = config::GetArg(std::string("-threads"), std::thread::hardware_concurrency());
 
-    /*
 
-    if (argc > 3)
-    {
-        uint8_t num_processors = nThreadsGPU;
-        char * pch = strtok(argv[3], ",");
-        nThreadsGPU = 0;
-        while (pch != NULL)
-        {
-            if (pch[0] >= '0' && pch[0] <= '9' && pch[1] == '\0')
-            {
-                if (atoi(pch) < num_processors)
-                    device_map[nThreadsGPU++] = atoi(pch);
-                else
-                {
-                    fprintf(stderr, "Non-existant CUDA device #%d specified\n", atoi(pch));
-                    exit(1);
-                }
-            }
-            else
-            {
-                fprintf(stderr, "Non-existant CUDA device '%s' specified\n", pch);
-                exit(1);
-            }
-            pch = strtok(NULL, ",");
-        }
-    }
+    std::vector<uint32_t> primeIndices;
+    std::vector<uint32_t> hashIndices;
 
-    */
+    std::string strPrimeIndices = config::GetArg(std::string("-prime"), ",");
+    std::string strHashIndices = config::GetArg(std::string("-hash"), ",");
 
-    if(config::GetBoolArg(std::string("-prime")))
+    /* Get comma seperated values from string passed in via command line. */
+    config::CommaSeperatedValues(primeIndices, strPrimeIndices);
+    config::CommaSeperatedValues(hashIndices, strHashIndices);
+
+    uint8_t nPrimeGPU = (uint8_t)primeIndices.size();
+    uint8_t nHashGPU =  (uint8_t)hashIndices.size();
+
+    uint8_t nPrimeCPU = 0;
+    uint8_t nHashCPU = 0;
+
+    uint8_t nPrimeWorkers = nPrimeGPU + nPrimeCPU;
+    uint8_t nHashWorkers = nHashGPU + nHashCPU;
+
+
+    /* If there are any prime workers at all, load primes. */
+    if(nPrimeWorkers)
     {
         /* Load in GPU config files for prime mining. */
-        prime::load_config(nThreadsGPU);
+        prime::load_config(nPrimeGPU);
         prime::load_offsets();
 
         /* Initialize primes used for prime mining. */
@@ -101,35 +94,37 @@ int main(int argc, char **argv)
     LLP::Miner Miner(ip, port, nTimeout);
 
     /* Add workers to miner */
-    if(config::GetBoolArg(std::string("-prime")))
+    if(config::GetBoolArg(std::string("-cpu"), false))
     {
+        /* Sieve */
+        for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
+            Miner.AddWorker<LLC::PrimeSieveCPU>(tid, tid);
 
-        if(config::GetBoolArg(std::string("-cpu"), false))
-        {
-            /* Sieve */
-            for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
-                Miner.AddWorker<LLC::PrimeSieveCPU>(tid, tid);
-
-            /* Test */
-            for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
-                Miner.AddWorker<LLC::PrimeTestCPU>(tid, tid);
-        }
-        else
-        {
-            /* Sieve */
-            for(uint8_t tid = 0; tid < nThreadsGPU; ++tid)
-                Miner.AddWorker<LLC::PrimeCUDA>(tid, tid);
-
-            /* Test */
-            for(uint8_t tid = 0; tid < nThreadsGPU; ++tid)
-                Miner.AddWorker<LLC::PrimeTestCPU>(tid, tid);
-        }
-
+        /* Test */
+        for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
+            Miner.AddWorker<LLC::PrimeTestCPU>(tid, tid);
     }
-    else if(config::GetBoolArg(std::string("-hash")))
+    else
     {
-        for(uint8_t tid = 0; tid < nThreadsGPU; ++tid)
-            Miner.AddWorker<LLC::HashCUDA>(tid, tid);
+        /* Sieve */
+        for(uint8_t tid = 0; tid < nPrimeGPU; ++tid)
+            Miner.AddWorker<LLC::PrimeCUDA>(primeIndices[tid], primeIndices[tid]);
+
+        /* Test */
+        for(uint8_t tid = 0; tid < nPrimeGPU; ++tid)
+            Miner.AddWorker<LLC::PrimeTestCPU>(primeIndices[tid], primeIndices[tid]);
+    }
+
+
+    if(config::GetBoolArg(std::string("-cpu"), false))
+    {
+        //TODO: CPU hash miner.
+    }
+    else
+    {
+        for(uint8_t tid = 0; tid < nHashGPU; ++tid)
+            Miner.AddWorker<LLC::HashCUDA>(hashIndices[tid], hashIndices[tid]);
+
     }
 
 
@@ -156,11 +151,10 @@ int main(int argc, char **argv)
     Miner.Stop();
 
 
-    if(config::GetBoolArg(std::string("-prime")))
-    {
-        /* Free the primes that were used for mining. */
+    /* Free the primes that were used for mining. */
+    if(nPrimeWorkers)
         LLC::FreePrimes();
-    }
+
 
     /* Shutdown CUDA internal components. */
     cuda_shutdown();

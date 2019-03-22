@@ -756,16 +756,16 @@ __host__ uint64_t sk1024_cpu_hash(
 	uint64_t startNonce,
 	uint32_t threadsperblock)
 {
-	uint64_t result = 0xffffffffffffffff;
-	CHECK(cudaMemset(d_SKNonce[thr_id], 0xff, sizeof(uint64_t)));
+	uint64_t result = 0xFFFFFFFFFFFFFFFF;
+	CHECK(cudaMemset(d_SKNonce[thr_id], 0xFF, sizeof(uint64_t)));
 	CHECK(cudaMemset(d_SKLowerHash[thr_id], result, sizeof(uint64_t)));
 
-	//dim3 grid((threads + threadsperblock - 1) / threadsperblock);
-	dim3 grid(threads / threadsperblock);
+	//dim3 grid(threads / threadsperblock);
 	dim3 block(threadsperblock);
+    dim3 grid((threads + block.x - 1) / block.x);
 
 
-	sk1024_gpu_hash << <grid, block >> >(threads, startNonce, d_SKNonce[thr_id], d_SKLowerHash[thr_id]);
+	sk1024_gpu_hash<<<grid, block >>>(threads, startNonce, d_SKNonce[thr_id], d_SKLowerHash[thr_id]);
 	CHECK(cudaMemcpy(h_sknonce[thr_id], d_SKNonce[thr_id], sizeof(uint64_t), cudaMemcpyDeviceToHost));
 
 	result = *h_sknonce[thr_id];
