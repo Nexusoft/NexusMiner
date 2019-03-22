@@ -371,7 +371,8 @@ public:
             if(pn[i >> 5] & (1 << (i & 31)))
                 break;
         }
-        return i;
+        /* Any number will have at least 1 bit. */
+        return i + 1;
     }
 
     std::string ToString() const

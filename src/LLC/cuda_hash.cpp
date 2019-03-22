@@ -82,7 +82,7 @@ namespace LLC
         {
             /* Calculate the number of leading zero-bits and display. */
             uint32_t nBits = pBlock->ProofHash().BitCount();
-            uint32_t nLeadingZeroes = 1024 - nBits - 1;
+            uint32_t nLeadingZeroes = 1024 - nBits;
             debug::log(0, "[MASTER] Found Hash Block with ",
                 nLeadingZeroes, " Leading Zero-Bits");
 

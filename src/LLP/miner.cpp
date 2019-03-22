@@ -44,8 +44,6 @@ namespace LLP
     , nBestHeight(0)
     , nHashDifficulty(0.0)
     , nPrimeDifficulty(0.0)
-    , nAccepted(0)
-    , nRejected(0)
     , nWorkers(0)
     , nReady(0)
     , fReset(true)
@@ -53,6 +51,10 @@ namespace LLP
     , fPause(true)
     , nChannels(0)
     {
+        nAccepted[0] = 0;
+        nAccepted[1] = 0;
+        nRejected[0] = 0;
+        nRejected[1] = 0;
     }
 
 
@@ -227,8 +229,10 @@ namespace LLP
             /*Assign the block to the one we just recieved. */
             *pBlock = block;
 
-            debug::log(2, FUNCTION, "Recieved new Block ",
-                pBlock->ProofHash().ToString().substr(0, 20), " on channel ", pBlock->nChannel);
+            uint1024_t proof_hash = pBlock->ProofHash();
+
+            debug::log(2, FUNCTION, "Recieved new ", proof_hash.BitCount(), "-Bit ", std::setw(5), ChannelName[pBlock->nChannel], " Block ",
+                proof_hash.ToString().substr(0, 20));
 
                 /* Set the global difficulty. */
                 if(pBlock->nChannel == 1)
@@ -290,12 +294,14 @@ namespace LLP
             }
         }
 
+        uint32_t nChannel = mapBlocks[blockID]->nChannel;
+
         /* Make sure there is work to submit. */
         if(have_submit == false || fReset.load())
             return;
 
         debug::log(0, "");
-        debug::log(0, "[MASTER] Submitting ", ChannelName[mapBlocks[blockID]->nChannel], " Block...");
+        debug::log(0, "[MASTER] Submitting ", ChannelName[nChannel], " Block...");
 
 
         Packet REQUEST;
@@ -348,13 +354,15 @@ namespace LLP
             if(RESPONSE.HEADER == GOOD_BLOCK)
             {
                 debug::log(0, "[MASTER] ", KLGRN, "ACCEPTED", KNRM);
-                ++nAccepted;
+                if(nChannel == 1 || nChannel == 2)
+                    ++nAccepted[nChannel - 1];
                 Reset();
             }
             else if(RESPONSE.HEADER == ORPHAN_BLOCK)
             {
                 debug::log(0, "[MASTER] ", KLYEL, "ORPHANED", KNRM);
-                ++nRejected;
+                if(nChannel == 1 || nChannel == 2)
+                    ++nRejected[nChannel - 1];
             }
             /* If there was an error disconnect and try and reestablish connection. */
             else
@@ -369,7 +377,8 @@ namespace LLP
         else if(RESPONSE.HEADER == BLOCK_REJECTED)
         {
             debug::log(0, "[MASTER] ", KRED, "REJECTED", KNRM);
-            ++nRejected;
+            if(nChannel == 1 || nChannel == 2)
+                ++nRejected[nChannel - 1];
         }
 
         /* If there was an error disconnect and try and reestablish connection. */
@@ -516,8 +525,8 @@ namespace LLP
             LLC::nHashes = 0;
 
             debug::log(0, "[HASHES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), nMHPerSecond, " MH/s",
-            " | Diff = ", std::setw(8), nHashDifficulty,
-            " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
+            " | Diff = ", std::setw(9), nHashDifficulty,
+            " | Block(s) A=", nAccepted[1].load(), " R=", nRejected[1].load(),
             " | ", strTime);
         }
 
@@ -548,8 +557,8 @@ namespace LLP
 
 
             debug::log(0, "[PRIMES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), WPS, " WP/s",
-            " | Diff = ", std::setw(8), std::setprecision(6), nPrimeDifficulty,
-            " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
+            " | Diff = ", std::setw(9), std::setprecision(7), nPrimeDifficulty,
+            " | Block(s) A=", nAccepted[0].load(), " R=", nRejected[0].load(),
             " | ", strTime);
 
             std::string stats;

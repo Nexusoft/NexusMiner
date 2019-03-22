@@ -165,8 +165,8 @@ namespace LLP
         runtime::timer wpsTimer;
 
         std::atomic<uint32_t> nBestHeight;
-        std::atomic<uint32_t> nAccepted;
-        std::atomic<uint32_t> nRejected;
+        std::atomic<uint32_t> nAccepted[2];
+        std::atomic<uint32_t> nRejected[2];
 
         double nHashDifficulty;
         double nPrimeDifficulty;
