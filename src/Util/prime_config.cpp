@@ -23,7 +23,7 @@ std::vector<uint32_t> offsetsTest;
 std::vector<uint32_t> offsetsA;
 std::vector<uint32_t> offsetsB;
 
-uint32_t nSievePrimeLimit = 0;
+uint32_t nSievePrimeLimit = 1 << 23;
 uint32_t nSievePrimesLog2[GPU_MAX] = { 0 };
 uint32_t nSieveBitsLog2[GPU_MAX] = { 0 };
 uint32_t nSieveIterationsLog2[GPU_MAX] = { 0 };

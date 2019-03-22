@@ -87,7 +87,7 @@ int main(int argc, char **argv)
     if(nPrimeWorkers)
     {
         /* Load in GPU config files for prime mining. */
-        prime::load_config(nPrimeWorkers);
+        prime::load_config(nPrimeGPU);
         prime::load_offsets();
 
         /* Initialize primes used for prime mining. */

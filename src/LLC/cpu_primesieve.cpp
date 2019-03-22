@@ -51,7 +51,19 @@ namespace LLC
         memset(pBitArraySieve, 0x00, nBitArraySize >> 3);
         uint64_t primorial_start = (uint64_t)nBitArraySize * (uint64_t)nSieveIndex;
 
-        mpz_add_ui(zFirstSieveElement, zFirstSieveElement, nBitArraySize * nPrimorial);
+        uint64_t base_offsetted = base_offset + primorial_start * nPrimorial;
+
+        /* Compute first sieving element. */
+        mpz_add_ui(zFirstSieveElement, zTempVar, base_offsetted);
+
+        /* Compute the base remainders. */
+        for(uint32_t i = nPrimorialEndPrime; i < nSievePrimeLimit; ++i)
+        {
+            /* Get the global sieving prime. */
+            uint32_t p   = primesInverseInvk[i * 4 + 0];
+            vBaseRemainders[i] = mpz_tdiv_ui(zFirstSieveElement, p);
+        }
+
 
 
         /* Loop through and sieve with each sieving offset. */
@@ -131,9 +143,6 @@ namespace LLC
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
         mpz_add(zTempVar, zPrimeOrigin, zPrimorialMod);
 
-        /* Compute first sieving element. */
-        mpz_add_ui(zFirstSieveElement, zTempVar, base_offset);
-
     }
 
     void PrimeSieveCPU::Shutdown()
@@ -166,8 +175,7 @@ namespace LLC
         uint32_t p   = primesInverseInvk[i * 4 + 0];
         uint32_t inv = primesInverseInvk[i * 4 + 1];
 
-        /* Compute the base remainder. */
-        vBaseRemainders[i] = mpz_tdiv_ui(zFirstSieveElement, p);
+
 
         /* Compute remainder. */
         uint32_t remainder = vBaseRemainders[i] + offsetsA[o];
