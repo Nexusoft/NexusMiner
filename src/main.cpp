@@ -16,6 +16,7 @@ ________________________________________________________________________________
 #include <LLC/include/global.h>
 #include <LLC/types/cuda_prime.h>
 #include <LLC/types/cuda_hash.h>
+#include <LLC/types/cpu_hash.h>
 #include <LLC/types/cpu_primetest.h>
 #include <LLC/types/cpu_primesieve.h>
 
@@ -43,11 +44,14 @@ int main(int argc, char **argv)
     /* Once we have read in the CLI paramters and config file, cache the args into global variables*/
     config::CacheArgs();
 
-    /* Display the driver version. */
-    int major = 0;
-    int minor = 0;
-    cuda_driver_version(major, minor);
-    debug::log(0, "CUDA Driver Version ", major, ".", minor);
+    /* Display the CUDA runtime and driver version. */
+    int runtime_major = 0;
+    int runtime_minor = 0;
+    int driver_major = 0;
+    int driver_minor = 0;
+    cuda_runtime_version(runtime_major, runtime_minor);
+    cuda_driver_version(driver_major, driver_minor);
+    debug::log(0, "CUDA Runtime/Driver Version ", "[", runtime_major, ".", runtime_minor, " / ", driver_major, ".", driver_minor, "]");
 
 
     std::string ip = config::GetArg(std::string("-ip"), "127.0.0.1");
@@ -94,7 +98,7 @@ int main(int argc, char **argv)
     LLP::Miner Miner(ip, port, nTimeout);
 
     /* Add workers to miner */
-    if(config::GetBoolArg(std::string("-cpu"), false))
+    if(config::GetBoolArg(std::string("-cpuprime"), false))
     {
         /* Sieve */
         for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
@@ -116,9 +120,10 @@ int main(int argc, char **argv)
     }
 
 
-    if(config::GetBoolArg(std::string("-cpu"), false))
+    if(config::GetBoolArg(std::string("-cpuhash"), false))
     {
-        //TODO: CPU hash miner.
+        for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
+            Miner.AddWorker<LLC::HashCPU>(tid, tid);
     }
     else
     {

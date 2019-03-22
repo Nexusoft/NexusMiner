@@ -20,21 +20,40 @@ extern "C" void cuda_device_synchronize()
   	cudaDeviceSynchronize();
 }
 
-extern "C" void cuda_driver_version(int &major, int &minor)
+extern "C" void cuda_runtime_version(int &major, int &minor)
 {
-	int version;
-	cudaError_t err = cudaDriverGetVersion(&version);
+    int runtime_version;
+	cudaError_t err = cudaRuntimeGetVersion(&runtime_version);
 	if (err != cudaSuccess)
 	{
-		debug::error("Unable to query CUDA driver version! Is an nVidia driver installed?");
+		debug::error("Unable to query CUDA runtime version! Is an Nvidia runtime installed?");
 		return;
 	}
 
-	major = version / 1000;
-	minor = version % 100; // same as in deviceQuery sample
+	major = runtime_version / 1000;
+	minor = (runtime_version % 100) / 10; // same as in deviceQuery sample
 	if (major < 5 || (major == 5 && minor < 5))
 	{
-		debug::error("Driver does not support CUDA 5.5 API! Update your nVidia driver!");
+		debug::error("Runtime does not support CUDA 5.5 API! Update your Nvidia runtime!");
+		return;
+	}
+}
+
+extern "C" void cuda_driver_version(int &major, int &minor)
+{
+	int driver_version;
+	cudaError_t err = cudaDriverGetVersion(&driver_version);
+	if (err != cudaSuccess)
+	{
+		debug::error("Unable to query CUDA driver version! Is an Nvidia driver installed?");
+		return;
+	}
+
+	major = driver_version / 1000;
+	minor = (driver_version % 100) / 10; // same as in deviceQuery sample
+	if (major < 5 || (major == 5 && minor < 5))
+	{
+		debug::error("Driver does not support CUDA 5.5 API! Update your Nvidia driver!");
 		return;
 	}
 }

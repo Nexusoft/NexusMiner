@@ -15,6 +15,7 @@ OBJS :=	build/main.o \
 				build/LLC_cpu_primetest.o \
 				build/LLC_cpu_primesieve.o \
 				build/LLC_cuda_hash.o \
+				build/LLC_cpu_hash.o \
 				build/LLP_base_address.o \
 				build/LLP_base_connection.o \
 				build/LLP_connection.o \

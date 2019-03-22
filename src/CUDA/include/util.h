@@ -22,6 +22,8 @@
 
 extern int device_map[GPU_MAX];
 
+extern "C" void cuda_runtime_version(int &major, int &minor);
+
 extern "C" void cuda_driver_version(int &major, int &minor);
 
 extern "C" uint32_t cuda_device_multiprocessors(uint8_t index);

@@ -526,7 +526,7 @@ namespace LLP
 
             debug::log(0, "[HASHES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), nMHPerSecond, " MH/s",
             " | Diff = ", std::setw(9), nHashDifficulty,
-            " | Block(s) A=", nAccepted[1].load(), " R=", nRejected[1].load(),
+            " | Block(s) A=", std::setw(2), nAccepted[1].load(), " R=", std::setw(2), nRejected[1].load(),
             " | ", strTime);
         }
 
@@ -558,7 +558,7 @@ namespace LLP
 
             debug::log(0, "[PRIMES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), WPS, " WP/s",
             " | Diff = ", std::setw(9), std::setprecision(7), nPrimeDifficulty,
-            " | Block(s) A=", nAccepted[0].load(), " R=", nRejected[0].load(),
+            " | Block(s) A=", std::setw(2), nAccepted[0].load(), " R=", std::setw(2), nRejected[0].load(),
             " | ", strTime);
 
             std::string stats;
