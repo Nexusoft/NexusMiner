@@ -159,7 +159,7 @@ namespace LLC
 
     void PrimeCUDA::Init()
     {
-        debug::log(2, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
 
         /* Atomic set reset flag to false. */
         fReset = false;
@@ -219,7 +219,7 @@ namespace LLC
 
     void PrimeCUDA::Load()
     {
-        debug::log(2, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
 
         /* Initialize the cuda device associated with this ID. */
         cuda_init(nID);
@@ -257,7 +257,7 @@ namespace LLC
 
     void PrimeCUDA::Shutdown()
     {
-        debug::log(2, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
 
         /* Set the GPU quit flag to true. */
         cuda_set_quit(1);
@@ -318,7 +318,7 @@ namespace LLC
                     uint32_t chain_offset_end2 = (meta2 >> 16) & 0xFF;
                     uint32_t chain_length2 = meta2 & 0xFF;
 
-                    debug::log(2, FUNCTION, std::hex, nonce_offsets[i], " existing:  ",
+                    debug::log(3, FUNCTION, std::hex, nonce_offsets[i], " existing:  ",
                         " combo: ", combo,
                         " beg: ", std::dec, chain_offset_beg,
                         " end: ", chain_offset_end,
@@ -344,7 +344,7 @@ namespace LLC
             std::vector<uint64_t> work_meta;
 
 
-            debug::log(2, FUNCTION, cuda_devicename(nID), "[", (uint32_t)nID, "] ",  dups.size(), "/", count, "(", (double)dups.size()/count * 100.0,"%) duplicates");
+            debug::log(3, FUNCTION, cuda_devicename(nID), "[", (uint32_t)nID, "] ",  dups.size(), "/", count, "(", (double)dups.size()/count * 100.0,"%) duplicates");
 
             /*for(uint32_t i = 0; i < dups.size(); ++i)
             {
@@ -355,7 +355,7 @@ namespace LLC
                 uint32_t chain_offset_end = (meta >> 16) & 0xFF;
                 uint32_t chain_length = meta & 0xFF;
 
-                debug::log(0, FUNCTION, "nonce: ", std::hex, dups[i].first, std::dec,
+                debug::log(3, FUNCTION, "nonce: ", std::hex, dups[i].first, std::dec,
                     " combo: ", combo,
                     " beg: ", chain_offset_beg,
                     " end: ", chain_offset_end,

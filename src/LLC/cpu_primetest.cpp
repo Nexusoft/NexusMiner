@@ -30,10 +30,13 @@ namespace LLC
     {
         if (chain_length == chain_target)
         {
+            debug::log(0, "");
             debug::log(0, "[PRIMES] ",
                 color, (int)chain_length, "-Chain Found: ",
-                (double)sieve_difficulty / 1e7,
-                KNRM, "  Nonce: ", std::hex, nonce, std::dec, " ", cuda_devicename(thr_id), "[", (uint32_t)thr_id, "]");
+                std::fixed, std::setprecision(6),(double)sieve_difficulty / 1e7,
+                KNRM,
+                "  Nonce: ", std::hex, std::uppercase, std::setfill('0'), std::setw(16), nonce,
+                std::dec, " ", cuda_devicename(thr_id), "[", (uint32_t)thr_id, "]");
         }
     }
 
@@ -101,7 +104,7 @@ namespace LLC
         uint32_t nWorkCount = (uint32_t)work.nonce_offsets.size();
 
         /* Log message. */
-        debug::log(2, "PrimeTestCPU[", (uint32_t)nID, "]: ", nWorkCount,
+        debug::log(3, "PrimeTestCPU[", (uint32_t)nID, "]: ", nWorkCount,
             " nonces from ", (uint32_t)work.thr_id);
 
         /* Process each result from array of nonces. */
@@ -269,7 +272,7 @@ namespace LLC
 
     void PrimeTestCPU::Load()
     {
-        debug::log(2, FUNCTION, "PrimeTestCPU", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeTestCPU", static_cast<uint32_t>(nID));
 
         mpz_init(zTempVar);
         mpz_init(zBaseOffsetted);
@@ -282,7 +285,7 @@ namespace LLC
 
     void PrimeTestCPU::Init()
     {
-        debug::log(2, FUNCTION, "PrimeTestCPU", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeTestCPU", static_cast<uint32_t>(nID));
 
         /* Atomic set reset flag to false. */
         fReset = false;
@@ -296,7 +299,7 @@ namespace LLC
 
     void PrimeTestCPU::Shutdown()
     {
-        debug::log(2, FUNCTION, "PrimeTestCPU", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeTestCPU", static_cast<uint32_t>(nID));
 
         /* Atomic set reset flag to true. */
         fReset = true;

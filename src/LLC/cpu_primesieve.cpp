@@ -90,7 +90,7 @@ namespace LLC
 
     void PrimeSieveCPU::Load()
     {
-        debug::log(2, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
 
         /* Initialize the GMP objects. */
         mpz_init(zPrimeOrigin);
@@ -106,7 +106,7 @@ namespace LLC
 
     void PrimeSieveCPU::Init()
     {
-        debug::log(2, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
 
         /* Atomic set reset flag to false. */
         fReset = false;
@@ -143,7 +143,7 @@ namespace LLC
 
     void PrimeSieveCPU::Shutdown()
     {
-        debug::log(2, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
 
         /* Atomic set reset flag to true. */
         fReset = true;

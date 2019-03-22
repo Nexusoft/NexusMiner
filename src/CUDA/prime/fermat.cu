@@ -35,7 +35,7 @@ extern "C" void cuda_set_test_offsets(uint32_t thr_id,
 {
     nOffsetsT = T_count;
 
-    debug::log(2, FUNCTION, thr_id, "    ", nOffsetsT);
+    debug::log(4, FUNCTION, thr_id, "    ", nOffsetsT);
 
     if(nOffsetsT > 32)
         debug::error(FUNCTION, "test offsets cannot exceed 32");
@@ -49,7 +49,7 @@ extern "C" void cuda_set_test_offsets(uint32_t thr_id,
 
 extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id, uint32_t *limbs)
 {
-    debug::log(2, FUNCTION, thr_id);
+    debug::log(4, FUNCTION, thr_id);
 
     CHECK(cudaMemcpyToSymbol(c_zFirstSieveElement, limbs,
         WORD_MAX*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
@@ -57,7 +57,7 @@ extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id, uint32_t *limbs)
 
 extern "C" void cuda_set_quit(uint32_t quit)
 {
-       debug::log(2, FUNCTION, quit ? "true" : "false");
+       debug::log(4, FUNCTION, quit ? "true" : "false");
 
        CHECK(cudaMemcpyToSymbol(c_quit, &quit,
                                 sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
@@ -643,7 +643,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
 
     uint8_t str_id = 4;
 
-    debug::log(2, FUNCTION, thr_id);
+    debug::log(4, FUNCTION, thr_id);
 
     /* Set the result event switch. */
     d_result_event_curr[thr_id][curr_test] = cudaErrorNotReady;
@@ -738,7 +738,7 @@ extern "C" void cuda_results(uint32_t thr_id,
         std::copy(pOffsets, pOffsets + (*result_count), result_offsets);
         std::copy(pMeta,    pMeta    + (*result_count), result_meta);
 
-        debug::log(2, FUNCTION, thr_id, "    ", *result_count, " results");
+        debug::log(4, FUNCTION, thr_id, "    ", *result_count, " results");
     }
 }
 
@@ -746,7 +746,7 @@ extern "C" void cuda_init_counts(uint32_t thr_id)
 {
     uint32_t zero[BUFFER_COUNT] = {0};
 
-    debug::log(2, FUNCTION, thr_id);
+    debug::log(4, FUNCTION, thr_id);
 
     CHECK(cudaDeviceSynchronize());
 

@@ -202,7 +202,8 @@ namespace LLP
 
         uint32_t count = static_cast<uint32_t>(mapBlocks.size());
 
-        debug::log(1, FUNCTION, "Requesting ", count, " new Block", count > 1 ? "s." : ".");
+        debug::log(2, "");
+        debug::log(2, FUNCTION, "Requesting ", count, " new Block", count > 1 ? "s." : ".");
 
         /* Lock all the blocks so miners can't submit stale blocks. */
         std::unique_lock<std::mutex> lk(mut);
@@ -226,7 +227,7 @@ namespace LLP
             /*Assign the block to the one we just recieved. */
             *pBlock = block;
 
-            debug::log(1, FUNCTION, "Recieved new Block ",
+            debug::log(2, FUNCTION, "Recieved new Block ",
                 pBlock->ProofHash().ToString().substr(0, 20), " on channel ", pBlock->nChannel);
 
                 /* Set the global difficulty. */
@@ -495,9 +496,15 @@ namespace LLP
         uint32_t nElapsed = minerTimer.Elapsed();
         uint64_t nElapsedMS = minerTimer.ElapsedMilliseconds();
 
+        std::string strTime = debug::safe_printstr(
+            std::setfill('0'), std::setw(2), SecondsElapsed / 86400, "d-",
+            std::setfill('0'), std::setw(2), (SecondsElapsed / 3600) % 24, ":",
+            std::setfill('0'), std::setw(2), (SecondsElapsed / 60) % 60, ":",
+            std::setfill('0'), std::setw(2), (SecondsElapsed) % 60);
 
 
 
+        debug::log(0, "");
 
         /* Print Hash Channel Stats. */
         if(nChannels & 2)
@@ -508,12 +515,10 @@ namespace LLP
 
             LLC::nHashes = 0;
 
-            debug::log(0, "[HASHES] ", nMHPerSecond, " MH/s ",
-            " | Diff = ", nHashDifficulty,
+            debug::log(0, "[HASHES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), nMHPerSecond, " MH/s",
+            " | Diff = ", std::setw(8), nHashDifficulty,
             " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
-            " | "); //TODO: format time here);
-
-
+            " | ", strTime);
         }
 
         /* Print Prime Channel Stats. */
@@ -541,44 +546,37 @@ namespace LLP
 
             double WPS = 1.0 * std::accumulate(LLC::vWPSValues.begin(), LLC::vWPSValues.end(), 0.0) / LLC::vWPSValues.size();
 
+
+            debug::log(0, "[PRIMES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), WPS, " WP/s",
+            " | Diff = ", std::setw(8), std::setprecision(6), nPrimeDifficulty,
+            " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
+            " | ", strTime);
+
+            std::string stats;
             uint32_t maxChToPrint = 9;
 
-            /*
-            printf("\n[PRIMES] %-5.02f WPS | Largest %f | Diff = %f | Block(s) A=%u R=%u | %02dd-%02d:%02d:%02d\n",
-                WPS,
-                LLC::nLargest.load() / 10000000.0,
-                nPrimeDifficulty,
-                nAccepted.load(),
-                nRejected.load(),
-                SecondsElapsed / 86400,     //days
-                (SecondsElapsed / 3600) % 24, //hours
-                (SecondsElapsed / 60) % 60,   //minutes
-                (SecondsElapsed) % 60);     //seconds
-            */
-            debug::log(0, "[PRIMES] ", std::left, std::setw(8), std::setprecision(7), WPS, " WPS",
-            " | Diff = ", nPrimeDifficulty,
-            " | Block(s) A=", nAccepted.load(), " R=", nRejected.load(),
-            " | ", std::setfill('0'), std::setprecision(2),
-            SecondsElapsed / 86400, "d-",
-            (SecondsElapsed / 3600) % 24, ":",
-            (SecondsElapsed / 60) % 60, ":",
-            (SecondsElapsed) % 60);
-
-            printf("\n-----------------------------------------------------------------------------------------------\nch  \t| ");
-            for (uint32_t i = 3; i <= maxChToPrint; i++)
-                printf("%-7d  |  ", i);
-            printf("\n---------------------------------------------------------------------------------------------\ncount\t| ");
-            for (uint32_t i = 3; i <= maxChToPrint; i++)
-                printf("%-7d  |  ", LLC::nChainCounts[i].load());
-            printf("\n---------------------------------------------------------------------------------------------\nch/m\t| ");
-            for (uint32_t i = 3; i <= maxChToPrint; i++)
+            debug::log(0, "-----------------------------------------------------------------------------------------------");
+            stats = debug::safe_printstr(std::setw(9), std::left, "| ch") + " | ";
+            for(uint32_t i = 3; i <= maxChToPrint; ++i)
+                stats += debug::safe_printstr(std::setw(9), std::left, i) + " | ";
+            debug::log(0, stats);
+            debug::log(0, "-----------------------------------------------------------------------------------------------");
+            stats = debug::safe_printstr(std::setw(9), std::left, "| count") + " | ";
+            for(uint32_t i = 3; i <= maxChToPrint; ++i)
+                stats += debug::safe_printstr(std::fixed, std::setprecision(2), std::setw(9), std::left, LLC::nChainCounts[i].load()) + " | ";
+            debug::log(0, stats);
+            debug::log(0, "-----------------------------------------------------------------------------------------------");
+            stats = debug::safe_printstr(std::setw(9), std::left, "| ch/m") + " | ";
+            for(uint32_t i = 3; i <= maxChToPrint; ++i)
             {
                 double sharePerHour = ((double)LLC::nChainCounts[i].load() / SecondsElapsed) * 60.0;
-                printf("%-7.02f  |  ", sharePerHour);
+                stats += debug::safe_printstr(std::fixed, std::setprecision(2), std::setw(9), std::left, sharePerHour) + " | ";
             }
-            printf("\n---------------------------------------------------------------------------------------------\nratio\t| ");
 
-            for (uint32_t i = 3; i <= maxChToPrint; i++)
+            debug::log(1, stats);
+            debug::log(1, "-----------------------------------------------------------------------------------------------");
+            stats = debug::safe_printstr(std::setw(9), std::left, "| ratio") + " | ";
+            for(uint32_t i = 3; i <= maxChToPrint; ++i)
             {
                 double chRatio = 0;
 
@@ -587,14 +585,15 @@ namespace LLP
 
                 if (c != 0)
                     chRatio = ((double)c2 / (double)c);
-                printf("%-7.03f  |  ", chRatio);
+                stats += debug::safe_printstr(std::fixed, std::setprecision(2), std::setw(9), std::left, chRatio) + " | ";
             }
-            printf("\n---------------------------------------------------------------------------------------------\n");
-            printf("Sieved %5.2f GiB/s | Tested %lu T/s GPU, %lu T/s CPU | Ratio: %.3f %%\n\n",
-                (double)gibps / (1 << 30),
-                tps_gpu,
-                tps_cpu,
-                pratio);
+            debug::log(1, stats);
+            debug::log(1, "-----------------------------------------------------------------------------------------------");
+
+            debug::log(0, "[PRIMES] ", "Sieved ", std::fixed, std::setprecision(2), (double)gibps / (1 << 30), " GiB/s | Tested ",
+                tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), pratio, " %");
+            debug::log(0, "");
+
 
             /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */
 

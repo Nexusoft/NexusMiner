@@ -95,7 +95,7 @@ namespace LLC
 
     void HashCUDA::Init()
     {
-        debug::log(2, FUNCTION, "HashCUDA", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "HashCUDA", static_cast<uint32_t>(nID));
         fReset = false;
 
         /* Set the block for this device */
@@ -116,7 +116,7 @@ namespace LLC
 
     void HashCUDA::Load()
     {
-        debug::log(2, FUNCTION, "HashCUDA", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "HashCUDA", static_cast<uint32_t>(nID));
 
         /* Initialize the cuda device associated with this ID. */
         cuda_init(nID);
@@ -131,7 +131,7 @@ namespace LLC
 
     void HashCUDA::Shutdown()
     {
-        debug::log(2, FUNCTION, "HashCUDA", static_cast<uint32_t>(nID));
+        debug::log(3, FUNCTION, "HashCUDA", static_cast<uint32_t>(nID));
         fReset = true;
 
         /* Free the GPU device memory associated with hashing. */
