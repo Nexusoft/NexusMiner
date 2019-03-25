@@ -852,7 +852,8 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
         #pragma unroll nOffsets
         for(uint8_t o = 0; o < nOffsets; ++o)
         {
-            uint16_t bit = (d_bit_array_sieve[idx >> 5] & (1 << (idx & 31))) == 0 ? 1 : 0;
+            /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
+            uint16_t bit = !((d_bit_array_sieve[idx >> 5]) & (1 << (idx & 31)));
             combo |= bit << o;
 
             d_bit_array_sieve += nBitArray_Size >> 5;
@@ -867,45 +868,48 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
         {
             //printf("combo: %08X invert: %08X popc: %d\n", combo, ~combo, count);
 
-            /*
-            uint8_t max_gap = 0;
-
-            combo <<= (32 - nOffsets); //align to most significant bits
-            #pragma unroll nOffsets
-            for(uint8_t o = 0; o < nOffsets; ++o)
-            {
-                max_gap = max(max_gap, __clz(combo << o));
-            }
-            */
-
             /* Shift the combo bits to the most significant bit. */
             uint32_t tmp = combo << (32 - nOffsets);
+
+            /* Count the leading zero bits to compute next offset. */
             uint8_t next = __clz(tmp);
             uint8_t prev = next;
+
+            /* Set the beginning index. */
             uint8_t beg = next;
+
+            /* Clear the high order bit for next round offset calculation. */
             tmp ^= 0x80000000 >> next;
             combo = tmp;
 
+
+            /* Count the first index */
             count = 1;
 
+            /* Continue loop while the next bit is less than the number of offsets. */
             while(next < nOffsets)
             {
+                /* Set previous and next indicies, clearing high order bit. */
                 prev = next;
                 next = __clz(tmp);
                 tmp ^= 0x80000000 >> next;
 
+                /* Make sure next does not overflow. */
                 if(next >= nOffsets)
                     break;
 
-                /* Check the prime gap */
-                if(c_offsetsA[next] - c_offsetsA[prev] > 12 && count < threshold)
+                /* Check the prime gap, resetting count and begin index if violated. */
+                if(c_offsetsA[next] - c_offsetsA[prev] > 12)
                 {
                     beg = next;
                     count = 0;
+                    combo = tmp;
                 }
 
+                /* Increment the count. */
                 ++count;
 
+                /* Stop search if threshold is met. */
                 if(count >= threshold)
                     break;
 
@@ -1297,6 +1301,8 @@ extern "C" void cuda_set_sieve(uint8_t thr_id,
     CHECK(cudaDeviceSynchronize());
 }
 
+static uint32_t sieve_index_prev = 0xFFFFFFFF;
+
 extern "C" bool cuda_primesieve(uint8_t thr_id,
                                 uint64_t base_offset,
                                 uint64_t primorial,
@@ -1314,10 +1320,11 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     uint8_t curr_sieve = sieve_index % FRAME_COUNT;
     uint8_t curr_test = test_index % FRAME_COUNT;
     uint32_t next_test = (test_index + 1) % FRAME_COUNT;
+    uint32_t prev_test = (test_index - 1) % FRAME_COUNT;
 
     /* Make sure current working sieve is finished */
     if(cudaEventQuery(d_Events[thr_id][curr_sieve][EVENT::COMPACT]) == cudaErrorNotReady
-    || cudaEventQuery(d_Events[thr_id][curr_test ][EVENT::FERMAT ]) == cudaErrorNotReady)
+    || cudaEventQuery(d_Events[thr_id][prev_test ][EVENT::FERMAT ]) == cudaErrorNotReady)
         return false;
 
     /* Create a sieve index that starts in a different lane for each frame */
@@ -1331,6 +1338,10 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
     /* Calculate bit array size, sieve start bit, and base offset */
 
+    if(sieve_index_prev == sieve_index)
+        debug::error(FUNCTION, "duplicate sieve index");
+
+
 
     uint64_t primorial_start = (uint64_t)nBitArray_Size * (uint64_t)sieve_index;
     uint64_t base_offsetted = base_offset + primorial * primorial_start;
@@ -1343,7 +1354,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     /* Clear the current working sieve and signal */
 
     CHECK(stream_wait_event(thr_id, curr_sieve, 0, EVENT::COMPACT));
-    CHECK(stream_wait_event(thr_id, curr_sieve, 0, EVENT::FERMAT));
+    CHECK(stream_wait_event(thr_id, prev_test, 0, EVENT::FERMAT));
 
     kernel_clear_launch(thr_id, 0, curr_sieve, nBitArray_Size);
     CHECK(stream_signal_event(thr_id, curr_sieve, 0, EVENT::CLEAR));
@@ -1376,6 +1387,8 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     CHECK(stream_signal_event(thr_id, curr_sieve, 3, EVENT::COMPACT));
 
     debug::log(4, FUNCTION, (uint32_t)thr_id);
+
+    sieve_index_prev = sieve_index;
 
     return true;
 }

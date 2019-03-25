@@ -21,9 +21,6 @@ extern struct FrameResource frameResources[GPU_MAX];
 __constant__ uint32_t c_zFirstSieveElement[WORD_MAX];
 __constant__ uint32_t c_quit;
 
-//extern cudaStream_t d_Streams[GPU_MAX][CUDA_STREAM_MAX];
-//extern cudaEvent_t d_Events[GPU_MAX][FRAME_COUNT][CUDA_EVENT_MAX];
-
 cudaError_t d_result_event_curr[GPU_MAX][FRAME_COUNT];
 cudaError_t d_result_event_prev[GPU_MAX][FRAME_COUNT];
 
@@ -600,7 +597,7 @@ __global__ void fermat_launcher(uint64_t *g_nonce_offsets,
             /* Launch the fermat kernel for this segment. */
             fermat_kernel<<<grid, block, 0, stream>>>(
                 &in_nonce_offsets[segment_offset],  &in_nonce_meta[segment_offset],  segment_in_count,
-                &out_nonce_offsets[segment_offset], &out_nonce_meta[segment_offset],  &out_nonce_count[threadIdx.x],
+                &out_nonce_offsets[0], &out_nonce_meta[0],  &out_nonce_count[0],
                 g_result_offsets, g_result_meta, g_result_count,
                 g_primes_checked, g_primes_found, nPrimorial, nTestOffsets, nTestLevels, threadIdx.x);
 
@@ -612,20 +609,19 @@ __global__ void fermat_launcher(uint64_t *g_nonce_offsets,
         }
     }
 
-    if(threadIdx.x == 0)
-    {
-        total_count = 0;
-        total_count = out_nonce_count[0] + out_nonce_count[1]
-                    + out_nonce_count[2] + out_nonce_count[3];
+    //if(threadIdx.x == 0)
+    //{
+    //    total_count = 0;
+    //    total_count = out_nonce_count[0];
 
-        out_nonce_count[0] = total_count;
+    //    out_nonce_count[0] = total_count;
 
         //printf("%d: result count: %03d \n", o, *g_result_count);
 
         //for(int j = 0; j < *g_result_count; ++j)
         //    printf("%016llX ", g_result_offsets[j]);
         //printf("\n");
-    }
+    //}
 
 }
 

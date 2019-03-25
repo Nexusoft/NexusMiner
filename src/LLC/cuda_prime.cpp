@@ -28,6 +28,7 @@ ________________________________________________________________________________
 #include <Util/include/prime_config.h>
 
 #include <cmath>
+#include <bitset>
 
 /*
 namespace
@@ -306,14 +307,14 @@ namespace LLC
                 {
                     uint64_t meta = it->second;
                     // Extract combo bits and chain info.
-                    uint32_t combo = meta >> 32;
+                    std::bitset<32> combo(meta >> 32);
                     uint32_t chain_offset_beg = (meta >> 24) & 0xFF;
                     uint32_t chain_offset_end = (meta >> 16) & 0xFF;
                     uint32_t chain_length = meta & 0xFF;
 
                     uint64_t meta2 = nonce_meta[i];
                     // Extract combo bits and chain info.
-                    uint32_t combo2 = meta2 >> 32;
+                    std::bitset<32> combo2(meta2 >> 32);
                     uint32_t chain_offset_beg2 = (meta2 >> 24) & 0xFF;
                     uint32_t chain_offset_end2 = (meta2 >> 16) & 0xFF;
                     uint32_t chain_length2 = meta2 & 0xFF;
