@@ -24,7 +24,7 @@ change GPU settings regarding seiving, testing
 
 ### offsets.ini
 
-Change sieve offsets and sieve primes. You probably don't want to
+Change sieve offsets and primorial. You probably don't want to
 change this unless you understand what is happening or want to experiment. see link
 in file for more info on primes.
 
@@ -56,4 +56,3 @@ in file for more info on primes.
 
 * GMP:          sudo apt-get install libgmp3-dev
 * OpenSSL:      sudo apt-get install libssl-dev
-

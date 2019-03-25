@@ -92,6 +92,8 @@ namespace prime
         std::string strOffsets;
         std::string P, O, T, A, B;
         std::getline(fin, P, '#');
+        
+        std::getline(fin, O);
         std::getline(fin, O, '#');
 
         std::getline(fin, T);
@@ -112,7 +114,7 @@ namespace prime
         uint32_t o;
 
         sP >> nPrimorialEndPrime;
-        
+
         sO >> base_offset;
 
         while (sT >> o)
