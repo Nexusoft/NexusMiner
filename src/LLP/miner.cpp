@@ -215,7 +215,8 @@ namespace LLP
             TAO::Ledger::Block *pBlock = it->second;
 
             /* Set the channel of the worker channel. */
-            SetChannel(pBlock->nChannel);
+            uint32_t nChannel = pBlock->nChannel;
+            SetChannel(nChannel);
             WritePacket(REQUEST);
             ReadNextPacket(RESPONSE);
 
@@ -228,6 +229,14 @@ namespace LLP
 
             /*Assign the block to the one we just recieved. */
             *pBlock = block;
+
+            /* Make sure the channel from the block matches what was requested. */
+            if(pBlock->nChannel != nChannel)
+            {
+                debug::error("Recieved block channel: ", ChannelName[pBlock->nChannel],
+                    " does not match channel: ", ChannelName[nChannel], " as requested. Force setting block channel.");
+                pBlock->nChannel = nChannel;
+            }
 
             uint1024_t proof_hash = pBlock->ProofHash();
 

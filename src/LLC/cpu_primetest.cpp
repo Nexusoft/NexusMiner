@@ -84,7 +84,7 @@ namespace LLC
             return false;
 
         /* Set the block pointer. */
-        *pBlock = *work.pBlock;
+        pBlock = work.pBlock;
 
         /* Get the prime origin from the block and import into GMP. */
         uint1024_t nPrimeOrigin = pBlock->ProofHash();

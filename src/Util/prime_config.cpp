@@ -18,6 +18,7 @@ ________________________________________________________________________________
 #include <sstream>
 #include <string>
 
+uint32_t nPrimorialEndPrime;
 uint64_t base_offset = 0;
 std::vector<uint32_t> offsetsTest;
 std::vector<uint32_t> offsetsA;
@@ -89,7 +90,8 @@ namespace prime
         }
 
         std::string strOffsets;
-        std::string O, T, A, B;
+        std::string P, O, T, A, B;
+        std::getline(fin, P, '#');
         std::getline(fin, O, '#');
 
         std::getline(fin, T);
@@ -102,12 +104,15 @@ namespace prime
         std::getline(fin, B, '#');
         fin.close();
 
+        std::stringstream sP(P);
         std::stringstream sO(O);
         std::stringstream sT(T);
         std::stringstream sA(A);
         std::stringstream sB(B);
         uint32_t o;
 
+        sP >> nPrimorialEndPrime;
+        
         sO >> base_offset;
 
         while (sT >> o)

@@ -34,8 +34,6 @@ namespace LLC
     uint64_t *g_nonce_meta[GPU_MAX] = {0};
     uint32_t *g_bit_array_sieve[GPU_MAX] = {0};
 
-    const uint8_t nPrimorialEndPrime = 8;
-
     uint64_t nBitArray_Stride;
     uint64_t nBitArray_StartIndex[GPU_MAX] = {0};
 
@@ -83,7 +81,7 @@ namespace LLC
         mpz_init_set_ui(zTwo, 2);
 
         double max_sieve = std::pow(2.0, 64);
-        for (uint8_t i = 1; i < nPrimorialEndPrime; ++i)
+        for (uint32_t i = 1; i < nPrimorialEndPrime; ++i)
         {
             mpz_mul_ui(zPrimorial, zPrimorial, primes[i]);
             max_sieve /= primes[i];

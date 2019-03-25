@@ -1301,8 +1301,6 @@ extern "C" void cuda_set_sieve(uint8_t thr_id,
     CHECK(cudaDeviceSynchronize());
 }
 
-static uint32_t sieve_index_prev = 0xFFFFFFFF;
-
 extern "C" bool cuda_primesieve(uint8_t thr_id,
                                 uint64_t base_offset,
                                 uint64_t primorial,
@@ -1337,10 +1335,6 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     //sieve_index += (uint32_t)curr_sieve * index_range;
 
     /* Calculate bit array size, sieve start bit, and base offset */
-
-    if(sieve_index_prev == sieve_index)
-        debug::error(FUNCTION, "duplicate sieve index");
-
 
 
     uint64_t primorial_start = (uint64_t)nBitArray_Size * (uint64_t)sieve_index;
@@ -1387,8 +1381,6 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     CHECK(stream_signal_event(thr_id, curr_sieve, 3, EVENT::COMPACT));
 
     debug::log(4, FUNCTION, (uint32_t)thr_id);
-
-    sieve_index_prev = sieve_index;
 
     return true;
 }

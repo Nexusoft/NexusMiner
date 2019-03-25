@@ -365,6 +365,7 @@ __device__ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
     if(Exp[i>>5] & (1 << (i & 31)))
       mulredc(X, X, A, N, d, t);
   }
+  
   redc(X, X, N, d, t);
 }
 
