@@ -16,15 +16,33 @@
 #define CUDA_STREAM_MAX 5
 #define CUDA_EVENT_MAX 5
 
-enum EVENT
+namespace EVENT
 {
-    CLEAR = 0,
-    SIEVE_A,
-    SIEVE_B,
-    COMPACT,
-    FERMAT,
-    MAX
-};
+    enum
+    {
+        CLEAR = 0,
+        SIEVE_A,
+        SIEVE_B,
+        COMPACT,
+        FERMAT,
+        MAX
+    };
+}
+
+namespace STREAM
+{
+    enum
+    {
+        CLEAR = 0,
+        SIEVE_A,
+        SIEVE_B,
+        COMPACT,
+        FERMAT,
+        MAX
+    };
+}
+
+
 
 extern cudaStream_t d_Streams[GPU_MAX][CUDA_STREAM_MAX];
 extern cudaEvent_t d_Events[GPU_MAX][FRAME_COUNT][CUDA_EVENT_MAX];

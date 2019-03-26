@@ -1347,38 +1347,38 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
     /* Clear the current working sieve and signal */
 
-    CHECK(stream_wait_event(thr_id, curr_sieve, 0, EVENT::COMPACT));
-    CHECK(stream_wait_event(thr_id, prev_test, 0, EVENT::FERMAT));
+    CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::COMPACT));
+    CHECK(stream_wait_event(thr_id, prev_test, STREAM::CLEAR, EVENT::FERMAT));
 
-    kernel_clear_launch(thr_id, 0, curr_sieve, nBitArray_Size);
-    CHECK(stream_signal_event(thr_id, curr_sieve, 0, EVENT::CLEAR));
+    kernel_clear_launch(thr_id, STREAM::CLEAR, curr_sieve, nBitArray_Size);
+    CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::CLEAR));
 
     /* Precompute offsets for small sieve */
-    kernelA0_launch(thr_id, 1, curr_sieve,
+    kernelA0_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
     nPrimorialEndPrime, nPrimeLimitA, base_offsetted);
 
-    CHECK(stream_wait_event(thr_id, curr_sieve, 1, EVENT::CLEAR));
+    CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::CLEAR));
 
     /* Launch small sieve, utilizing shared memory and signal */
-    comboA_launch(thr_id, 1, curr_sieve,
+    comboA_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
                   nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size);
 
-    CHECK(stream_wait_event(thr_id, curr_sieve, 2, EVENT::CLEAR));
+    CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::CLEAR));
 
     /* Launch large sieve, utilizing global memory and signal */
-    comboB_launch(thr_id, 2, base_offsetted, curr_sieve,
+    comboB_launch(thr_id, STREAM::SIEVE_B, base_offsetted, curr_sieve,
                   nPrimeLimitA, nPrimeLimitB, nBitArray_Size);
 
 
-    CHECK(streams_signal_events(thr_id, curr_sieve, 1, 2));
+    CHECK(streams_signal_events(thr_id, curr_sieve, STREAM::SIEVE_A, STREAM::SIEVE_B));
 
     /* Wait Stream 2, Events[0, 1] */
-    CHECK(stream_wait_events(thr_id, curr_sieve, 3, EVENT::SIEVE_A, EVENT::SIEVE_B));
+    CHECK(stream_wait_events(thr_id, curr_sieve, STREAM::COMPACT, EVENT::SIEVE_A, EVENT::SIEVE_B));
 
     /* Launch compaction and signal */
-    kernel_ccompact_launch(thr_id, 3, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start, nComboThreshold);
+    kernel_ccompact_launch(thr_id, STREAM::COMPACT, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start, nComboThreshold);
 
-    CHECK(stream_signal_event(thr_id, curr_sieve, 3, EVENT::COMPACT));
+    CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::COMPACT, EVENT::COMPACT));
 
     debug::log(4, FUNCTION, (uint32_t)thr_id);
 

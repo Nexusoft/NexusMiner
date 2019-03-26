@@ -27,6 +27,7 @@ cudaError_t d_result_event_prev[GPU_MAX][FRAME_COUNT];
 
 uint8_t nOffsetsT;
 __constant__ uint32_t c_offsetsT[32];
+
 extern "C" void cuda_set_test_offsets(uint32_t thr_id,
                                        uint32_t *OffsetsT, uint32_t T_count)
 {
@@ -54,274 +55,274 @@ extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id, uint32_t *limbs)
 
 extern "C" void cuda_set_quit(uint32_t quit)
 {
-       debug::log(4, FUNCTION, quit ? "true" : "false");
+    debug::log(4, FUNCTION, quit ? "true" : "false");
 
-       CHECK(cudaMemcpyToSymbol(c_quit, &quit,
-                                sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpyToSymbol(c_quit, &quit,
+                            sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
 
 }
 
 __device__ void assign(uint32_t *l, uint32_t *r)
 {
-  #pragma unroll
-  for(uint8_t i = 0; i < WORD_MAX; ++i)
-    l[i] = r[i];
+    #pragma unroll
+    for(uint8_t i = 0; i < WORD_MAX; ++i)
+        l[i] = r[i];
 }
 
 __device__ int inv2adic(uint32_t x)
 {
-  uint32_t a;
-  a = x;
-  x = (((x+2)&4)<<1)+x;
-  x *= 2 - a*x;
-  x *= 2 - a*x;
-  x *= 2 - a*x;
-  return -x;
+    uint32_t a;
+    a = x;
+    x = (((x+2)&4)<<1)+x;
+    x *= 2 - a*x;
+    x *= 2 - a*x;
+    x *= 2 - a*x;
+    return -x;
 }
 
 __device__ uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
 {
-  for(int8_t i = WORD_MAX-1; i >= 0; --i)
-  {
-    if(x[i] > y[i])
-      return 1;
+    for(int8_t i = WORD_MAX-1; i >= 0; --i)
+    {
+        if(x[i] > y[i])
+            return 1;
 
-    if(x[i] < y[i])
-      return 0;
-  }
-  return 1;
+        if(x[i] < y[i])
+            return 0;
+    }
+    return 1;
 }
 
 __device__ uint8_t sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
 {
-  uint32_t temp;
-  uint8_t c = 0;
+    uint32_t temp;
+    uint8_t c = 0;
 
-  #pragma unroll
-  for(uint8_t i = 0; i < WORD_MAX; ++i)
-  {
-    temp = x[i] - y[i] - c;
-    c = (temp > x[i]);
-    z[i] = temp;
-  }
-  return c;
+    #pragma unroll
+    for(uint8_t i = 0; i < WORD_MAX; ++i)
+    {
+        temp = x[i] - y[i] - c;
+        c = (temp > x[i]);
+        z[i] = temp;
+    }
+    return c;
 }
 
 __device__ void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
 {
-  uint32_t temp = x[0] - ui;
-  uint8_t c = temp > x[0];
-  z[0] = temp;
+    uint32_t temp = x[0] - ui;
+    uint8_t c = temp > x[0];
+    z[0] = temp;
 
-  #pragma unroll
-  for(uint8_t i = 1; i < WORD_MAX; ++i)
-  {
-    temp = x[i] - c;
-    c = (temp > x[i]);
-    z[i] = temp;
-  }
+    #pragma unroll
+    for(uint8_t i = 1; i < WORD_MAX; ++i)
+    {
+        temp = x[i] - c;
+        c = (temp > x[i]);
+        z[i] = temp;
+    }
 }
 
 __device__ void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
 {
-  uint32_t temp = x[0] + static_cast<uint32_t>(ui & 0xFFFFFFFF);
-  uint8_t c = temp < x[0];
-  z[0] = temp;
+    uint32_t temp = x[0] + static_cast<uint32_t>(ui & 0xFFFFFFFF);
+    uint8_t c = temp < x[0];
+    z[0] = temp;
 
-  temp = x[1] + static_cast<uint32_t>(ui >> 32) + c;
-  c = temp < x[1];
-  z[1] = temp;
+    temp = x[1] + static_cast<uint32_t>(ui >> 32) + c;
+    c = temp < x[1];
+    z[1] = temp;
 
-  #pragma unroll
-  for(uint8_t i = 2; i < WORD_MAX; ++i)
-  {
-    temp = x[i] + c;
-    c = (temp < x[i]);
-    z[i] = temp;
-  }
+    #pragma unroll
+    for(uint8_t i = 2; i < WORD_MAX; ++i)
+    {
+        temp = x[i] + c;
+        c = (temp < x[i]);
+        z[i] = temp;
+    }
 }
 
 __device__ uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
 {
-  uint64_t prod;
-  uint32_t c = 0;
+    uint64_t prod;
+    uint32_t c = 0;
 
-  #pragma unroll
-  for(uint8_t i = 0; i < WORD_MAX; ++i)
-  {
-    prod = static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y);
-    prod += c;
-    prod += z[i];
-    z[i] = prod;
-    c = prod >> 32;
-  }
+    #pragma unroll
+    for(uint8_t i = 0; i < WORD_MAX; ++i)
+    {
+        prod = static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y);
+        prod += c;
+        prod += z[i];
+        z[i] = prod;
+        c = prod >> 32;
+    }
 
-  return c;
+    return c;
 }
 
 __device__ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t d, uint32_t *t)
 {
-  uint32_t m;//, c;
-  //uint64_t temp;
-  uint8_t i, j;
-
-  #pragma unroll
-  for(i = 0; i < WORD_MAX + 2; ++i)
-    t[i] = 0;
-
-  for(i = 0; i < WORD_MAX; ++i)
-  {
-    //c = addmul_1(t, x, y[i]);
-    t[WORD_MAX] += addmul_1(t, x, y[i]);
-    //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
-    //t[WORD_MAX] = temp;
-    //t[WORD_MAX] += c;
-    //t[WORD_MAX + 1] = temp >> 32;
-
-    m = t[0]*d;
-
-    //c = addmul_1(t, n, m);
-    t[WORD_MAX] += addmul_1(t, n, m);
-    //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
-    //t[WORD_MAX] = temp;
-    //t[WORD_MAX] += c;
-    //t[WORD_MAX + 1] = temp >> 32;
+    uint32_t m;//, c;
+    //uint64_t temp;
+    uint8_t i, j;
 
     #pragma unroll
-    for(j = 0; j <= WORD_MAX; ++j)
-      t[j] = t[j+1];
-  }
-  if(cmp_ge_n(t, n))
-    sub_n(t, t, n);
+    for(i = 0; i < WORD_MAX + 2; ++i)
+        t[i] = 0;
 
-  #pragma unroll
-  for(i = 0; i < WORD_MAX; ++i)
-    z[i] = t[i];
+    for(i = 0; i < WORD_MAX; ++i)
+    {
+        //c = addmul_1(t, x, y[i]);
+        t[WORD_MAX] += addmul_1(t, x, y[i]);
+        //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
+        //t[WORD_MAX] = temp;
+        //t[WORD_MAX] += c;
+        //t[WORD_MAX + 1] = temp >> 32;
+
+        m = t[0]*d;
+
+        //c = addmul_1(t, n, m);
+        t[WORD_MAX] += addmul_1(t, n, m);
+        //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
+        //t[WORD_MAX] = temp;
+        //t[WORD_MAX] += c;
+        //t[WORD_MAX + 1] = temp >> 32;
+
+        #pragma unroll
+        for(j = 0; j <= WORD_MAX; ++j)
+            t[j] = t[j+1];
+    }
+    if(cmp_ge_n(t, n))
+        sub_n(t, t, n);
+
+    #pragma unroll
+    for(i = 0; i < WORD_MAX; ++i)
+        z[i] = t[i];
 }
 
 __device__ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
 {
-  uint32_t m;
-  uint8_t i, j;
+    uint32_t m;
+    uint8_t i, j;
 
-  #pragma unroll
-  for(i = 0; i < WORD_MAX; ++i)
-    t[i] = x[i];
-
-  t[WORD_MAX] = 0;
-
-  for(i = 0; i < WORD_MAX; ++i)
-  {
-    m = t[0]*d;
-    t[WORD_MAX] = addmul_1(t, n, m);
-
-    for(j = 0; j < WORD_MAX; ++j)
-      t[j] = t[j+1];
+    #pragma unroll
+    for(i = 0; i < WORD_MAX; ++i)
+        t[i] = x[i];
 
     t[WORD_MAX] = 0;
-  }
 
-  if(cmp_ge_n(t, n))
-    sub_n(t, t, n);
+    for(i = 0; i < WORD_MAX; ++i)
+    {
+        m = t[0]*d;
+        t[WORD_MAX] = addmul_1(t, n, m);
 
-  #pragma unroll
-  for(i = 0; i < WORD_MAX; ++i)
-    z[i] = t[i];
+        for(j = 0; j < WORD_MAX; ++j)
+            t[j] = t[j+1];
+
+        t[WORD_MAX] = 0;
+    }
+
+    if(cmp_ge_n(t, n))
+        sub_n(t, t, n);
+
+    #pragma unroll
+    for(i = 0; i < WORD_MAX; ++i)
+        z[i] = t[i];
 }
 
 __device__ uint16_t bit_count(uint32_t *x)
 {
-   uint16_t msb = 0; //most significant bit
+    uint16_t msb = 0; //most significant bit
 
-   uint16_t bits = WORD_MAX << 5;
-   uint16_t i;
+    uint16_t bits = WORD_MAX << 5;
+    uint16_t i;
 
-   #pragma unroll
-   for(i = 0; i < bits; ++i)
-   {
-     if(x[i>>5] & (1 << (i & 31)))
-       msb = i;
-   }
+    #pragma unroll
+    for(i = 0; i < bits; ++i)
+    {
+        if(x[i>>5] & (1 << (i & 31)))
+            msb = i;
+    }
 
-   return msb + 1; //any number will have at least 1-bit
+    return msb + 1; //any number will have at least 1-bit
 }
 
 __device__ void lshift(uint32_t *r, uint32_t *a, uint16_t shift)
 {
-  int8_t i;
+    int8_t i;
 
-  #pragma unroll
-  for(i = 0; i < WORD_MAX; ++i)
-    r[i] = 0;
+    #pragma unroll
+    for(i = 0; i < WORD_MAX; ++i)
+        r[i] = 0;
 
-  uint8_t k = shift >> 5;
-  shift = shift & 31;
+    uint8_t k = shift >> 5;
+    shift = shift & 31;
 
-  for(i = 0; i < WORD_MAX; ++i)
-  {
-    uint8_t ik = i + k;
-    uint8_t ik1 = ik + 1;
+    for(i = 0; i < WORD_MAX; ++i)
+    {
+        uint8_t ik = i + k;
+        uint8_t ik1 = ik + 1;
 
-    if(ik1 < WORD_MAX && shift != 0)
-      r[ik1] |= (a[i] >> (32-shift));
-    if(ik < WORD_MAX)
-      r[ik] |= (a[i] << shift);
-  }
+        if(ik1 < WORD_MAX && shift != 0)
+            r[ik1] |= (a[i] >> (32-shift));
+        if(ik < WORD_MAX)
+            r[ik] |= (a[i] << shift);
+    }
 }
 
 __device__ void rshift(uint32_t *r, uint32_t *a, uint16_t shift)
 {
-  int8_t i;
+    int8_t i;
 
-  #pragma unroll
-  for(i = 0; i < WORD_MAX; ++i)
-    r[i] = 0;
+    #pragma unroll
+    for(i = 0; i < WORD_MAX; ++i)
+        r[i] = 0;
 
-  uint8_t k = shift >> 5;
-  shift = shift & 31;
+    uint8_t k = shift >> 5;
+    shift = shift & 31;
 
-  for(i = 0; i < WORD_MAX; ++i)
-  {
-    int8_t ik = i - k;
-    int8_t ik1 = ik - 1;
+    for(i = 0; i < WORD_MAX; ++i)
+    {
+        int8_t ik = i - k;
+        int8_t ik1 = ik - 1;
 
-    if(ik1 >= 0 && shift != 0)
-      r[ik1] |= (a[i] << (32-shift));
-    if(ik >= 0)
-      r[ik] |= (a[i] >> shift);
-  }
+        if(ik1 >= 0 && shift != 0)
+            r[ik1] |= (a[i] << (32-shift));
+        if(ik >= 0)
+            r[ik] |= (a[i] >> shift);
+    }
 }
 
 __device__ void lshift1(uint32_t *r, uint32_t *a)
 {
-  uint32_t t = a[0];
-  uint32_t t2;
-  uint8_t i = 1;
+    uint32_t t = a[0];
+    uint32_t t2;
+    uint8_t i = 1;
 
-  r[0] = t << 1;
-  for(; i < WORD_MAX; ++i)
-  {
-    t2 = a[i];
-    r[i] = (t2 << 1) | (t >> 31);
-    t = t2;
-  }
+    r[0] = t << 1;
+    for(; i < WORD_MAX; ++i)
+    {
+        t2 = a[i];
+        r[i] = (t2 << 1) | (t >> 31);
+        t = t2;
+    }
 }
 
 __device__ void rshift1(uint32_t *r, uint32_t *a)
 {
-  uint8_t n = WORD_MAX-1;
-  int8_t i = n-1;
+    uint8_t n = WORD_MAX-1;
+    int8_t i = n-1;
 
-  uint32_t t = a[n];
-  uint32_t t2;
+    uint32_t t = a[n];
+    uint32_t t2;
 
-  r[n] = t >> 1;
-  for(; i >= 0; --i)
-  {
-    t2 = a[i];
-    r[i] = (t2 >> 1) | (t << 31);
-    t = t2;
-  }
+    r[n] = t >> 1;
+    for(; i >= 0; --i)
+    {
+        t2 = a[i];
+        r[i] = (t2 >> 1) | (t << 31);
+        t = t2;
+    }
 }
 
 /* Calculate ABar and BBar for Montgomery Modular Multiplication. */
@@ -338,54 +339,54 @@ __device__ void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
     {
         rshift1(t, t);
         if(cmp_ge_n(a, t))
-          sub_n(a, a, t);
+            sub_n(a, a, t);
     }
 
     lshift1(b, a);     //calculate 2R mod N;
     if(cmp_ge_n(b, n))
-      sub_n(b, b, n);
+        sub_n(b, b, n);
 }
 
 
 /* Calculate X = 2^Exp Mod N (Fermat test) */
 __device__ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
 {
-  uint32_t A[WORD_MAX];
-  uint32_t d;
-  uint32_t t[WORD_MAX + 1];
+    uint32_t A[WORD_MAX];
+    uint32_t d;
+    uint32_t t[WORD_MAX + 1];
 
-  d = inv2adic(N[0]);
+    d = inv2adic(N[0]);
 
-  calcBar(X, A, N, t);
+    calcBar(X, A, N, t);
 
-  for(int16_t i = bit_count(Exp)-1; i >= 0; --i)
-  {
-    mulredc(X, X, X, N, d, t);
+    for(int16_t i = bit_count(Exp)-1; i >= 0; --i)
+    {
+        mulredc(X, X, X, N, d, t);
 
-    if(Exp[i>>5] & (1 << (i & 31)))
-      mulredc(X, X, A, N, d, t);
-  }
-  
-  redc(X, X, N, d, t);
+        if(Exp[i>>5] & (1 << (i & 31)))
+            mulredc(X, X, A, N, d, t);
+    }
+
+    redc(X, X, N, d, t);
 }
 
 
 /* Test if number p passes Fermat Primality Test base 2. */
 __device__ bool fermat_prime(uint32_t *p)
 {
-  uint32_t e[WORD_MAX];
-  uint32_t r[WORD_MAX];
+    uint32_t e[WORD_MAX];
+    uint32_t r[WORD_MAX];
 
-  sub_ui(e, p, 1);
-  pow2m(r, e, p);
+    sub_ui(e, p, 1);
+    pow2m(r, e, p);
 
-  uint32_t result = r[0] - 1;
+    uint32_t result = r[0] - 1;
 
-  #pragma unroll
-  for(uint8_t i = 1; i < WORD_MAX; ++i)
-    result |= r[i];
+    #pragma unroll
+    for(uint8_t i = 1; i < WORD_MAX; ++i)
+        result |= r[i];
 
-  return (result == 0);
+    return (result == 0);
 }
 
 /* Add a Result to the buffer. */
@@ -638,7 +639,6 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
 
     uint8_t nComboThreshold = 8;
 
-    uint8_t str_id = 4;
 
     debug::log(4, FUNCTION, thr_id);
 
@@ -647,12 +647,12 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     d_result_event_prev[thr_id][curr_test] = cudaErrorNotReady;
 
     /*Make sure compaction event is finished before testing. */
-    CHECK(stream_wait_event(thr_id, curr_sieve, str_id, EVENT::COMPACT));
+    CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
 
     //printf("fermat_launcher<<<%d, %d>>>\n", 1, 1);
     for(uint8_t o = 0; o < nComboThreshold; ++o)
     {
-        fermat_launcher<<<1, 4, 0, d_Streams[thr_id][str_id]>>>(
+        fermat_launcher<<<1, 4, 0, d_Streams[thr_id][STREAM::FERMAT]>>>(
                  frameResources[thr_id].d_nonce_offsets[curr_test],
                  frameResources[thr_id].d_nonce_meta[curr_test],
                  frameResources[thr_id].d_nonce_count[curr_test],
@@ -667,32 +667,30 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     /* Copy the result count. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_count[curr_test],
                           frameResources[thr_id].d_result_count[curr_test],
-                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][str_id]));
+                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the result offsets. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_offsets[curr_test],
                           frameResources[thr_id].d_result_offsets[curr_test],
-                          OFFSETS_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][str_id]));
+                          OFFSETS_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* copy the result meta. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_meta[curr_test],
                           frameResources[thr_id].d_result_meta[curr_test],
-                          OFFSETS_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][str_id]));
+                          OFFSETS_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the amount of primes checked. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_checked[curr_test],
                           frameResources[thr_id].d_primes_checked[curr_test],
-                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][str_id]));
+                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the amount of primes found. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_found[curr_test],
                           frameResources[thr_id].d_primes_found[curr_test],
-                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][str_id]));
+                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Signal the Fermat event. */
-    CHECK(stream_signal_event(thr_id, curr_test, str_id, EVENT::FERMAT));
-
-
+    CHECK(stream_signal_event(thr_id, curr_test, STREAM::FERMAT, EVENT::FERMAT));
 
 }
 
@@ -756,6 +754,4 @@ extern "C" void cuda_init_counts(uint32_t thr_id)
                          sizeof(uint32_t) * BUFFER_COUNT,
                          cudaMemcpyHostToDevice));
     }
-
-
 }
