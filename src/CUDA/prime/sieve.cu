@@ -13,6 +13,8 @@
 #include <CUDA/include/frame_resources.h>
 #include <CUDA/include/streams_events.h>
 
+#include <CUDA/include/constants.cuh>
+#include <CUDA/include/unroller.cuh>
 #include <Util/include/debug.h>
 
 #include <cuda.h>
@@ -42,11 +44,6 @@ uint32_t mod_p_small(uint64_t a, uint32_t p, uint64_t recip)
 }
 
 
-__constant__ uint64_t c_zTempVar[17];
-__constant__ uint32_t c_offsetsA[32];
-__constant__ uint32_t c_offsetsB[32];
-__constant__ uint16_t c_primes[4096];
-
 uint4 *d_primesInverseInvk[GPU_MAX];
 uint32_t *d_primes[GPU_MAX];
 uint32_t *d_base_remainders[GPU_MAX];
@@ -66,7 +63,10 @@ extern "C" void cuda_set_sieve_offsets(uint8_t thr_id,
     nOffsetsB = B_count;
 
     if(nOffsetsA > 16 || nOffsetsB > 16)
-        exit(1);
+    {
+        debug::error(FUNCTION, "Cannot have more than 16 offsets");
+        return;
+    }
 
     CHECK(cudaMemcpyToSymbol(c_offsetsA, OffsetsA,
         nOffsetsA*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
@@ -243,10 +243,9 @@ __device__ uint32_t mpi_mod_int(uint64_t *A, uint32_t B, uint64_t recip)
     return (uint32_t)y;
 }
 
-__global__ void base_remainders_kernel(uint4 *primes, uint32_t *base_remainders,
-uint32_t nPrimorialEndPrime, uint32_t nPrimeLimit)
+__global__ void base_remainders_kernel(uint4 *primes, uint32_t *base_remainders, uint32_t nPrimeLimit)
 {
-    uint32_t i = nPrimorialEndPrime + blockDim.x * blockIdx.x + threadIdx.x;
+    uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < nPrimeLimit)
     {
         uint4 tmp = primes[i];
@@ -255,11 +254,9 @@ uint32_t nPrimorialEndPrime, uint32_t nPrimeLimit)
     }
 }
 
-extern "C" void cuda_base_remainders(uint8_t thr_id,
-                                     uint32_t nPrimorialEndPrime,
-                                     uint32_t nPrimeLimit)
+extern "C" void cuda_base_remainders(uint8_t thr_id, uint32_t nPrimeLimit)
 {
-    int nThreads = nPrimeLimit - nPrimorialEndPrime;
+    int nThreads = nPrimeLimit;
     int nThreadsPerBlock = 256;
     int nBlocks = (nThreads + nThreadsPerBlock-1) / nThreadsPerBlock;
 
@@ -268,29 +265,8 @@ extern "C" void cuda_base_remainders(uint8_t thr_id,
 
     base_remainders_kernel<<<grid, block, 0>>>(d_primesInverseInvk[thr_id],
                                                d_base_remainders[thr_id],
-                                               nPrimorialEndPrime,
                                                nPrimeLimit);
 }
-
-template<int Begin, int End, int Step = 1>
-struct Unroller
-{
-    template<typename Action>
-    __device__ __forceinline__ static void step(Action& action)
-    {
-        action(Begin);
-        Unroller<Begin+Step, End, Step>::step(action);
-    }
-};
-
-template<int End, int Step>
-struct Unroller<End, End, Step>
-{
-    template<typename Action>
-    __device__ __forceinline__ static void step(Action& action)
-    {
-    }
-};
 
 
 template<uint8_t nOffsets>

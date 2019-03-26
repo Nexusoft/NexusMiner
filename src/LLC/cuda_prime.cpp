@@ -196,7 +196,7 @@ namespace LLC
 
         /* Compute base remainders. */
         cuda_set_zTempVar(nID, (const uint64_t*)zTempVar[0]._mp_d);
-        cuda_base_remainders(nID, nPrimorialEndPrime, nSievePrimes);
+        cuda_base_remainders(nID, nSievePrimes);
 
 
         /* Compute first sieving element. */

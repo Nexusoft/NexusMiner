@@ -9,8 +9,7 @@
 #define NEXUS_CUDA_FERMAT_H
 
 #include <cstdint>
-
-#define WORD_MAX 32
+#include <CUDA/include/macro.h>
 
 extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id,
                                            uint32_t *limbs);
