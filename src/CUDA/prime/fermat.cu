@@ -11,6 +11,8 @@
 
 #include <CUDA/include/streams_events.h>
 
+#include <CUDA/include/constants.cuh>
+
 #include <Util/include/debug.h>
 
 #include <stdio.h>
@@ -18,15 +20,14 @@
 
 extern struct FrameResource frameResources[GPU_MAX];
 
-__constant__ uint32_t c_zFirstSieveElement[WORD_MAX];
-__constant__ uint32_t c_quit;
+
 
 cudaError_t d_result_event_curr[GPU_MAX][FRAME_COUNT];
 cudaError_t d_result_event_prev[GPU_MAX][FRAME_COUNT];
 
 
 uint8_t nOffsetsT;
-__constant__ uint32_t c_offsetsT[32];
+
 extern "C" void cuda_set_test_offsets(uint32_t thr_id,
                                        uint32_t *OffsetsT, uint32_t T_count)
 {
@@ -34,12 +35,11 @@ extern "C" void cuda_set_test_offsets(uint32_t thr_id,
 
     debug::log(4, FUNCTION, thr_id, "    ", nOffsetsT);
 
-    if(nOffsetsT > 32)
-        debug::error(FUNCTION, "test offsets cannot exceed 32");
+    if(nOffsetsT > 16)
+        debug::error(FUNCTION, "test offsets cannot exceed 16");
 
     CHECK(cudaMemcpyToSymbol(c_offsetsT, OffsetsT,
         nOffsetsT*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
-
 
 }
 
@@ -365,7 +365,7 @@ __device__ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
     if(Exp[i>>5] & (1 << (i & 31)))
       mulredc(X, X, A, N, d, t);
   }
-  
+
   redc(X, X, N, d, t);
 }
 
@@ -452,30 +452,36 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
         /* Add to the first sieving element to compute prime to test. */
         add_ui(p, c_zFirstSieveElement, primorial_offset);
 
-        /* Check if prime passes fermat test base 2. */
-        if(fermat_prime(p))
+        if(p[0] % 5 != 0)
         {
-            atomicAdd(g_primes_found, 1);
-            ++chain_length;
-            prime_gap = 0;
 
-            /* If the chain length is satisfied, add it to result buffer. */
-            if(chain_length == nTestLevels)
+
+            /* Check if prime passes fermat test base 2. */
+            if(fermat_prime(p))
             {
-                /* Encode the nonce meta data. */
-                nonce_meta = 0;
-                nonce_meta |= ((uint64_t)combo << 32);
-                nonce_meta |= ((uint64_t)chain_offset_beg << 24);
-                nonce_meta |= ((uint64_t)chain_offset_end << 16);
-                nonce_meta |= ((uint64_t)prime_gap << 8);
-                nonce_meta |= (uint64_t)chain_length;
+                atomicAdd(g_primes_found, 1);
+                ++chain_length;
+                prime_gap = 0;
 
-                /* Add to result buffer. */
-                add_result(g_result_offsets, g_result_meta, g_result_count,
-                           nonce_offset, nonce_meta, OFFSETS_MAX);
+                /* If the chain length is satisfied, add it to result buffer. */
+                if(chain_length == nTestLevels)
+                {
+                    /* Encode the nonce meta data. */
+                    nonce_meta = 0;
+                    nonce_meta |= ((uint64_t)combo << 32);
+                    nonce_meta |= ((uint64_t)chain_offset_beg << 24);
+                    nonce_meta |= ((uint64_t)chain_offset_end << 16);
+                    nonce_meta |= ((uint64_t)prime_gap << 8);
+                    nonce_meta |= (uint64_t)chain_length;
 
-                //printf("%d: add_result: %016llX\n", o, nonce_offset);
+                    /* Add to result buffer. */
+                    add_result(g_result_offsets, g_result_meta, g_result_count,
+                               nonce_offset, nonce_meta, OFFSETS_MAX);
+
+                    //printf("%d: add_result: %016llX\n", o, nonce_offset);
+                }
             }
+            atomicAdd(g_primes_checked, 1);
         }
         /* Otherwise, if chain length is not satisfied, keep testing. */
         if(chain_length < nTestLevels)
@@ -521,7 +527,7 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
                 }
             }
         }
-        atomicAdd(g_primes_checked, 1);
+        //atomicAdd(g_primes_checked, 1);
     }
 }
 

@@ -1,10 +1,14 @@
+/*******************************************************************************************
+
+ Nexus Earth 2018
+
+ [Scale Indefinitely] BlackJack. http://www.opensource.org/licenses/mit-license.php
+
+*******************************************************************************************/
 #ifndef NEXUS_CUDA_UTIL_H
 #define NEXUS_CUDA_UTIL_H
 
-#ifndef GPU_MAX
-#define GPU_MAX 8
-#endif
-
+#include <CUDA/include/macro.h>
 #include <Util/include/debug.h>
 #include <cstdint>
 #include <string>
