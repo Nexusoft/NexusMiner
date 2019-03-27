@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <CUDA/include/macro.h>
 
+extern "C" void cuda_set_primorial(uint8_t thr_id, uint64_t nPrimorial);
+
 extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id,
                                            uint32_t *limbs);
 
@@ -21,7 +23,6 @@ extern "C" void cuda_set_quit(uint32_t quit);
 extern "C" void cuda_fermat(uint32_t thr_id,
                             uint32_t sieve_index,
                             uint32_t test_index,
-                            uint64_t nPrimorial,
                             uint32_t nTestLevels);
 
 extern "C" void cuda_results(uint32_t thr_id,

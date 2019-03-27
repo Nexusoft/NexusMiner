@@ -111,7 +111,7 @@ namespace LLC
             if (nSieveIndex % nIterations == 0 && nSieveIndex > 0)
             {
                 /* Test results. */
-                cuda_fermat(nID, nSieveIndex, nTestIndex, nPrimorial, nTestLevel);
+                cuda_fermat(nID, nSieveIndex, nTestIndex, nTestLevel);
                 ++nTestIndex;
             }
 
@@ -235,6 +235,9 @@ namespace LLC
         cuda_init_primes(nID, primes, primesInverseInvk, nSievePrimes,
         nSieveBits, 32,
         nPrimorialEndPrime, primeLimitA);
+
+        /* Set the primorial for this GPU device. */
+        cuda_set_primorial(nID, nPrimorial);
 
         /* Load the sieve offsets configuration on the GPU device. */
         cuda_set_sieve_offsets(nID, &offsetsA[0], (uint8_t)offsetsA.size(),

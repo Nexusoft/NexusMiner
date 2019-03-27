@@ -18,6 +18,7 @@ __constant__ uint32_t c_offsetsB[16];
 __constant__ uint32_t c_offsetsT[16];
 __constant__ uint16_t c_primes[4096];
 
+__constant__ uint64_t c_primorial;
 __constant__ uint32_t c_zFirstSieveElement[WORD_MAX];
 __constant__ uint32_t c_quit;
 

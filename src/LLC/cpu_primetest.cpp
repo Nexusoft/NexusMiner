@@ -227,8 +227,12 @@ namespace LLC
                     chain_length = (uint32_t)(nPrimeDifficulty2 / 1e7);
                 }
 
-                /* Compute the weight for WPS. */
-                nWeight += nPrimeDifficulty * 50;
+                if(chain_length >= 3)
+                {
+                    /* Compute the weight for WPS. */
+                    nWeight += nPrimeDifficulty * 50;
+                }
+
 
                 if (nPrimeDifficulty > nLargest)
                     nLargest = nPrimeDifficulty;

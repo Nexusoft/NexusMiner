@@ -274,10 +274,9 @@ __global__ void primesieve_kernelA0(uint64_t origin,
                                     uint4 *primes,
                                     uint32_t *prime_remainders,
                                     uint32_t *base_remainders,
-                                    uint16_t nPrimorialEndPrime,
                                     uint16_t nPrimeLimit)
 {
-    uint16_t i = nPrimorialEndPrime + blockDim.x * blockIdx.x + threadIdx.x;
+    uint16_t i = blockDim.x * blockIdx.x + threadIdx.x;
 
     if(i < nPrimeLimit)
     {
@@ -810,7 +809,7 @@ __global__ void compact_offsets(uint64_t *d_nonce_offsets, uint64_t *d_nonce_met
 
 template<uint8_t nOffsets>
 __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta, uint32_t *d_nonce_count,
-                              uint32_t *d_bit_array_sieve, uint32_t nBitArray_Size, uint64_t sieve_start_index, uint8_t threshold)
+                              uint32_t *d_bit_array_sieve, uint32_t *prime_remainders, uint32_t nBitArray_Size, uint64_t sieve_start_index, uint64_t base_offset, uint8_t threshold)
 {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -830,6 +829,23 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
         {
             /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
             uint16_t bit = !((d_bit_array_sieve[idx >> 5]) & (1 << (idx & 31)));
+
+            /* Check for small divisors. */
+            for(uint8_t i = 1; i < 12; ++i)
+            {
+                uint32_t pr0 = (prime_remainders[(i << 4) + o] + base_offset) % c_primes[i];
+                uint32_t pr1 = (c_primorial * nonce_offset) % c_primes[i];
+
+                uint32_t pr = pr0 + pr1;
+                if(pr >= c_primes[i])
+                    pr -= c_primes[i];
+
+                //if(i == 1 && pr == 0)
+                //    printf("p=%d pr0=%d pr1=%d pr=%d\n", c_primes[i], pr0, pr1, pr);
+
+                bit &= !(pr == 0);
+            }
+
             combo |= bit << o;
 
             d_bit_array_sieve += nBitArray_Size >> 5;
@@ -846,17 +862,14 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
 
             /* Shift the combo bits to the most significant bit. */
             uint32_t tmp = combo << (32 - nOffsets);
+            combo = tmp;
 
             /* Count the leading zero bits to compute next offset. */
             uint8_t next = __clz(tmp);
             uint8_t prev = next;
 
-            /* Set the beginning index. */
-            uint8_t beg = next;
-
             /* Clear the high order bit for next round offset calculation. */
             tmp ^= 0x80000000 >> next;
-            combo = tmp;
 
 
             /* Count the first index */
@@ -877,7 +890,6 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
                 /* Check the prime gap, resetting count and begin index if violated. */
                 if(c_offsetsA[next] - c_offsetsA[prev] > 12)
                 {
-                    beg = next;
                     count = 0;
                     combo = tmp;
                 }
@@ -900,6 +912,9 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
 
                 if(i < OFFSETS_MAX)
                 {
+                    uint8_t beg = __clz(combo);
+                    combo ^= 0x80000000 >> beg;
+
                     /* Encode the beginning nonce meta data for testing. */
                     uint64_t nonce_meta = 0;
                     nonce_meta |= ((uint64_t)combo << 32);
@@ -923,18 +938,16 @@ origin, \
 d_primesInverseInvk[thr_id], \
 frameResources[thr_id].d_prime_remainders[frame_index], \
 d_base_remainders[thr_id], \
-nPrimorialEndPrime, \
 nPrimeLimitA); \
 
 void kernelA0_launch(uint8_t thr_id,
                      uint8_t str_id,
                      uint8_t frame_index,
-                     uint16_t nPrimorialEndPrime,
                      uint16_t nPrimeLimitA,
                      uint64_t origin)
 {
     dim3 block(32);
-    dim3 grid((nPrimeLimitA - nPrimorialEndPrime + block.x - 1) / block.x);
+    dim3 grid((nPrimeLimitA + block.x - 1) / block.x);
 
     switch(nOffsetsA)
     {
@@ -1203,12 +1216,14 @@ void kernel_compact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, u
     frameResources[thr_id].d_nonce_meta[curr_test], \
     frameResources[thr_id].d_nonce_count[curr_test], \
     frameResources[thr_id].d_bit_array_sieve[curr_sieve], \
+    frameResources[thr_id].d_prime_remainders[curr_sieve], \
     nBitArray_Size, \
     primorial_start, \
+    base_offset, \
     threshold)
 
 void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, uint8_t curr_test,
-                            uint8_t next_test, uint32_t nBitArray_Size, uint64_t primorial_start, uint8_t threshold)
+                            uint8_t next_test, uint32_t nBitArray_Size, uint64_t primorial_start, uint64_t base_offset, uint8_t threshold)
 {
     dim3 block(64);
     dim3 grid((nBitArray_Size + block.x - 1) / block.x);
@@ -1320,18 +1335,17 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
     //CHECK(cudaDeviceSynchronize());
 
-
-    /* Clear the current working sieve and signal */
-
+    /* Wait for testing and compaction to finish. */
     CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::COMPACT));
     CHECK(stream_wait_event(thr_id, prev_test, STREAM::CLEAR, EVENT::FERMAT));
 
+    /* Clear the current working sieve and signal */
     kernel_clear_launch(thr_id, STREAM::CLEAR, curr_sieve, nBitArray_Size);
     CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::CLEAR));
 
-    /* Precompute offsets for small sieve */
+    /* Precompute prime remainders. */
     kernelA0_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
-    nPrimorialEndPrime, nPrimeLimitA, base_offsetted);
+      nPrimeLimitA, base_offsetted);
 
     CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::CLEAR));
 
@@ -1352,7 +1366,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     CHECK(stream_wait_events(thr_id, curr_sieve, STREAM::COMPACT, EVENT::SIEVE_A, EVENT::SIEVE_B));
 
     /* Launch compaction and signal */
-    kernel_ccompact_launch(thr_id, STREAM::COMPACT, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start, nComboThreshold);
+    kernel_ccompact_launch(thr_id, STREAM::COMPACT, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start, base_offset, nComboThreshold);
 
     CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::COMPACT, EVENT::COMPACT));
 
