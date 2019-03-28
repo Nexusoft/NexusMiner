@@ -8,9 +8,9 @@
 #ifndef NEXUS_CUDA_FRAME_RESOURCES_H
 #define NEXUS_CUDA_FRAME_RESOURCES_H
 
+#include <CUDA/include/macro.h>
 #include <cstdint>
 
-#define OFFSETS_MAX (1 << 18)
 #define FRAME_COUNT 3
 #define BUFFER_COUNT 2
 
@@ -48,5 +48,8 @@ struct FrameResource
   uint16_t  *d_bucket_away[FRAME_COUNT]; //sieves away from next offset
 
 };
+
+/* Global instance. */
+extern struct FrameResource frameResources[GPU_MAX];
 
 #endif

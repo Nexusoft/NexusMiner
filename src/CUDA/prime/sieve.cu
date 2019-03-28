@@ -8,6 +8,7 @@
 
 *******************************************************************************************/
 
+#include <CUDA/include/macro.h>
 #include <CUDA/include/sieve.h>
 #include <CUDA/include/util.h>
 #include <CUDA/include/frame_resources.h>
@@ -15,6 +16,7 @@
 
 #include <CUDA/include/constants.cuh>
 #include <CUDA/include/unroller.cuh>
+
 #include <Util/include/debug.h>
 
 #include <cuda.h>
@@ -44,15 +46,13 @@ uint32_t mod_p_small(uint64_t a, uint32_t p, uint64_t recip)
 }
 
 
+struct FrameResource frameResources[GPU_MAX];
 uint4 *d_primesInverseInvk[GPU_MAX];
 uint32_t *d_primes[GPU_MAX];
 uint32_t *d_base_remainders[GPU_MAX];
 uint16_t *d_blockoffset_mod_p[GPU_MAX];
 uint8_t nOffsetsA;
 uint8_t nOffsetsB;
-
-
-struct FrameResource frameResources[GPU_MAX];
 
 
 extern "C" void cuda_set_sieve_offsets(uint8_t thr_id,
@@ -830,22 +830,6 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
             /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
             uint16_t bit = !((d_bit_array_sieve[idx >> 5]) & (1 << (idx & 31)));
 
-            /* Check for small divisors. */
-            for(uint8_t i = 1; i < 12; ++i)
-            {
-                uint32_t pr0 = (prime_remainders[(i << 4) + o] + base_offset) % c_primes[i];
-                uint32_t pr1 = (c_primorial * nonce_offset) % c_primes[i];
-
-                uint32_t pr = pr0 + pr1;
-                if(pr >= c_primes[i])
-                    pr -= c_primes[i];
-
-                //if(i == 1 && pr == 0)
-                //    printf("p=%d pr0=%d pr1=%d pr=%d\n", c_primes[i], pr0, pr1, pr);
-
-                bit &= !(pr == 0);
-            }
-
             combo |= bit << o;
 
             d_bit_array_sieve += nBitArray_Size >> 5;
@@ -870,7 +854,6 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
 
             /* Clear the high order bit for next round offset calculation. */
             tmp ^= 0x80000000 >> next;
-
 
             /* Count the first index */
             count = 1;

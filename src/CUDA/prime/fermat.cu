@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <algorithm>
 
-extern struct FrameResource frameResources[GPU_MAX];
+
 
 
 
@@ -67,14 +67,16 @@ extern "C" void cuda_set_quit(uint32_t quit)
 
 }
 
-__device__ void assign(uint32_t *l, uint32_t *r)
+__device__ __forceinline__
+void assign(uint32_t *l, uint32_t *r)
 {
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
         l[i] = r[i];
 }
 
-__device__ int inv2adic(uint32_t x)
+__device__ __forceinline__
+int inv2adic(uint32_t x)
 {
     uint32_t a;
     a = x;
@@ -85,7 +87,8 @@ __device__ int inv2adic(uint32_t x)
     return -x;
 }
 
-__device__ uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
+__device__ __forceinline__
+uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
 {
     for(int8_t i = WORD_MAX-1; i >= 0; --i)
     {
@@ -98,7 +101,8 @@ __device__ uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
     return 1;
 }
 
-__device__ uint8_t sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
+__device__ __forceinline__
+uint8_t sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
 {
     uint32_t temp;
     uint8_t c = 0;
@@ -113,7 +117,8 @@ __device__ uint8_t sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
     return c;
 }
 
-__device__ void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
+__device__ __forceinline__
+void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
 {
     uint32_t temp = x[0] - ui;
     uint8_t c = temp > x[0];
@@ -128,7 +133,8 @@ __device__ void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
     }
 }
 
-__device__ void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
+__device__ __forceinline__
+void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
 {
     uint32_t temp = x[0] + static_cast<uint32_t>(ui & 0xFFFFFFFF);
     uint8_t c = temp < x[0];
@@ -147,7 +153,8 @@ __device__ void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
     }
 }
 
-__device__ uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
+__device__ __forceinline__
+uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
 {
     uint64_t prod;
     uint32_t c = 0;
@@ -165,7 +172,8 @@ __device__ uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
     return c;
 }
 
-__device__ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t d, uint32_t *t)
+__device__ __forceinline__
+void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t d, uint32_t *t)
 {
     uint32_t m;//, c;
     //uint64_t temp;
@@ -205,7 +213,8 @@ __device__ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, cons
         z[i] = t[i];
 }
 
-__device__ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
+__device__ __forceinline__
+void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
 {
     uint32_t m;
     uint8_t i, j;
@@ -235,7 +244,8 @@ __device__ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, ui
         z[i] = t[i];
 }
 
-__device__ uint16_t bit_count(uint32_t *x)
+__device__ __forceinline__
+uint16_t bit_count(uint32_t *x)
 {
     uint16_t msb = 0; //most significant bit
 
@@ -252,7 +262,8 @@ __device__ uint16_t bit_count(uint32_t *x)
     return msb + 1; //any number will have at least 1-bit
 }
 
-__device__ void lshift(uint32_t *r, uint32_t *a, uint16_t shift)
+__device__ void __forceinline__
+lshift(uint32_t *r, uint32_t *a, uint16_t shift)
 {
     int8_t i;
 
@@ -275,7 +286,8 @@ __device__ void lshift(uint32_t *r, uint32_t *a, uint16_t shift)
     }
 }
 
-__device__ void rshift(uint32_t *r, uint32_t *a, uint16_t shift)
+__device__ __forceinline__
+void rshift(uint32_t *r, uint32_t *a, uint16_t shift)
 {
     int8_t i;
 
@@ -298,7 +310,8 @@ __device__ void rshift(uint32_t *r, uint32_t *a, uint16_t shift)
     }
 }
 
-__device__ void lshift1(uint32_t *r, uint32_t *a)
+__device__ __forceinline__
+void lshift1(uint32_t *r, uint32_t *a)
 {
     uint32_t t = a[0];
     uint32_t t2;
@@ -313,7 +326,8 @@ __device__ void lshift1(uint32_t *r, uint32_t *a)
     }
 }
 
-__device__ void rshift1(uint32_t *r, uint32_t *a)
+__device__ __forceinline__
+void rshift1(uint32_t *r, uint32_t *a)
 {
     uint8_t n = WORD_MAX-1;
     int8_t i = n-1;
@@ -331,7 +345,8 @@ __device__ void rshift1(uint32_t *r, uint32_t *a)
 }
 
 /* Calculate ABar and BBar for Montgomery Modular Multiplication. */
-__device__ void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
+__device__ __forceinline__
+void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
 {
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
@@ -354,13 +369,13 @@ __device__ void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
 
 
 /* Calculate X = 2^Exp Mod N (Fermat test) */
-__device__ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
+__device__ __forceinline__
+void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
 {
     uint32_t A[WORD_MAX];
-    uint32_t d;
     uint32_t t[WORD_MAX + 1];
 
-    d = inv2adic(N[0]);
+    uint32_t d = inv2adic(N[0]);
 
     calcBar(X, A, N, t);
 
@@ -375,15 +390,49 @@ __device__ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
     redc(X, X, N, d, t);
 }
 
+/* Calculate X = 2^(N-1) Mod N (Fermat test, assume no overflow) */
+__device__ __forceinline__
+void pow2m(uint32_t *X, uint32_t *N)
+{
+    uint32_t A[WORD_MAX];
+    uint32_t t[WORD_MAX + 1];
+
+    uint32_t d = inv2adic(N[0]);
+
+    uint64_t N0 = ((((uint64_t)N[1]) << 32) | (uint64_t)N[0]) - 1;
+
+    calcBar(X, A, N, t);
+
+    for(int16_t i = bit_count(N)-1; i >= 64; --i)
+    {
+        mulredc(X, X, X, N, d, t);
+
+        if(N[i>>5] & (1 << (i & 31)))
+            mulredc(X, X, A, N, d, t);
+    }
+
+    for(int16_t i = 63; i >= 0; --i)
+    {
+        mulredc(X, X, X, N, d, t);
+
+        if(N0 & ((uint64_t)1 << (i & 63)))
+            mulredc(X, X, A, N, d, t);
+    }
+
+    redc(X, X, N, d, t);
+}
+
 
 /* Test if number p passes Fermat Primality Test base 2. */
-__device__ bool fermat_prime(uint32_t *p)
+__device__ __forceinline__
+bool fermat_prime(uint32_t *p)
 {
-    uint32_t e[WORD_MAX];
+    //uint32_t e[WORD_MAX];
     uint32_t r[WORD_MAX];
 
-    sub_ui(e, p, 1);
-    pow2m(r, e, p);
+    //sub_ui(e, p, 1);
+    //pow2m(r, e, p);
+    pow2m(r, p);
 
     uint32_t result = r[0] - 1;
 
@@ -395,7 +444,8 @@ __device__ bool fermat_prime(uint32_t *p)
 }
 
 /* Add a Result to the buffer. */
-__device__ void add_result(uint64_t *nonce_offsets, uint64_t *nonce_meta, uint32_t *nonce_count,
+__device__ __forceinline__
+void add_result(uint64_t *nonce_offsets, uint64_t *nonce_meta, uint32_t *nonce_count,
                            uint64_t &offset, uint64_t &meta, uint32_t max)
 {
     uint32_t i = atomicAdd(nonce_count, 1);
@@ -478,6 +528,8 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
                 /* Add to result buffer. */
                 add_result(g_result_offsets, g_result_meta, g_result_count,
                            nonce_offset, nonce_meta, OFFSETS_MAX);
+
+                //printf("%d: add_result: %016llX\n", o, nonce_offset);
             }
         }
 
@@ -580,7 +632,6 @@ __global__ void fermat_launcher(uint64_t *g_nonce_offsets,
         uint32_t segment_in_count = (total_count + 5) >> 2;
         uint32_t segment_offset = threadIdx.x * segment_in_count;
         int32_t diff = total_count - segment_offset;
-
         if(diff < 0)
             diff = 0;
 
@@ -613,21 +664,6 @@ __global__ void fermat_launcher(uint64_t *g_nonce_offsets,
             cudaStreamDestroy(stream);
         }
     }
-
-    //if(threadIdx.x == 0)
-    //{
-    //    total_count = 0;
-    //    total_count = out_nonce_count[0];
-
-    //    out_nonce_count[0] = total_count;
-
-        //printf("%d: result count: %03d \n", o, *g_result_count);
-
-        //for(int j = 0; j < *g_result_count; ++j)
-        //    printf("%016llX ", g_result_offsets[j]);
-        //printf("\n");
-    //}
-
 }
 
 
@@ -651,7 +687,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     /*Make sure compaction event is finished before testing. */
     CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
 
-    //printf("fermat_launcher<<<%d, %d>>>\n", 1, 1);
+
     for(uint8_t o = 0; o < nComboThreshold; ++o)
     {
         fermat_launcher<<<1, 4, 0, d_Streams[thr_id][STREAM::FERMAT]>>>(

@@ -92,7 +92,7 @@ namespace prime
         std::string strOffsets;
         std::string P, O, T, A, B;
         std::getline(fin, P, '#');
-        
+
         std::getline(fin, O);
         std::getline(fin, O, '#');
 
@@ -141,7 +141,7 @@ namespace prime
         strOffsets = std::to_string(offsetsTest[0]);
         for (int i = 1; i < offsetsTest.size(); ++i)
             strOffsets += ", " + std::to_string(offsetsTest[i]);
-        debug::log(0, "offsetsTest = ", strOffsets);
+        debug::log(0, "offsetsT = ", strOffsets);
 
         strOffsets = std::to_string(offsetsA[0]);
         for (int i = 1; i < offsetsA.size(); ++i)
