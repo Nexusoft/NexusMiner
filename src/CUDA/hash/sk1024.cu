@@ -2,9 +2,10 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-#include <CUDA/include/constants.cuh>
+
 #include <CUDA/include/util.h>
-#include <CUDA/include/helper.h>
+#include <CUDA/include/constants.cuh>
+#include <CUDA/include/hash_helper.cuh>
 
 #include <LLC/hash/SK.h>
 

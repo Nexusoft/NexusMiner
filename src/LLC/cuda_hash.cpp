@@ -12,7 +12,6 @@
 ____________________________________________________________________________________________*/
 
 #include <CUDA/include/util.h>
-//#include <CUDA/include/frame_resources.h>
 #include <CUDA/include/sk1024.h>
 
 #include <LLC/include/global.h>

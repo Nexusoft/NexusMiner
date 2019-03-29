@@ -40,14 +40,14 @@ OBJS :=	build/main.o \
 
 CUDA_SRCS := $(wildcard src/CUDA/*.cu)
 CUDA_OBJS := build/CUDA_prime_sieve.o \
-	         build/CUDA_prime_fermat.o \
+	         build/CUDA_prime_test.o \
 			 build/CUDA_hash_sk1024.o \
 	         build/CUDA_util.o \
-			 build/CUDA_streams_events.o
+			 build/CUDA_streams_events.o \
 
 CUDA_LINK_OBJ := build/CUDA_cuLink.o
 
-CUDA_PATH := /usr/local/cuda-10.0
+CUDA_PATH := /usr/local/cuda-10.1
 NVCC := $(CUDA_PATH)/bin/nvcc
 CXX := g++
 CC := gcc
@@ -106,7 +106,7 @@ build/Util_%.o:	src/Util/%.cpp
 build/CUDA_prime_sieve.o:	src/CUDA/prime/sieve.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
 
-build/CUDA_prime_fermat.o:	src/CUDA/prime/fermat.cu
+build/CUDA_prime_test.o:	src/CUDA/prime/test.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=128 -rdc=true -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_hash_sk1024.o:	src/CUDA/hash/sk1024.cu

@@ -127,6 +127,8 @@ namespace LLC
             uint32_t chain_offset_end = (meta >> 16) & 0xFF;
             uint32_t chain_length = meta & 0xFF;
 
+
+
             //debug::log(0, "beg: ", chain_offset_beg, " end: ", chain_offset_end, " len: ", chain_length);
 
             /* Compute the base offset of the nonce */
@@ -134,6 +136,57 @@ namespace LLC
             mpz_add(zBaseOffsetted, zFirstSieveElement, zTempVar);
 
             uint8_t nPrimeGap = 0;
+
+
+            uint32_t prev = offsetsTest[chain_offset_end];
+            uint32_t next;
+
+
+
+            /* Start the number from the last known prime in the chain. */
+            mpz_add_ui(zTempVar, zBaseOffsetted, prev);
+
+
+            /* Loop through the remaining offset positions and test. */
+            for(++chain_offset_end; chain_offset_end < offsetsTest.size(); ++chain_offset_end)
+            {
+
+                next = offsetsTest[chain_offset_end];
+
+                /* Compute prime gap between offsets. */
+                uint8_t nGap = next - prev;
+                nPrimeGap += nGap;
+
+                /* Make sure prime gap isn't violated. */
+                if(nPrimeGap > 12)
+                    break;
+
+                mpz_add_ui(zTempVar, zTempVar, nGap);
+
+                if(combo & 0x80000000 >> chain_offset_end)
+                {
+                    if(mpz_probab_prime_p(zTempVar, 1) > 0)
+                    {
+                        mpz_sub_ui(zN, zTempVar, 1);
+                        mpz_powm(zResidue, zTwo, zN, zTempVar);
+                        if (mpz_cmp_ui(zResidue, 1) == 0)
+                        {
+                            ++PrimesFound;
+                            ++chain_length;
+
+                            nPrimeGap = 0;
+                        }
+                    }
+                    ++PrimesChecked;
+                    ++Tests_CPU;
+                }
+
+
+
+                /* Compute the next offsets to test. */
+                prev = next;
+
+            }
 
             chain_offset_beg = offsetsTest[chain_offset_beg];
             chain_offset_end = offsetsTest[chain_offset_end] + 2;
@@ -144,6 +197,7 @@ namespace LLC
             //    continue;
 
             /* Search for primes after small cluster */
+            /*
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_end);
             while (nPrimeGap <= 12)
             {
@@ -169,12 +223,15 @@ namespace LLC
                 chain_offset_end += 2;
                 nPrimeGap += 2;
             }
+            */
 
 
-            nPrimeGap = 0;
+            //nPrimeGap = 0;
 
 
             /* Search for primes before small cluster */
+
+            /*
             uint32_t begin_offset = 0;
             uint32_t begin_next = 2;
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
@@ -202,9 +259,11 @@ namespace LLC
                 nPrimeGap += 2;
             }
 
+            */
+
             /* Translate nonce offset of begin prime to global offset. */
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
-            mpz_sub_ui(zTempVar, zTempVar, begin_offset);
+            //mpz_sub_ui(zTempVar, zTempVar, begin_offset);
             mpz_sub(zTempVar, zTempVar, zPrimeOrigin);
             nNonce = mpz_get_ui(zTempVar);
 

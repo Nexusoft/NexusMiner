@@ -12,7 +12,7 @@
 ____________________________________________________________________________________________*/
 
 #include <CUDA/include/sieve.h>
-#include <CUDA/include/fermat.h>
+#include <CUDA/include/test.h>
 #include <CUDA/include/util.h>
 #include <CUDA/include/frame_resources.h>
 
