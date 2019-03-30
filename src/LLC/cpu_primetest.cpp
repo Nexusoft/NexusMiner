@@ -20,6 +20,7 @@ ________________________________________________________________________________
 #include <Util/include/debug.h>
 #include <Util/include/print_colors.h>
 #include <Util/include/prime_config.h>
+#include <Util/include/bitmanip.h>
 
 #include <iomanip>
 
@@ -57,6 +58,8 @@ namespace LLC
     PrimeTestCPU::~PrimeTestCPU()
     {
     }
+
+
 
     bool PrimeTestCPU::Work()
     {
