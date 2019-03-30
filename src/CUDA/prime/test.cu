@@ -19,7 +19,6 @@
 
 #include <stdio.h>
 #include <algorithm>
-#include <iomanip>
 
 
 cudaError_t d_result_event_curr[GPU_MAX][FRAME_COUNT];
@@ -331,18 +330,17 @@ extern "C" void cuda_results(uint32_t thr_id,
                              uint32_t *primes_checked,
                              uint32_t *primes_found)
 {
+    /* Clear the stats. */
     *result_count = 0;
-    *primes_checked = 0;
-    *primes_found = 0;
+    for(uint16_t i = 0; i < 16; ++i)
+    {
+        primes_checked[i] = 0;
+        primes_found[i] = 0;
+    }
+
 
     uint32_t curr_test = test_index % FRAME_COUNT;
 
-    uint32_t checked[16];
-    uint32_t found[16];
-
-    static double minRatios[16] = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0 };
-    static double maxRatios[16] = {0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0   };
-    double ratio = 0.0;
 
     d_result_event_prev[thr_id][curr_test] = d_result_event_curr[thr_id][curr_test];
     d_result_event_curr[thr_id][curr_test] = cudaEventQuery(d_Events[thr_id][curr_test][EVENT::FERMAT]);
@@ -356,26 +354,14 @@ extern "C" void cuda_results(uint32_t thr_id,
         *frameResources[thr_id].h_result_count[curr_test] = 0;
 
 
-        debug::log(0, "[PRIMES] Offset Ratios: ");
         for(uint32_t i = 0; i < vOffsetsT.size(); ++i)
         {
-            checked[i] =  frameResources[thr_id].h_primes_checked[curr_test][i];
-            found[i]   = frameResources[thr_id].h_primes_found[curr_test][i];
+            primes_checked[i] =  frameResources[thr_id].h_primes_checked[curr_test][i];
+            primes_found[i]   = frameResources[thr_id].h_primes_found[curr_test][i];
 
             frameResources[thr_id].h_primes_checked[curr_test][i] = 0;
             frameResources[thr_id].h_primes_found[curr_test][i] = 0;
-
-            *primes_checked += checked[i];
-            *primes_found += found[i];
-
-            ratio = (double)(100 * found[i]) / checked[i];
-
-            minRatios[i] = std::min(minRatios[i], ratio);
-            maxRatios[i] = std::max(maxRatios[i], ratio);
-
-            debug::log(0, std::setw(2), std::right, i, ": ", std::setw(2), std::right, vOffsetsT[i], " = ", std::setprecision(3), std::fixed, "[", minRatios[i], "-", maxRatios[i],  "]", "%  ");
         }
-
 
 
         if(*result_count == 0)

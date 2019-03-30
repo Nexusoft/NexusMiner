@@ -40,6 +40,7 @@ OBJS :=	build/main.o \
 
 CUDA_SRCS := $(wildcard src/CUDA/*.cu)
 CUDA_OBJS := build/CUDA_prime_sieve.o \
+			 build/CUDA_prime_combo_sieve.o \
 	         build/CUDA_prime_test.o \
 			 build/CUDA_hash_sk1024.o \
 	         build/CUDA_util.o \
@@ -105,6 +106,9 @@ build/Util_%.o:	src/Util/%.cpp
 	$(CXX) -o $@ -c $(CXXFLAGS) $< $(INCLUDES)
 
 build/CUDA_prime_sieve.o:	src/CUDA/prime/sieve.cu
+	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
+
+build/CUDA_prime_combo_sieve.o:	src/CUDA/prime/combo_sieve.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_prime_test.o:	src/CUDA/prime/test.cu

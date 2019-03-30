@@ -7,11 +7,9 @@
  [Scale Indefinitely] BlackJack. http://www.opensource.org/licenses/mit-license.php
 
 *******************************************************************************************/
-#pragma once
-#ifndef NEXUS_CUDA_COMBO_SIEVE_CUH
-#define NEXUS_CUDA_COMBO_SIEVE_CUH
 
 #include <CUDA/include/macro.h>
+#include <CUDA/include/combo_sieve.h>
 #include <CUDA/include/frame_resources.h>
 #include <CUDA/include/sieve_resources.h>
 #include <CUDA/include/prime_helper.cuh>
@@ -435,5 +433,3 @@ void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, 
 
     debug::log(4, FUNCTION, (uint32_t)thr_id);
 }
-
-#endif

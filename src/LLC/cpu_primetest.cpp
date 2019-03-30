@@ -142,7 +142,6 @@ namespace LLC
             uint32_t next;
 
 
-
             /* Start the number from the last known prime in the chain. */
             mpz_add_ui(zTempVar, zBaseOffsetted, prev);
 
@@ -171,13 +170,13 @@ namespace LLC
                         mpz_powm(zResidue, zTwo, zN, zTempVar);
                         if (mpz_cmp_ui(zResidue, 1) == 0)
                         {
-                            ++PrimesFound;
+                            //++PrimesFound;
                             ++chain_length;
 
                             nPrimeGap = 0;
                         }
                     }
-                    ++PrimesChecked;
+                    //++PrimesChecked;
                     ++Tests_CPU;
                 }
 
@@ -210,13 +209,13 @@ namespace LLC
                     mpz_powm(zResidue, zTwo, zN, zTempVar);
                     if (mpz_cmp_ui(zResidue, 1) == 0)
                     {
-                        ++PrimesFound;
+                        //++PrimesFound;
                         ++chain_length;
 
                         nPrimeGap = 0;
                     }
                 }
-                ++PrimesChecked;
+                //++PrimesChecked;
                 ++Tests_CPU;
 
                 mpz_add_ui(zTempVar, zTempVar, 2);

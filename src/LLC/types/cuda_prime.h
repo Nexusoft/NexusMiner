@@ -105,8 +105,8 @@ namespace LLC
         mpz_t zTempVar;
 
         uint32_t nCount;
-        uint32_t nPrimesChecked;
-        uint32_t nPrimesFound;
+        uint32_t nPrimesChecked[16];
+        uint32_t nPrimesFound[16];
         uint32_t nSieveIndex;
         uint32_t nTestIndex;
 

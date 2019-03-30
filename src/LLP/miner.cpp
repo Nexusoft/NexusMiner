@@ -16,9 +16,11 @@ ________________________________________________________________________________
 #include <TAO/Ledger/include/difficulty.h>
 #include <Util/include/convert.h>
 #include <Util/include/print_colors.h>
+#include <Util/include/prime_config.h>
 #include <functional>
 #include <numeric>
 #include <iomanip>
+#include <cmath>
 
 const char *ChannelName[3] =
 {
@@ -554,8 +556,14 @@ namespace LLP
             LLC::Tests_CPU = 0;
             LLC::Tests_GPU = 0;
 
-            uint64_t checked = LLC::PrimesChecked.load();
-            uint64_t found = LLC::PrimesFound.load();
+            uint64_t checked = 0;
+            uint64_t found = 0;
+
+            for(uint8_t i = 0; i < vOffsets.size(); ++i)
+            {
+                checked += LLC::PrimesChecked[i].load();
+                found   += LLC::PrimesFound[i].load();
+            }
 
             double pratio = 0.0;
 
@@ -611,6 +619,21 @@ namespace LLP
             debug::log(0, "[PRIMES] ", "Sieved ", std::fixed, std::setprecision(2), (double)gibps / (1 << 30), " GiB/s | Tested ",
                 tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), pratio, " %");
             debug::log(0, "");
+
+
+            debug::log(1, "[PRIMES] Offset Ratios: ");
+
+            for(uint16_t i = 0; i < vOffsets.size(); ++i)
+            {
+                double ratio = (double)(100 * LLC::PrimesFound[i].load()) / LLC::PrimesChecked[i].load();
+
+                LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
+                LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
+
+                debug::log(1, std::setw(2), std::right, i, ": ",
+                              std::setw(2), std::right, vOffsets[i], " = ",
+                              std::setprecision(3), std::fixed, "[", LLC::minRatios[i], "-", LLC::maxRatios[i],  "]", "%  ");
+            }
 
 
             /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */

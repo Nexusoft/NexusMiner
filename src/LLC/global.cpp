@@ -51,8 +51,11 @@ namespace LLC
     std::atomic<uint64_t> SievedBits;
     std::atomic<uint64_t> Tests_CPU;
     std::atomic<uint64_t> Tests_GPU;
-    std::atomic<uint64_t> PrimesFound;
-    std::atomic<uint64_t> PrimesChecked;
+    std::atomic<uint64_t> PrimesFound[16];
+    std::atomic<uint64_t> PrimesChecked[16];
+    double minRatios[16] = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0 };
+    double maxRatios[16] = {0.0};
+
     std::atomic<uint64_t> nWeight;
     std::deque<double> vWPSValues;
 

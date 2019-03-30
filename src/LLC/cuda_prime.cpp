@@ -56,8 +56,6 @@ namespace LLC
     , zPrimorialMod()
     , zTempVar()
     , nCount(0)
-    , nPrimesChecked(0)
-    , nPrimesFound(0)
     , nSieveIndex(0)
     , nTestIndex(0)
     , nIterations(0)
@@ -65,6 +63,11 @@ namespace LLC
     , nSieveBits(0)
     , nTestLevel(0)
     {
+        for(uint8_t i = 0; i < 16; ++i)
+        {
+            nPrimesChecked[i] = 0;
+            nPrimesFound[i] = 0;
+        }
     }
 
     PrimeCUDA::~PrimeCUDA()
@@ -130,14 +133,17 @@ namespace LLC
         if(nTestIndex)
         {
             cuda_results(nID, nTestIndex-1, nonce_offsets, nonce_meta,
-                &nCount, &nPrimesChecked, &nPrimesFound);
+                &nCount, nPrimesChecked, nPrimesFound);
         }
 
 
         /* Total up global stats from each device. */
-        PrimesChecked += nPrimesChecked;
-        Tests_GPU += nPrimesChecked;
-        PrimesFound += nPrimesFound;
+        for(uint8_t i = 0; i < 16; ++i)
+        {
+            PrimesChecked[i] += nPrimesChecked[i];
+            Tests_GPU += nPrimesChecked[i];
+            PrimesFound[i] += nPrimesFound[i];
+        }
 
         /* Check for early out. */
         if(fReset.load())
@@ -176,10 +182,13 @@ namespace LLC
 
         /* Initialize the stats for this CPU. */
         nCount = 0;
-        nPrimesChecked = 0;
-        nPrimesFound = 0;
         nSieveIndex = 0;
         nTestIndex = 0;
+        for(uint8_t i = 0; i < 16; ++i)
+        {
+            nPrimesChecked[i] = 0;
+            nPrimesFound[i] = 0;
+        }
 
         /* Compute non-colliding origins for each GPU within 2^64 search space */
         //uint64_t range = ~(0) / nPrimorial / GPU_MAX;

@@ -15,7 +15,7 @@
 #include <CUDA/include/sieve_resources.h>
 #include <CUDA/include/streams_events.h>
 
-#include <CUDA/include/combo_sieve.cuh>
+#include <CUDA/include/combo_sieve.h>
 
 #include <CUDA/include/constants.h>
 #include <CUDA/include/unroller.cuh>

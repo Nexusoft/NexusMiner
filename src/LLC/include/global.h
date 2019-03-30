@@ -55,8 +55,11 @@ namespace LLC
     extern std::atomic<uint64_t> SievedBits;
     extern std::atomic<uint64_t> Tests_CPU;
     extern std::atomic<uint64_t> Tests_GPU;
-    extern std::atomic<uint64_t> PrimesFound;
-    extern std::atomic<uint64_t> PrimesChecked;
+    extern std::atomic<uint64_t> PrimesFound[16];
+    extern std::atomic<uint64_t> PrimesChecked[16];
+    extern double minRatios[16];
+    extern double maxRatios[16];
+
     extern std::atomic<uint64_t> nWeight;
     extern std::deque<double> vWPSValues;
 
