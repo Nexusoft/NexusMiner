@@ -138,7 +138,7 @@ namespace LLC
             uint8_t nPrimeGap = 0;
 
 
-            uint32_t prev = vOffsetsT[chain_offset_end];
+            uint32_t prev = vOffsets[chain_offset_end];
             uint32_t next;
 
 
@@ -148,10 +148,10 @@ namespace LLC
 
 
             /* Loop through the remaining offset positions and test. */
-            for(++chain_offset_end; chain_offset_end < vOffsetsT.size(); ++chain_offset_end)
+            for(++chain_offset_end; chain_offset_end < vOffsets.size(); ++chain_offset_end)
             {
 
-                next = vOffsetsT[chain_offset_end];
+                next = vOffsets[chain_offset_end];
 
                 /* Compute prime gap between offsets. */
                 uint8_t nGap = next - prev;

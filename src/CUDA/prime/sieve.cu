@@ -37,13 +37,15 @@ uint32_t nOffsetsB;
 
 
 extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
-                                         const std::vector<uint32_t> &offsetsA,
-                                         const std::vector<uint32_t> &offsetsB,
-                                         const std::vector<uint32_t> &offsetsT)
+                                         const std::vector<uint32_t> &offsets,
+                                         const std::vector<uint32_t> &indicesA,
+                                         const std::vector<uint32_t> &indicesB,
+                                         const std::vector<uint32_t> &indicesT)
 {
-    nOffsetsA = offsetsA.size();
-    nOffsetsB = offsetsB.size();
-    uint32_t nOffsetsT = offsetsT.size();
+    nOffsetsA = indicesA.size();
+    nOffsetsB = indicesB.size();
+    uint32_t nOffsetsT = indicesT.size();
+    uint32_t nOffsets = offsets.size();
 
     if(nOffsetsA > 16 || nOffsetsB > 16 || nOffsetsT > 16)
     {
@@ -51,13 +53,16 @@ extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
         return;
     }
 
-    CHECK(cudaMemcpyToSymbol(c_offsetsA, offsetsA.data(),
+    CHECK(cudaMemcpyToSymbol(c_offsets, offsets.data(),
+        nOffsets*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
+
+    CHECK(cudaMemcpyToSymbol(c_iA, indicesA.data(),
         nOffsetsA*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
 
-    CHECK(cudaMemcpyToSymbol(c_offsetsB, offsetsB.data(),
+    CHECK(cudaMemcpyToSymbol(c_iB, indicesB.data(),
         nOffsetsB*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
 
-    CHECK(cudaMemcpyToSymbol(c_offsetsT, offsetsT.data(),
+    CHECK(cudaMemcpyToSymbol(c_iT, indicesT.data(),
         nOffsetsT*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
 
 }
@@ -83,7 +88,7 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
     uint32_t sharedSizeBits = sharedSizeKB * 1024 * 8;
     uint32_t allocSize = ((nBitArray_Size * 16  + sharedSizeBits - 1) / sharedSizeBits) * sharedSizeBits;
     uint32_t bitarray_size = (allocSize+31)/32 * sizeof(uint32_t);
-    uint32_t remainder_size = nPrimeLimit * 16 * sizeof(uint32_t);
+    uint32_t remainder_size = 2 * nPrimeLimitA * 16 * sizeof(uint32_t);
 
     /* Allocate memory for the primes, inverses, and reciprocals that are used
        as the basis for prime sieve computation */
@@ -233,12 +238,12 @@ extern "C" void cuda_base_remainders(uint8_t thr_id, uint32_t nPrimeLimit)
 }
 
 
-template<uint8_t nOffsets>
 __global__ void primesieve_kernelA0(uint64_t origin,
                                     uint4 *primes,
                                     uint32_t *prime_remainders,
                                     uint32_t *base_remainders,
-                                    uint16_t nPrimeLimit)
+                                    uint16_t nPrimeLimit,
+                                    uint8_t nOffsets)
 {
     uint16_t i = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -247,10 +252,31 @@ __global__ void primesieve_kernelA0(uint64_t origin,
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
-        #pragma unroll nOffsets
         for(uint8_t o = 0; o < nOffsets; ++o)
         {
-            tmp.z = mod_p_small(origin + base_remainders[i] + c_offsetsA[o], tmp.x, recip);
+            tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
+            prime_remainders[(i << 4) + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+        }
+    }
+}
+
+__global__ void primesieve_kernelB0(uint64_t origin,
+                                    uint4 *primes,
+                                    uint32_t *prime_remainders,
+                                    uint32_t *base_remainders,
+                                    uint16_t nPrimeLimit,
+                                    uint8_t nOffsets)
+{
+    uint16_t i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if(i < nPrimeLimit)
+    {
+        uint4 tmp = primes[i];
+        uint64_t recip = make_uint64_t(tmp.z, tmp.w);
+
+        for(uint8_t o = 0; o < nOffsets; ++o)
+        {
+            tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iB[o]], tmp.x, recip);
             prime_remainders[(i << 4) + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
         }
     }
@@ -521,7 +547,7 @@ __global__ void bucketinit_kernel(uint64_t origin,
         //compute offsets
         for(uint32_t j = 0; j < n_offsets; ++j)
         {
-            tmp.z = mod_p_small(origin + base_remainders[idx] + c_offsetsA[j], tmp.x, recip);
+            tmp.z = mod_p_small(origin + base_remainders[idx] + c_offsets[c_iA[j]], tmp.x, recip);
             tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
             bucket_o[(idx << 4) + j] =    tmp.w & bit_array_mask;
@@ -576,14 +602,14 @@ __global__ void primesieve_kernelB(uint64_t origin,
 {
     uint32_t position = blockDim.x * blockIdx.x + threadIdx.x;
     uint32_t i = nPrimorialEndPrime + (position >> 3);
-    uint32_t o = position & 0x7;
+    uint32_t o = position & 7;
 
     if(i < nPrimeLimit && o < nOffsets)
     {
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
-        tmp.z = mod_p_small(origin + base_remainders[i] + c_offsetsB[o], tmp.x, recip);
+        tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
@@ -620,15 +646,6 @@ __global__ void compact_offsets(uint64_t *d_nonce_offsets, uint64_t *d_nonce_met
 }
 
 
-
-
-#define KERNEL_A0_LAUNCH(X) primesieve_kernelA0<X><<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
-origin, \
-d_primesInverseInvk[thr_id], \
-frameResources[thr_id].d_prime_remainders[frame_index], \
-d_base_remainders[thr_id], \
-nPrimeLimitA); \
-
 void kernelA0_launch(uint8_t thr_id,
                      uint8_t str_id,
                      uint8_t frame_index,
@@ -638,24 +655,31 @@ void kernelA0_launch(uint8_t thr_id,
     dim3 block(32);
     dim3 grid((nPrimeLimitA + block.x - 1) / block.x);
 
-    switch(nOffsetsA)
-    {
-        case 1:  KERNEL_A0_LAUNCH(1);  break;
-        case 2:  KERNEL_A0_LAUNCH(2);  break;
-        case 3:  KERNEL_A0_LAUNCH(3);  break;
-        case 4:  KERNEL_A0_LAUNCH(4);  break;
-        case 5:  KERNEL_A0_LAUNCH(5);  break;
-        case 6:  KERNEL_A0_LAUNCH(6);  break;
-        case 7:  KERNEL_A0_LAUNCH(7);  break;
-        case 8:  KERNEL_A0_LAUNCH(8);  break;
-        case 9:  KERNEL_A0_LAUNCH(9);  break;
-        case 10: KERNEL_A0_LAUNCH(10); break;
-        case 11: KERNEL_A0_LAUNCH(11); break;
-        case 12: KERNEL_A0_LAUNCH(12); break;
-        case 13: KERNEL_A0_LAUNCH(13); break;
-        case 14: KERNEL_A0_LAUNCH(14); break;
-        case 15: KERNEL_A0_LAUNCH(15); break;
-    }
+    primesieve_kernelA0<<<grid, block, 0, d_Streams[thr_id][str_id]>>>(
+        origin,
+        d_primesInverseInvk[thr_id],
+        frameResources[thr_id].d_prime_remainders[frame_index],
+        d_base_remainders[thr_id],
+        nPrimeLimitA,
+        nOffsetsA );
+}
+
+void kernelB0_launch(uint8_t thr_id,
+                     uint8_t str_id,
+                     uint8_t frame_index,
+                     uint16_t nPrimeLimitA,
+                     uint64_t origin)
+{
+    dim3 block(32);
+    dim3 grid((nPrimeLimitA + block.x - 1) / block.x);
+
+    primesieve_kernelB0<<<grid, block, 0, d_Streams[thr_id][str_id]>>>(
+        origin,
+        d_primesInverseInvk[thr_id],
+        &frameResources[thr_id].d_prime_remainders[frame_index][nPrimeLimitA],
+        d_base_remainders[thr_id],
+        nPrimeLimitA,
+        nOffsetsB );
 }
 
 #define KERNEL_A_LAUNCH(X) primesieve_kernelA_1024<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\

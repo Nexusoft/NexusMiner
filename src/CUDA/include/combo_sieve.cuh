@@ -166,7 +166,7 @@ __global__ void combosieve_kernelB(uint64_t origin,
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
-        tmp.z = mod_p_small(origin + base_remainders[i] + c_offsetsB[o], tmp.x, recip);
+        tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iB[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
@@ -240,7 +240,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
                     break;
 
                 /* Check the prime gap, resetting count and begin index if violated. */
-                if(c_offsetsT[next] - c_offsetsT[prev] > 12)
+                if(c_offsets[c_iT[next]] - c_offsets[c_iT[prev]] > 12)
                 {
                     count = 0;
                     combo = tmp;

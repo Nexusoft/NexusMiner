@@ -92,7 +92,7 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
         /* Compute the primorial offset from the primorial and
          * offset pattern (i.e 510510*n + [0,4,6,10] ) */
         uint64_t primorial_offset = c_primorial * nonce_offset;
-        primorial_offset += c_offsetsT[chain_offset_end];
+        primorial_offset += c_offsets[c_iT[chain_offset_end]];
 
         /* Add to the first sieving element to compute prime to test. */
         add_ui(p, c_zFirstSieveElement, primorial_offset);
@@ -147,7 +147,7 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
                 && chain_offset_beg <= nTestOffsets - nTestLevels)
                 {
                     /* Calculate prime gap to next offset from last prime. */
-                    prime_gap += c_offsetsT[chain_offset_next] - c_offsetsT[chain_offset_end];
+                    prime_gap += c_offsets[c_iT[chain_offset_next]] - c_offsets[c_iT[chain_offset_end]];
                     chain_offset_end = chain_offset_next;
 
                     if(prime_gap <= 12)
@@ -356,7 +356,7 @@ extern "C" void cuda_results(uint32_t thr_id,
         *frameResources[thr_id].h_result_count[curr_test] = 0;
 
 
-        debug::log(0, "[PRIME] Offset Ratios: ");
+        debug::log(0, "[PRIMES] Offset Ratios: ");
         for(uint32_t i = 0; i < vOffsetsT.size(); ++i)
         {
             checked[i] =  frameResources[thr_id].h_primes_checked[curr_test][i];

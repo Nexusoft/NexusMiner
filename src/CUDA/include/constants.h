@@ -14,9 +14,10 @@
 
 //PRIME/////////////////////////////////////////////////////////////////////////
 extern __constant__ uint64_t c_zTempVar[17];
-extern __constant__ uint32_t c_offsetsA[16];
-extern __constant__ uint32_t c_offsetsB[16];
-extern __constant__ uint32_t c_offsetsT[16];
+extern __constant__ uint32_t c_offsets[16];
+extern __constant__ uint32_t c_iA[16];
+extern __constant__ uint32_t c_iB[16];
+extern __constant__ uint32_t c_iT[16];
 extern __constant__ uint16_t c_primes[4096];
 
 extern __constant__ uint64_t c_primorial;

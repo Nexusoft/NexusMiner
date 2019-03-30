@@ -88,7 +88,9 @@ int main(int argc, char **argv)
     {
         /* Load in GPU config files for prime mining. */
         prime::load_config(nPrimeGPU);
-        prime::load_offsets();
+
+        if(!prime::load_offsets())
+            return 0;
 
         /* Initialize primes used for prime mining. */
         LLC::InitializePrimes();

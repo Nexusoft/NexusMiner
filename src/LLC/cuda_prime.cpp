@@ -240,7 +240,7 @@ namespace LLC
         cuda_set_primorial(nID, nPrimorial);
 
         /* Load the sieve offsets configuration on the GPU device. */
-        cuda_set_offset_patterns(nID, vOffsetsA, vOffsetsB, vOffsetsT);
+        cuda_set_offset_patterns(nID, vOffsets, vOffsetsA, vOffsetsB, vOffsetsT);
 
         /* Allocate memory for offsets testing meta and bit array sieve. */
         g_nonce_offsets[nID] =   (uint64_t*)malloc(OFFSETS_MAX * sizeof(uint64_t));

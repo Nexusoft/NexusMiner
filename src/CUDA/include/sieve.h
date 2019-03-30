@@ -46,8 +46,9 @@ extern "C" void cuda_set_sieve(uint8_t thr_id,
                                uint8_t bit_array_size_log2);
 
 extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
-                                         const std::vector<uint32_t> &offsetsA,
-                                         const std::vector<uint32_t> &offsetsB,
-                                         const std::vector<uint32_t> &offsetsT);
+                                         const std::vector<uint32_t> &offsets,
+                                         const std::vector<uint32_t> &indicesA,
+                                         const std::vector<uint32_t> &indicesB,
+                                         const std::vector<uint32_t> &indicesT);
 
 #endif
