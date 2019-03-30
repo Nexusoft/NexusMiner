@@ -33,6 +33,4 @@ extern "C" void cuda_results(uint32_t thr_id,
                              uint32_t *primes_checked,
                              uint32_t *primes_found);
 
- extern "C" void cuda_set_test_offsets(uint32_t thr_id, uint32_t *OffsetsT, uint32_t T_count);
-
 #endif

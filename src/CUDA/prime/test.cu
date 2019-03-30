@@ -12,41 +12,24 @@
 
 #include <CUDA/include/streams_events.h>
 
-#include <CUDA/include/constants.cuh>
+#include <CUDA/include/constants.h>
 
 #include <Util/include/debug.h>
+#include <Util/include/prime_config.h>
 
 #include <stdio.h>
 #include <algorithm>
+#include <iomanip>
 
 
 cudaError_t d_result_event_curr[GPU_MAX][FRAME_COUNT];
 cudaError_t d_result_event_prev[GPU_MAX][FRAME_COUNT];
-
-
-uint8_t nOffsetsT;
 
 extern "C" void cuda_set_primorial(uint8_t thr_id, uint64_t nPrimorial)
 {
     CHECK(cudaMemcpyToSymbol(c_primorial, &nPrimorial,
         sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
 }
-
-extern "C" void cuda_set_test_offsets(uint32_t thr_id,
-                                       uint32_t *OffsetsT, uint32_t T_count)
-{
-    nOffsetsT = T_count;
-
-    debug::log(4, FUNCTION, thr_id, "    ", nOffsetsT);
-
-    if(nOffsetsT > 16)
-        debug::error(FUNCTION, "test offsets cannot exceed 16");
-
-    CHECK(cudaMemcpyToSymbol(c_offsetsT, OffsetsT,
-        nOffsetsT*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
-
-}
-
 
 extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id, uint32_t *limbs)
 {
@@ -117,7 +100,7 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
         /* Check if prime passes fermat test base 2. */
         if(fermat_prime(p))
         {
-            atomicAdd(g_primes_found, 1);
+            atomicAdd(&g_primes_found[chain_offset_end], 1);
             ++chain_length;
             prime_gap = 0;
 
@@ -138,6 +121,7 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
 
             }
         }
+        atomicAdd(&g_primes_checked[chain_offset_end], 1);
 
         /* Otherwise, if chain length is not satisfied, keep testing. */
         if(chain_length < nTestLevels)
@@ -183,7 +167,6 @@ __global__ void fermat_kernel(uint64_t *in_nonce_offsets,
                 }
             }
         }
-        atomicAdd(g_primes_checked, 1);
     }
 }
 
@@ -226,8 +209,14 @@ __global__ void fermat_launcher(uint64_t *g_nonce_offsets,
     if(threadIdx.x == 0 && o == 0)
     {
         *g_result_count = 0;
-        *g_primes_checked = 0;
-        *g_primes_found = 0;
+
+        #pragma unroll
+        for(uint8_t i = 0; i < 16; ++i)
+        {
+            g_primes_checked[i] = 0;
+            g_primes_found[i] = 0;
+        }
+
     }
 
     if(total_count > 0 && c_quit == false)
@@ -277,6 +266,8 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     uint32_t curr_sieve = sieve_index % FRAME_COUNT;
     uint32_t curr_test = test_index % FRAME_COUNT;
 
+    uint32_t nComboThreshold = 8;
+
 
     debug::log(4, FUNCTION, thr_id);
 
@@ -288,7 +279,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
 
 
-    for(uint8_t o = 0; o < 6; ++o)
+    for(uint8_t o = 0; o < nComboThreshold; ++o)
     {
         fermat_launcher<<<1, 4, 0, d_Streams[thr_id][STREAM::FERMAT]>>>(
                  frameResources[thr_id].d_nonce_offsets[curr_test],
@@ -299,7 +290,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
                  frameResources[thr_id].d_result_count[curr_test],
                  frameResources[thr_id].d_primes_checked[curr_test],
                  frameResources[thr_id].d_primes_found[curr_test],
-                 nOffsetsT, nTestLevels, o);
+                 vOffsetsT.size(), nTestLevels, o);
     }
 
     /* Copy the result count. */
@@ -320,12 +311,12 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     /* Copy the amount of primes checked. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_checked[curr_test],
                           frameResources[thr_id].d_primes_checked[curr_test],
-                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          16 * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the amount of primes found. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_found[curr_test],
                           frameResources[thr_id].d_primes_found[curr_test],
-                          sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          16 * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Signal the Fermat event. */
     CHECK(stream_signal_event(thr_id, curr_test, STREAM::FERMAT, EVENT::FERMAT));
@@ -346,6 +337,13 @@ extern "C" void cuda_results(uint32_t thr_id,
 
     uint32_t curr_test = test_index % FRAME_COUNT;
 
+    uint32_t checked[16];
+    uint32_t found[16];
+
+    static double minRatios[16] = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0 };
+    static double maxRatios[16] = {0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0  , 0.0   };
+    double ratio = 0.0;
+
     d_result_event_prev[thr_id][curr_test] = d_result_event_curr[thr_id][curr_test];
     d_result_event_curr[thr_id][curr_test] = cudaEventQuery(d_Events[thr_id][curr_test][EVENT::FERMAT]);
 
@@ -355,12 +353,30 @@ extern "C" void cuda_results(uint32_t thr_id,
         d_result_event_prev[thr_id][curr_test] = cudaSuccess;
 
         *result_count   = *frameResources[thr_id].h_result_count[curr_test];
-        *primes_checked = *frameResources[thr_id].h_primes_checked[curr_test];
-        *primes_found   = *frameResources[thr_id].h_primes_found[curr_test];
-
         *frameResources[thr_id].h_result_count[curr_test] = 0;
-        *frameResources[thr_id].h_primes_checked[curr_test] = 0;
-        *frameResources[thr_id].h_primes_found[curr_test] = 0;
+
+
+        debug::log(0, "[PRIME] Offset Ratios: ");
+        for(uint32_t i = 0; i < vOffsetsT.size(); ++i)
+        {
+            checked[i] =  frameResources[thr_id].h_primes_checked[curr_test][i];
+            found[i]   = frameResources[thr_id].h_primes_found[curr_test][i];
+
+            frameResources[thr_id].h_primes_checked[curr_test][i] = 0;
+            frameResources[thr_id].h_primes_found[curr_test][i] = 0;
+
+            *primes_checked += checked[i];
+            *primes_found += found[i];
+
+            ratio = (double)(100 * found[i]) / checked[i];
+
+            minRatios[i] = std::min(minRatios[i], ratio);
+            maxRatios[i] = std::max(maxRatios[i], ratio);
+
+            debug::log(0, std::setw(2), std::right, i, ": ", std::setw(2), std::right, vOffsetsT[i], " = ", std::setprecision(3), std::fixed, "[", minRatios[i], "-", maxRatios[i],  "]", "%  ");
+        }
+
+
 
         if(*result_count == 0)
             return;

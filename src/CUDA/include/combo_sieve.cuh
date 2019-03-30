@@ -15,7 +15,7 @@
 #include <CUDA/include/frame_resources.h>
 #include <CUDA/include/sieve_resources.h>
 #include <CUDA/include/prime_helper.cuh>
-#include <CUDA/include/constants.cuh>
+#include <CUDA/include/constants.h>
 
 template<uint8_t o>
 __global__ void combosieve_kernelA_512(uint32_t *g_bit_array_sieve,
@@ -240,7 +240,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
                     break;
 
                 /* Check the prime gap, resetting count and begin index if violated. */
-                if(c_offsetsA[next] - c_offsetsA[prev] > 12)
+                if(c_offsetsT[next] - c_offsetsT[prev] > 12)
                 {
                     count = 0;
                     combo = tmp;
@@ -292,11 +292,11 @@ nPrimorialEndPrime, \
 nPrimeLimitA)
 
 void comboA_launch(uint8_t thr_id,
-                    uint8_t str_id,
-                    uint8_t frame_index,
-                    uint16_t nPrimorialEndPrime,
-                    uint16_t nPrimeLimitA,
-                    uint32_t nBitArray_Size)
+                   uint8_t str_id,
+                   uint8_t frame_index,
+                   uint16_t nPrimorialEndPrime,
+                   uint16_t nPrimeLimitA,
+                   uint32_t nBitArray_Size)
 {
     uint32_t sharedSizeBits = 32 * 1024 * 8;
     uint32_t nBlocks = (nBitArray_Size + sharedSizeBits-1) / sharedSizeBits;
@@ -325,7 +325,8 @@ void comboA_launch(uint8_t thr_id,
         case 3:  COMBO_A_LAUNCH(2);
         case 2:  COMBO_A_LAUNCH(1);
         case 1:  COMBO_A_LAUNCH(0);
-        default:
+        break;
+        default: debug::error("Unsupported Combo A Launch.");
         break;
     }
 
@@ -374,7 +375,8 @@ void comboB_launch(uint8_t thr_id,
         case 3:  COMBO_B_LAUNCH(2);
         case 2:  COMBO_B_LAUNCH(1);
         case 1:  COMBO_B_LAUNCH(0);
-        default:
+        break;
+        default: debug::error("Unsupported Combo B Launch.");
         break;
     }
 
@@ -414,7 +416,7 @@ void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, 
         case 13: COMBO_COMPACT_LAUNCH(13); break;
         case 14: COMBO_COMPACT_LAUNCH(14); break;
         case 15: COMBO_COMPACT_LAUNCH(15); break;
-        default: break;
+        default: debug::error("Unsupported Combo Compact Launch."); break;
     }
 
     /* Copy the nonce count for this compaction. */

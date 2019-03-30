@@ -178,7 +178,7 @@ namespace LLC
 
 
         /* Compute remainder. */
-        uint32_t remainder = vBaseRemainders[i] + offsetsA[o];
+        uint32_t remainder = vBaseRemainders[i] + vOffsetsT[o];
 
         if(p < remainder)
             remainder -= p;

@@ -138,7 +138,7 @@ namespace LLC
             uint8_t nPrimeGap = 0;
 
 
-            uint32_t prev = offsetsTest[chain_offset_end];
+            uint32_t prev = vOffsetsT[chain_offset_end];
             uint32_t next;
 
 
@@ -148,10 +148,10 @@ namespace LLC
 
 
             /* Loop through the remaining offset positions and test. */
-            for(++chain_offset_end; chain_offset_end < offsetsTest.size(); ++chain_offset_end)
+            for(++chain_offset_end; chain_offset_end < vOffsetsT.size(); ++chain_offset_end)
             {
 
-                next = offsetsTest[chain_offset_end];
+                next = vOffsetsT[chain_offset_end];
 
                 /* Compute prime gap between offsets. */
                 uint8_t nGap = next - prev;
@@ -188,8 +188,8 @@ namespace LLC
 
             }
 
-            chain_offset_beg = offsetsTest[chain_offset_beg];
-            chain_offset_end = offsetsTest[chain_offset_end] + 2;
+            chain_offset_beg = vOffsetsT[chain_offset_beg];
+            chain_offset_end = vOffsetsT[chain_offset_end] + 2;
 
             /* Make sure first prime passes trial division annd miller rabin. */
             //mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);

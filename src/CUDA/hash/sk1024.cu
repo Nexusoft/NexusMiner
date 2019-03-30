@@ -4,7 +4,7 @@
 
 
 #include <CUDA/include/util.h>
-#include <CUDA/include/constants.cuh>
+#include <CUDA/include/constants.h>
 #include <CUDA/include/hash_helper.cuh>
 
 #include <LLC/hash/SK.h>

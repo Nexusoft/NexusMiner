@@ -20,9 +20,9 @@ ________________________________________________________________________________
 
 uint32_t nPrimorialEndPrime;
 uint64_t base_offset = 0;
-std::vector<uint32_t> offsetsTest;
-std::vector<uint32_t> offsetsA;
-std::vector<uint32_t> offsetsB;
+std::vector<uint32_t> vOffsetsA;
+std::vector<uint32_t> vOffsetsB;
+std::vector<uint32_t> vOffsetsT;
 
 uint32_t nSievePrimeLimit = 1 << 23;
 uint32_t nSievePrimesLog2[GPU_MAX] = { 0 };
@@ -79,6 +79,32 @@ namespace prime
         }
     }
 
+    void read_offset_pattern(std::ifstream &fin, std::vector<uint32_t> &offsets, const std::string label)
+    {
+        std::string s;
+        std::string strOffsets;
+        uint32_t o;
+
+        std::getline(fin, s);
+        std::getline(fin, s, '#');
+
+        std::stringstream ss(s);
+
+        while(ss >> o)
+        {
+            offsets.push_back(o);
+            if(ss.peek() == ',')
+                ss.ignore();
+        }
+
+        strOffsets = std::to_string(offsets[0]);
+        for (uint32_t i = 1; i < offsets.size(); ++i)
+            strOffsets += ", " + std::to_string(offsets[i]);
+
+        debug::log(0, label, " = ", strOffsets);
+
+    }
+
     void load_offsets()
     {
         //get offsets used for sieving from file
@@ -90,68 +116,23 @@ namespace prime
         }
 
         std::string strOffsets;
-        std::string P, O, T, A, B;
+        std::string P, O, A, B, T;
         std::getline(fin, P, '#');
+        std::stringstream sP(P);
+        sP >> nPrimorialEndPrime;
+
 
         std::getline(fin, O);
         std::getline(fin, O, '#');
-
-        std::getline(fin, T);
-        std::getline(fin, T, '#');
-
-        std::getline(fin, A);
-        std::getline(fin, A, '#');
-
-        std::getline(fin, B);
-        std::getline(fin, B, '#');
-        fin.close();
-
-        std::stringstream sP(P);
         std::stringstream sO(O);
-        std::stringstream sT(T);
-        std::stringstream sA(A);
-        std::stringstream sB(B);
-        uint32_t o;
-
-        sP >> nPrimorialEndPrime;
-
         sO >> base_offset;
-
-        while (sT >> o)
-        {
-            offsetsTest.push_back(o);
-            if (sT.peek() == ',')
-                sT.ignore();
-        }
-        while (sA >> o)
-        {
-            offsetsA.push_back(o);
-            if (sA.peek() == ',')
-                sA.ignore();
-        }
-        while (sB >> o)
-        {
-            offsetsB.push_back(o);
-            if (sB.peek() == ',')
-                sB.ignore();
-        }
-
         debug::log(0, "base_offset = ", base_offset);
 
-        strOffsets = std::to_string(offsetsTest[0]);
-        for (int i = 1; i < offsetsTest.size(); ++i)
-            strOffsets += ", " + std::to_string(offsetsTest[i]);
-        debug::log(0, "offsetsT = ", strOffsets);
+        read_offset_pattern(fin, vOffsetsA, "OffsetsA");
+        read_offset_pattern(fin, vOffsetsB, "OffsetsB");
+        read_offset_pattern(fin, vOffsetsT, "OffsetsT");
 
-        strOffsets = std::to_string(offsetsA[0]);
-        for (int i = 1; i < offsetsA.size(); ++i)
-            strOffsets += ", " + std::to_string(offsetsA[i]);
-        debug::log(0, "offsetsA = ", strOffsets);
-
-        strOffsets = std::to_string(offsetsB[0]);
-        for (int i = 1; i < offsetsB.size(); ++i)
-            strOffsets += ", " + std::to_string(offsetsB[i]);
-        debug::log(0, "offsetsB = ", strOffsets);
+        fin.close();
 
         debug::log(0, "");
     }

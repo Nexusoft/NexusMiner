@@ -5,7 +5,7 @@
  [Scale Indefinitely] BlackJack. http://www.opensource.org/licenses/mit-license.php
 
 *******************************************************************************************/
-#include <CUDA/include/constants.cuh>
+#include <CUDA/include/constants.h>
 #include <CUDA/include/prime_helper.cuh>
 #include <CUDA/include/macro.h>
 

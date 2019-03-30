@@ -21,9 +21,12 @@ ________________________________________________________________________________
 
 extern uint32_t nPrimorialEndPrime;
 extern uint64_t base_offset;
-extern std::vector<uint32_t> offsetsTest;
-extern std::vector<uint32_t> offsetsA;
-extern std::vector<uint32_t> offsetsB;
+
+
+extern std::vector<uint32_t> vOffsetsA;
+extern std::vector<uint32_t> vOffsetsB;
+extern std::vector<uint32_t> vOffsetsT;
+
 
 
 extern uint32_t nSievePrimeLimit;

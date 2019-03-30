@@ -9,6 +9,7 @@
 #define NEXUS_CUDA_SIEVE_H
 
 #include <cstdint>
+#include <vector>
 
 extern "C" void cuda_set_zTempVar(uint8_t thr_id, const uint64_t *limbs);
 
@@ -44,8 +45,9 @@ extern "C" void cuda_set_sieve(uint8_t thr_id,
                                uint32_t n_prime_limit,
                                uint8_t bit_array_size_log2);
 
-extern "C" void cuda_set_sieve_offsets(uint8_t thr_id,
-                                      uint32_t *OffsetsA, uint8_t A_count,
-                                      uint32_t *OffsetsB, uint8_t B_count);
+extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
+                                         const std::vector<uint32_t> &offsetsA,
+                                         const std::vector<uint32_t> &offsetsB,
+                                         const std::vector<uint32_t> &offsetsT);
 
 #endif
