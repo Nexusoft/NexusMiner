@@ -85,6 +85,7 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
 {
     uint32_t primeinverseinvk_size = sizeof(uint32_t) * 4 * nPrimeLimit;
     uint32_t nonce64_size = OFFSETS_MAX * sizeof(uint64_t);
+    uint32_t nonce32_size = OFFSETS_MAX * sizeof(uint32_t);
     uint32_t sharedSizeBits = sharedSizeKB * 1024 * 8;
     uint32_t allocSize = ((nBitArray_Size * 16  + sharedSizeBits - 1) / sharedSizeBits) * sharedSizeBits;
     uint32_t bitarray_size = (allocSize+31)/32 * sizeof(uint32_t);
@@ -110,8 +111,8 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
         /* test */
         CHECK(    cudaMalloc(&frameResources[thr_id].d_result_offsets[i], nonce64_size));
         CHECK(cudaMallocHost(&frameResources[thr_id].h_result_offsets[i], nonce64_size));
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_result_meta[i],    nonce64_size));
-        CHECK(cudaMallocHost(&frameResources[thr_id].h_result_meta[i],    nonce64_size));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_result_meta[i],    nonce32_size));
+        CHECK(cudaMallocHost(&frameResources[thr_id].h_result_meta[i],    nonce32_size));
         CHECK(    cudaMalloc(&frameResources[thr_id].d_result_count[i],   sizeof(uint32_t)));
         CHECK(cudaMallocHost(&frameResources[thr_id].h_result_count[i],   sizeof(uint32_t)));
 
@@ -123,7 +124,7 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
 
         /* compaction */
         CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_offsets[i], nonce64_size * BUFFER_COUNT));
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_meta[i],    nonce64_size * BUFFER_COUNT));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_meta[i],    nonce32_size * BUFFER_COUNT));
         CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_count[i],   sizeof(uint32_t) * 4 * BUFFER_COUNT));
         CHECK(cudaMallocHost(&frameResources[thr_id].h_nonce_count[i],   sizeof(uint32_t)));
 
@@ -621,7 +622,7 @@ __global__ void primesieve_kernelB(uint64_t origin,
 
 
 
-__global__ void compact_offsets(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta, uint32_t *d_nonce_count,
+__global__ void compact_offsets(uint64_t *d_nonce_offsets, uint32_t *d_nonce_meta, uint32_t *d_nonce_count,
                                 uint32_t *d_bit_array_sieve, uint32_t nBitArray_Size, uint64_t sieve_start_index)
 {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -639,7 +640,7 @@ __global__ void compact_offsets(uint64_t *d_nonce_offsets, uint64_t *d_nonce_met
                 d_nonce_offsets[i] = nonce_offset;
 
                 uint32_t combo = 0xFFFF0000;
-                d_nonce_meta[i] = ((uint64_t)combo) << 32;
+                d_nonce_meta[i] = combo;
             }
         }
     }
@@ -898,25 +899,25 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
     {
 
-        /* Wait for testing and compaction to finish. */
-        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::COMPACT));
-        CHECK(stream_wait_event(thr_id, prev_test, STREAM::SIEVE_A, EVENT::FERMAT));
+        /* Wait for testing and compaction to finish before starting next round. */
+        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::COMPACT));
+        CHECK(stream_wait_event(thr_id, prev_test, STREAM::CLEAR, EVENT::FERMAT));
 
         /* Clear the current working sieve and signal */
         kernel_clear_launch(thr_id, STREAM::CLEAR, curr_sieve, nBitArray_Size);
         CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::CLEAR));
 
         /* Precompute prime remainders. */
-        kernelA0_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
+        kernelB0_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
           nPrimeLimitA, base_offsetted);
 
     }
 
 
-    {
+    {  /* Launch small sieve, utilizing shared memory and signal */
 
         CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::CLEAR));
-        /* Launch small sieve, utilizing shared memory and signal */
+
         //kernelA_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
         //              nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size);
         comboA_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
@@ -925,9 +926,10 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
     }
 
-    {
+
+    {  /* Launch large sieve, utilizing global memory and signal */
         CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_A));
-        /* Launch large sieve, utilizing global memory and signal */
+
         //kernelB_launch(thr_id, STREAM::SIEVE_B, base_offsetted, curr_sieve,
         //              nPrimeLimitA, nPrimeLimitB, nBitArray_Size);
         comboB_launch(thr_id, STREAM::SIEVE_B, base_offsetted, curr_sieve,
@@ -937,11 +939,10 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
 
 
-    {
-        /* Wait Stream 2, Events[0, 1] */
+    {   /* Launch compaction and signal */
+
         CHECK(stream_wait_events(thr_id, curr_sieve, STREAM::COMPACT, EVENT::SIEVE_A, EVENT::SIEVE_B));
 
-        /* Launch compaction and signal */
         //kernel_compact_launch(thr_id, STREAM::COMPACT, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start);
 
         kernel_ccompact_launch(thr_id, STREAM::COMPACT, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start, nComboThreshold);

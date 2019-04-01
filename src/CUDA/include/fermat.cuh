@@ -388,8 +388,8 @@ bool fermat_prime(uint32_t *p)
 
 /* Add a Result to the buffer. */
 __device__ __forceinline__
-void add_result(uint64_t *nonce_offsets, uint64_t *nonce_meta, uint32_t *nonce_count,
-                           uint64_t &offset, uint64_t &meta, uint32_t max)
+void add_result(uint64_t *nonce_offsets, uint32_t *nonce_meta, uint32_t *nonce_count,
+                           uint64_t &offset, uint32_t &meta, uint32_t max)
 {
     uint32_t i = atomicAdd(nonce_count, 1);
 

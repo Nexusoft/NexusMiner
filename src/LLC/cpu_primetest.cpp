@@ -21,6 +21,7 @@ ________________________________________________________________________________
 #include <Util/include/print_colors.h>
 #include <Util/include/prime_config.h>
 #include <Util/include/bitmanip.h>
+#include <bitset>
 
 #include <iomanip>
 
@@ -52,6 +53,7 @@ namespace LLC
     , zFirstSieveElement()
     , zPrimorialMod()
     , work()
+    , mapTest()
     {
     }
 
@@ -110,6 +112,8 @@ namespace LLC
         debug::log(3, "PrimeTestCPU[", (uint32_t)nID, "]: ", nWorkCount,
             " nonces from ", (uint32_t)work.thr_id);
 
+        uint8_t nOffsets = vOffsets.size();
+
         /* Process each result from array of nonces. */
         for(uint32_t i = 0; i < nWorkCount; ++i)
         {
@@ -122,84 +126,93 @@ namespace LLC
 
             /* Obtain work nonce offset and nonce meta. */
             uint64_t offset = work.nonce_offsets[i];
-            uint64_t meta = work.nonce_meta[i];
+            uint32_t combo = work.nonce_meta[i];
 
-            /* Extract combo bits and chain info. */
-            uint32_t combo = meta >> 32;
-            uint32_t chain_offset_beg = (meta >> 24) & 0xFF;
-            uint32_t chain_offset_end = (meta >> 16) & 0xFF;
-            uint32_t chain_length = meta & 0xFF;
-
-
-
-            //debug::log(0, "beg: ", chain_offset_beg, " end: ", chain_offset_end, " len: ", chain_length);
 
             /* Compute the base offset of the nonce */
             mpz_mul_ui(zTempVar, zPrimorial, offset);
             mpz_add(zBaseOffsetted, zFirstSieveElement, zTempVar);
 
-            uint8_t nPrimeGap = 0;
 
-
-            uint32_t prev = vOffsets[chain_offset_end];
-            uint32_t next;
-
-
-            /* Start the number from the last known prime in the chain. */
-            mpz_add_ui(zTempVar, zBaseOffsetted, prev);
-
-
-            /* Loop through the remaining offset positions and test. */
-            for(++chain_offset_end; chain_offset_end < vOffsets.size(); ++chain_offset_end)
+            /* Loop through combo and test remaining offsets. */
+            for(uint8_t j = 0; j < nOffsets; ++j)
             {
+                if(fReset.load() || nHeight != pBlock->nHeight)
+                    return false;
 
-                next = vOffsets[chain_offset_end];
+                /* Don't test failed offsets. */
+                if(combo & (1 << j))
+                    continue;
 
-                /* Compute prime gap between offsets. */
-                uint8_t nGap = next - prev;
-                nPrimeGap += nGap;
+                /* Start fresh from each offset remaining. */
+                mpz_add_ui(zTempVar, zBaseOffsetted, vOffsets[j]);
 
-                /* Make sure prime gap isn't violated. */
-                if(nPrimeGap > 12)
-                    break;
-
-                mpz_add_ui(zTempVar, zTempVar, nGap);
-
-                if(combo & 0x80000000 >> chain_offset_end)
+                /* Check for Miller-Rabin test */
+                if(mpz_probab_prime_p(zTempVar, 1) > 0)
                 {
-                    if(mpz_probab_prime_p(zTempVar, 1) > 0)
-                    {
-                        mpz_sub_ui(zN, zTempVar, 1);
-                        mpz_powm(zResidue, zTwo, zN, zTempVar);
-                        if (mpz_cmp_ui(zResidue, 1) == 0)
-                        {
-                            //++PrimesFound;
-                            ++chain_length;
+                    /* Skip GPU offsets. Already Fermat tested. */
+                    if(mapTest.find(j) != mapTest.end())
+                        continue;
 
-                            nPrimeGap = 0;
-                        }
-                    }
-                    //++PrimesChecked;
-                    ++Tests_CPU;
+                    /* Check for Fermat test. */
+                    mpz_sub_ui(zN, zTempVar, 1);
+                    mpz_powm(zResidue, zTwo, zN, zTempVar);
+                    if (mpz_cmp_ui(zResidue, 1) == 0)
+                        ++PrimesFound[j];
+                    else
+                        combo |= (1 << j);
+                }
+                else
+                {
+                    combo |= (1 << j);
+
+                    /* Take back passed test from GPU. Fermat liar. */
+                    if(mapTest.find(j) != mapTest.end())
+                        --PrimesFound[j];
                 }
 
 
 
-                /* Compute the next offsets to test. */
-                prev = next;
-
+                ++PrimesChecked[j];
+                ++Tests_CPU;
             }
 
-            chain_offset_beg = vOffsetsT[chain_offset_beg];
-            chain_offset_end = vOffsetsT[chain_offset_end] + 2;
+            /* Invert the bits and mask off the high bits. */
+            combo = (~combo) & (0xFFFFFFFF >> nOffsets);
 
-            /* Make sure first prime passes trial division annd miller rabin. */
-            //mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
-            //if(mpz_probab_prime_p(zTempVar, 1) == 0)
-            //    continue;
+
+            /* If there are no more combo bits, this candidate will never lead to a solution. */
+            if(combo == 0)
+                continue;
+
+            /* Get the number of survived offsets. */
+            uint32_t chain_length = convert::popc(combo);
+
+            /* Get the begin and end offsets of the chain. */
+            uint32_t chain_offset_beg = convert::ctz(combo);
+            uint32_t chain_offset_end = nOffsets - convert::clz(combo << (32 - nOffsets - 1));
+
+            //if(i % 100 == 0)
+            //debug::log(0, "combo=", std::bitset<11>(combo),
+            //" len=", chain_length,
+            //" beg=", chain_offset_beg,
+            //" end=", chain_offset_end);
+
+            if(chain_offset_beg >= nOffsets
+            || chain_offset_end >= nOffsets)
+                return debug::error("Offset index out of bounds.",
+                " beg=", chain_offset_beg,
+                " end=", chain_offset_end,
+                " combo=", std::bitset<32>(combo));
+
+
+
+            chain_offset_beg = vOffsets[chain_offset_beg];
+            chain_offset_end = vOffsets[chain_offset_end] + 2;
+
 
             /* Search for primes after small cluster */
-            /*
+            uint8_t nPrimeGap = 0;
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_end);
             while (nPrimeGap <= 12)
             {
@@ -225,15 +238,10 @@ namespace LLC
                 chain_offset_end += 2;
                 nPrimeGap += 2;
             }
-            */
-
-
-            //nPrimeGap = 0;
 
 
             /* Search for primes before small cluster */
-
-            /*
+            nPrimeGap = 0;
             uint32_t begin_offset = 0;
             uint32_t begin_next = 2;
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
@@ -247,13 +255,13 @@ namespace LLC
                     mpz_powm(zResidue, zTwo, zN, zTempVar);
                     if (mpz_cmp_ui(zResidue, 1) == 0)
                     {
-                        ++PrimesFound;
+                        //++PrimesFound;
                         ++chain_length;
                         nPrimeGap = 0;
                         begin_offset = begin_next;
                     }
                 }
-                ++PrimesChecked;
+                //++PrimesChecked;
                 ++Tests_CPU;
 
                 mpz_sub_ui(zTempVar, zTempVar, 2);
@@ -261,11 +269,9 @@ namespace LLC
                 nPrimeGap += 2;
             }
 
-            */
-
             /* Translate nonce offset of begin prime to global offset. */
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
-            //mpz_sub_ui(zTempVar, zTempVar, begin_offset);
+            mpz_sub_ui(zTempVar, zTempVar, begin_offset);
             mpz_sub(zTempVar, zTempVar, zPrimeOrigin);
             nNonce = mpz_get_ui(zTempVar);
 
@@ -346,6 +352,10 @@ namespace LLC
         mpz_init(zResidue);
         mpz_init(zFirstSieveElement);
         mpz_init(zPrimorialMod);
+
+        /* Store a map of false positives for GPU Fermat offset tests. */
+        for(uint8_t i = 0; i < vOffsetsT.size(); ++i)
+            mapTest[vOffsetsT[i]] = i;
     }
 
     void PrimeTestCPU::Init()

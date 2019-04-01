@@ -31,7 +31,7 @@ namespace LLC
     mpz_t zTwo;
 
     uint64_t *g_nonce_offsets[GPU_MAX] = {0};
-    uint64_t *g_nonce_meta[GPU_MAX] = {0};
+    uint32_t *g_nonce_meta[GPU_MAX] = {0};
     uint32_t *g_bit_array_sieve[GPU_MAX] = {0};
 
     uint64_t nBitArray_Stride;

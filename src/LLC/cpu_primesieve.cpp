@@ -45,7 +45,7 @@ namespace LLC
     bool PrimeSieveCPU::Work()
     {
         std::vector<uint64_t> vNonces;
-        std::vector<uint64_t> vMeta;
+        std::vector<uint32_t> vMeta;
 
         /* Clear the bit array. */
         memset(pBitArraySieve, 0x00, nBitArraySize >> 3);

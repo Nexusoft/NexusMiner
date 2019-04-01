@@ -28,7 +28,7 @@ extern "C" void cuda_fermat(uint32_t thr_id,
 extern "C" void cuda_results(uint32_t thr_id,
                              uint32_t test_index,
                              uint64_t *result_offsets,
-                             uint64_t *result_meta,
+                             uint32_t *result_meta,
                              uint32_t *result_count,
                              uint32_t *primes_checked,
                              uint32_t *primes_found);

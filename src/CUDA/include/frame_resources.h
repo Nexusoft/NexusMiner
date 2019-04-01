@@ -20,8 +20,8 @@ struct FrameResource
   uint64_t *d_result_offsets[FRAME_COUNT];
   uint64_t *h_result_offsets[FRAME_COUNT];
 
-  uint64_t *d_result_meta[FRAME_COUNT];
-  uint64_t *h_result_meta[FRAME_COUNT];
+  uint32_t *d_result_meta[FRAME_COUNT];
+  uint32_t *h_result_meta[FRAME_COUNT];
 
   uint32_t *d_result_count[FRAME_COUNT];
   uint32_t *h_result_count[FRAME_COUNT];
@@ -34,7 +34,7 @@ struct FrameResource
 
     //compacting
   uint64_t *d_nonce_offsets[FRAME_COUNT];
-  uint64_t *d_nonce_meta[FRAME_COUNT];
+  uint32_t *d_nonce_meta[FRAME_COUNT];
   uint32_t *d_nonce_count[FRAME_COUNT];
 
   uint32_t *h_nonce_count[FRAME_COUNT];

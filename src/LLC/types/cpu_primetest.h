@@ -21,6 +21,7 @@ ________________________________________________________________________________
 #include <LLC/prime/prime2.h>
 
 #include <cstdint>
+#include <map>
 
 #if defined(_MSC_VER)
 #include <mpir.h>
@@ -101,6 +102,8 @@ namespace LLC
         mpz_t zPrimorialMod;
 
         work_info work;
+
+        std::map<uint32_t, uint32_t> mapTest;
 
     };
 }

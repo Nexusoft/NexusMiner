@@ -14,6 +14,7 @@
 #include <CUDA/include/sieve_resources.h>
 #include <CUDA/include/prime_helper.cuh>
 #include <CUDA/include/constants.h>
+#include <Util/include/prime_config.h>
 
 template<uint8_t o>
 __global__ void combosieve_kernelA_512(uint32_t *g_bit_array_sieve,
@@ -174,9 +175,15 @@ __global__ void combosieve_kernelB(uint64_t origin,
     }
 }
 
-template<uint8_t nOffsets>
-__global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta, uint32_t *d_nonce_count,
-                              uint32_t *d_bit_array_sieve, uint32_t *prime_remainders, uint32_t nBitArray_Size, uint64_t sieve_start_index, uint8_t threshold)
+__global__ void compact_combo(uint64_t *d_nonce_offsets,
+                              uint32_t *d_nonce_meta,
+                              uint32_t *d_nonce_count,
+                              uint32_t *d_bit_array_sieve,
+                              uint32_t nBitArray_Size,
+                              uint64_t sieve_start_index,
+                              uint8_t nThreshold,
+                              uint8_t nOffsetsB,
+                              uint8_t nOffsets)
 {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -188,95 +195,34 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
     {
         uint64_t nonce_offset = sieve_start_index + idx;
         uint32_t combo = 0;
-        uint8_t count = 0;
 
         /* Take the bit from each sieve and compact them into a single word. */
-        #pragma unroll nOffsets
-        for(uint8_t o = 0; o < nOffsets; ++o)
+        for(uint8_t o = 0; o < nOffsetsB; ++o)
         {
             /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
             uint16_t bit = !((d_bit_array_sieve[idx >> 5]) & (1 << (idx & 31)));
 
-            combo |= bit << o;
+            combo |= bit << c_iB[o];
 
             d_bit_array_sieve += nBitArray_Size >> 5;
         }
 
+        /* Get the count of the remaining zero bits and compare to threshold. */
+        uint32_t nCount = __popc(combo);
+
+
         /* Count the bits for this combo. */
-        count = __popc(combo);
-
-        /* Make sure the sieved bit count is at least as large as the target
-         * prime cluster threshold. */
-        if(count >= threshold)
+        if(nCount >= nThreshold)
         {
-            //printf("combo: %08X invert: %08X popc: %d\n", combo, ~combo, count);
+            //printf("combo=%08X, count=%d\n", combo, nCount);
 
-            /* Shift the combo bits to the most significant bit. */
-            uint32_t tmp = combo << (32 - nOffsets);
-            combo = tmp;
+            uint32_t i = atomicAdd(d_nonce_count, 1);
 
-            /* Count the leading zero bits to compute next offset. */
-            uint8_t next = __clz(tmp);
-            uint8_t prev = next;
-
-            /* Clear the high order bit for next round offset calculation. */
-            tmp ^= 0x80000000 >> next;
-
-            /* Count the first index */
-            count = 1;
-
-            /* Continue loop while the next bit is less than the number of offsets. */
-            while(next < nOffsets)
+            if(i < OFFSETS_MAX)
             {
-                /* Set previous and next indicies, clearing high order bit. */
-                prev = next;
-                next = __clz(tmp);
-                tmp ^= 0x80000000 >> next;
-
-                /* Make sure next does not overflow. */
-                if(next >= nOffsets)
-                    break;
-
-                /* Check the prime gap, resetting count and begin index if violated. */
-                if(c_offsets[c_iT[next]] - c_offsets[c_iT[prev]] > 12)
-                {
-                    count = 0;
-                    combo = tmp;
-                }
-
-                /* Increment the count. */
-                ++count;
-
-                /* Stop search if threshold is met. */
-                if(count >= threshold)
-                    break;
-
-            }
-
-
-            /* We want to make sure that the combination follows prime gap rule
-               as close as possible */
-            if(count >= threshold)
-            {
-                uint32_t i = atomicAdd(d_nonce_count, 1);
-
-                if(i < OFFSETS_MAX)
-                {
-                    uint8_t beg = __clz(combo);
-                    combo ^= 0x80000000 >> beg;
-
-                    /* Encode the beginning nonce meta data for testing. */
-                    uint64_t nonce_meta = 0;
-                    nonce_meta |= ((uint64_t)combo << 32);
-                    nonce_meta |= ((uint64_t)beg << 24);
-                    nonce_meta |= ((uint64_t)beg << 16);
-
-                    /* Assign the global nonce offset and meta data. */
-                    d_nonce_offsets[i] = nonce_offset;
-                    d_nonce_meta[i] = nonce_meta;
-                }
-                else
-                    printf("OFFSETS_MAX EXCEEDED\n");
+                /* Assign the global nonce offset and meta data. */
+                d_nonce_offsets[i] = nonce_offset;
+                d_nonce_meta[i] = (~combo) & (0xFFFFFFFF >> nOffsets);
             }
         }
     }
@@ -284,7 +230,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets, uint64_t *d_nonce_meta,
 
 #define COMBO_A_LAUNCH(X) combosieve_kernelA_256<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
-frameResources[thr_id].d_prime_remainders[frame_index], \
+&frameResources[thr_id].d_prime_remainders[frame_index][nPrimeLimitA], \
 d_blockoffset_mod_p[thr_id], \
 nPrimorialEndPrime, \
 nPrimeLimitA)
@@ -306,7 +252,7 @@ void comboA_launch(uint8_t thr_id,
     dim3 grid(nBlocks);
 
     /* fall-through switch logic, zero-based indexing */
-    switch(nOffsetsA)
+    switch(nOffsetsB)
     {
         case 15: COMBO_A_LAUNCH(14);
         case 14: COMBO_A_LAUNCH(13);
@@ -381,15 +327,16 @@ void comboB_launch(uint8_t thr_id,
     debug::log(4, FUNCTION, (uint32_t)thr_id);
 }
 
-#define COMBO_COMPACT_LAUNCH(X) compact_combo<X><<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
+#define COMBO_COMPACT_LAUNCH(X) compact_combo<<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
     frameResources[thr_id].d_nonce_offsets[curr_test], \
     frameResources[thr_id].d_nonce_meta[curr_test], \
     frameResources[thr_id].d_nonce_count[curr_test], \
     frameResources[thr_id].d_bit_array_sieve[curr_sieve], \
-    frameResources[thr_id].d_prime_remainders[curr_sieve], \
     nBitArray_Size, \
     primorial_start, \
-    threshold)
+    threshold, \
+    X, \
+    vOffsets.size())
 
 void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, uint8_t curr_test,
                             uint8_t next_test, uint32_t nBitArray_Size, uint64_t primorial_start, uint8_t threshold)
@@ -397,7 +344,7 @@ void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, 
     dim3 block(64);
     dim3 grid((nBitArray_Size + block.x - 1) / block.x);
 
-    switch(nOffsetsA)
+    switch(nOffsetsB)
     {
         case 1:  COMBO_COMPACT_LAUNCH(1);  break;
         case 2:  COMBO_COMPACT_LAUNCH(2);  break;

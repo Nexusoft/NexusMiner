@@ -625,10 +625,17 @@ namespace LLP
 
             for(uint16_t i = 0; i < vOffsets.size(); ++i)
             {
-                double ratio = (double)(100 * LLC::PrimesFound[i].load()) / LLC::PrimesChecked[i].load();
+                uint64_t found = LLC::PrimesFound[i].load();
+                uint64_t checked = LLC::PrimesChecked[i].load();
 
-                LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
-                LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
+                /* Check for divide by zero. */
+                if(checked)
+                {
+                    double ratio = (double)(100 * found) / checked;
+
+                    LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
+                    LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
+                }
 
                 debug::log(1, std::setw(2), std::right, i, ": ",
                               std::setw(2), std::right, vOffsets[i], " = ",

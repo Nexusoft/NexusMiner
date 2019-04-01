@@ -80,7 +80,7 @@ namespace LLC
 
         /* Get thread local nonce offsets and meta. */
         uint64_t *nonce_offsets = g_nonce_offsets[nID];
-        uint64_t *nonce_meta = g_nonce_meta[nID];
+        uint32_t *nonce_meta = g_nonce_meta[nID];
 
         /* Get difficulty. */
         uint32_t nDifficulty = pBlock->nBits;
@@ -134,15 +134,6 @@ namespace LLC
         {
             cuda_results(nID, nTestIndex-1, nonce_offsets, nonce_meta,
                 &nCount, nPrimesChecked, nPrimesFound);
-        }
-
-
-        /* Total up global stats from each device. */
-        for(uint8_t i = 0; i < 16; ++i)
-        {
-            PrimesChecked[i] += nPrimesChecked[i];
-            Tests_GPU += nPrimesChecked[i];
-            PrimesFound[i] += nPrimesFound[i];
         }
 
         /* Check for early out. */
@@ -253,7 +244,7 @@ namespace LLC
 
         /* Allocate memory for offsets testing meta and bit array sieve. */
         g_nonce_offsets[nID] =   (uint64_t*)malloc(OFFSETS_MAX * sizeof(uint64_t));
-        g_nonce_meta[nID] =      (uint64_t*)malloc(OFFSETS_MAX * sizeof(uint64_t));
+        g_nonce_meta[nID] =      (uint32_t*)malloc(OFFSETS_MAX * sizeof(uint32_t));
         g_bit_array_sieve[nID] = (uint32_t *)malloc(16 * (nSieveBits >> 5) * sizeof(uint32_t));
 
         /* Initialize the GMP objects. */
@@ -303,74 +294,46 @@ namespace LLC
         {
             /* Get thread local nonce offsets and meta. */
             uint64_t *nonce_offsets = g_nonce_offsets[nID];
-            uint64_t *nonce_meta = g_nonce_meta[nID];
+            uint32_t *nonce_meta = g_nonce_meta[nID];
 
-            std::map<uint64_t, uint64_t> nonces;
-            std::vector<std::pair<uint64_t, uint64_t> > dups;
+            /* Total up global stats from each device. */
+            for(uint8_t i = 0; i < 16; ++i)
+            {
+                PrimesChecked[i] += nPrimesChecked[i];
+                Tests_GPU += nPrimesChecked[i];
+                PrimesFound[i] += nPrimesFound[i];
+            }
+
+            std::map<uint64_t, uint32_t> nonces;
+            std::vector<std::pair<uint64_t, uint32_t> > dups;
 
             for(uint32_t i = 0; i < count; ++i)
             {
                 auto it = nonces.find(nonce_offsets[i]);
                 if(it != nonces.end())
                 {
-                    uint64_t meta = it->second;
                     // Extract combo bits and chain info.
-                    std::bitset<32> combo(meta >> 32);
-                    uint32_t chain_offset_beg = (meta >> 24) & 0xFF;
-                    uint32_t chain_offset_end = (meta >> 16) & 0xFF;
-                    uint32_t chain_length = meta & 0xFF;
+                    std::bitset<32> combo(it->second);
+                    std::bitset<32> combo2(nonce_meta[i]);
 
-                    uint64_t meta2 = nonce_meta[i];
-                    // Extract combo bits and chain info.
-                    std::bitset<32> combo2(meta2 >> 32);
-                    uint32_t chain_offset_beg2 = (meta2 >> 24) & 0xFF;
-                    uint32_t chain_offset_end2 = (meta2 >> 16) & 0xFF;
-                    uint32_t chain_length2 = meta2 & 0xFF;
 
                     debug::log(3, FUNCTION, std::hex, nonce_offsets[i], " existing:  ",
-                        " combo: ", combo,
-                        " beg: ", std::dec, chain_offset_beg,
-                        " end: ", chain_offset_end,
-                        " len: ", chain_length,
-                        " | duplicate: ", std::hex,
-                            " combo: ", combo2,
-                            " beg: ", std::dec, chain_offset_beg2,
-                            " end: ", chain_offset_end2,
-                            " len: ", chain_length2);
+                        combo, " | duplicate: ", combo2);
 
 
-
-                    dups.push_back(std::pair<uint64_t, uint64_t>(nonce_offsets[i], nonce_meta[i]));
+                    dups.push_back(std::pair<uint64_t, uint32_t>(nonce_offsets[i], nonce_meta[i]));
 
 
                 }
                 else
-                nonces[nonce_offsets[i]] = nonce_meta[i];
+                    nonces[nonce_offsets[i]] = nonce_meta[i];
             }
 
 
             std::vector<uint64_t> work_offsets;
-            std::vector<uint64_t> work_meta;
-
+            std::vector<uint32_t> work_meta;
 
             debug::log(3, FUNCTION, cuda_devicename(nID), "[", (uint32_t)nID, "] ",  dups.size(), "/", count, "(", (double)dups.size()/count * 100.0,"%) duplicates");
-
-            /*for(uint32_t i = 0; i < dups.size(); ++i)
-            {
-                uint64_t meta = dups[i].second;
-                // Extract combo bits and chain info.
-                uint32_t combo = meta >> 32;
-                uint32_t chain_offset_beg = (meta >> 24) & 0xFF;
-                uint32_t chain_offset_end = (meta >> 16) & 0xFF;
-                uint32_t chain_length = meta & 0xFF;
-
-                debug::log(3, FUNCTION, "nonce: ", std::hex, dups[i].first, std::dec,
-                    " combo: ", combo,
-                    " beg: ", chain_offset_beg,
-                    " end: ", chain_offset_end,
-                    " len: ", chain_length);
-            } */
-
 
             for(auto it = nonces.begin(); it != nonces.end(); ++it)
             {
