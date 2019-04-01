@@ -565,10 +565,10 @@ namespace LLP
                 found   += LLC::PrimesFound[i].load();
             }
 
-            double pratio = 0.0;
+            double ratio = 0.0;
 
             if (checked)
-                pratio = (double)(100 * found) / checked;
+             ratio = (double)(100 * found) / checked;
 
             double WPS = 1.0 * std::accumulate(LLC::vWPSValues.begin(), LLC::vWPSValues.end(), 0.0) / LLC::vWPSValues.size();
 
@@ -617,21 +617,21 @@ namespace LLP
             debug::log(1, "-----------------------------------------------------------------------------------------------");
 
             debug::log(0, "[PRIMES] ", "Sieved ", std::fixed, std::setprecision(2), (double)gibps / (1 << 30), " GiB/s | Tested ",
-                tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), pratio, " %");
+                tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), ratio, " %");
             debug::log(0, "");
 
 
+            /* Calculate and print the prime pattern offset ratios. */
             debug::log(1, "[PRIMES] Offset Ratios: ");
-
             for(uint16_t i = 0; i < vOffsets.size(); ++i)
             {
-                uint64_t found = LLC::PrimesFound[i].load();
-                uint64_t checked = LLC::PrimesChecked[i].load();
+                found = LLC::PrimesFound[i].load();
+                checked = LLC::PrimesChecked[i].load();
 
                 /* Check for divide by zero. */
                 if(checked)
                 {
-                    double ratio = (double)(100 * found) / checked;
+                    ratio = (double)(100 * found) / checked;
 
                     LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
                     LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
@@ -646,9 +646,6 @@ namespace LLP
             /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */
 
         }
-
-        /* Print the total stats from each worker. */
-        //debug::log(0, statsTotal.ToString());
     }
 
 }

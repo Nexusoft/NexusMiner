@@ -40,7 +40,7 @@ __global__ void combosieve_kernelA_512(uint32_t *g_bit_array_sieve,
         uint32_t pIdx = threadIdx.x * pr;
         uint32_t nAdd = pr << 9;
 
-        uint32_t index = prime_remainders[(i << 4) + o] + pre2; // << 4 because we have space for 16 offsets
+        uint32_t index = prime_remainders[(i << 3) + o] + pre2; // << 4 because we have space for 16 offsets
 
         if(index >= pr)
             index = index - pr;
@@ -84,7 +84,7 @@ __global__ void combosieve_kernelA_256(uint32_t *g_bit_array_sieve,
         uint32_t pIdx = threadIdx.x * pr;
         uint32_t nAdd = pr << 8;
 
-        uint32_t index = prime_remainders[(i << 4) + o] + pre2; // << 4 because we have space for 16 offsets
+        uint32_t index = prime_remainders[(i << 3) + o] + pre2; // << 4 because we have space for 16 offsets
 
         if(index >= pr)
             index = index - pr;
@@ -128,7 +128,7 @@ __global__ void combosieve_kernelA_128(uint32_t *g_bit_array_sieve,
         uint32_t pIdx = threadIdx.x * pr;
         uint32_t nAdd = pr << 7;
 
-        uint32_t index = prime_remainders[(i << 4) + o] + pre2; // << 4 because we have space for 16 offsets
+        uint32_t index = prime_remainders[(i << 3) + o] + pre2; // << 4 because we have space for 16 offsets
 
         if(index >= pr)
             index = index - pr;
@@ -178,7 +178,8 @@ __global__ void combosieve_kernelB(uint64_t origin,
 __global__ void compact_combo(uint64_t *d_nonce_offsets,
                               uint32_t *d_nonce_meta,
                               uint32_t *d_nonce_count,
-                              uint32_t *d_bit_array_sieve,
+                              uint32_t *d_bit_array_sieve_A,
+                              uint32_t *d_bit_array_sieve_B,
                               uint32_t nBitArray_Size,
                               uint64_t sieve_start_index,
                               uint8_t nThreshold,
@@ -196,20 +197,23 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
         uint64_t nonce_offset = sieve_start_index + idx;
         uint32_t combo = 0;
 
+        /* Check the single sieve to see if offsets are valid. */
+        if((d_bit_array_sieve_A[idx >> 5] & (1 << (idx & 31))) == 0)
+            combo = c_bitmaskA;
+
         /* Take the bit from each sieve and compact them into a single word. */
         for(uint8_t o = 0; o < nOffsetsB; ++o)
         {
             /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
-            uint16_t bit = !((d_bit_array_sieve[idx >> 5]) & (1 << (idx & 31)));
+            uint16_t bit = !((d_bit_array_sieve_B[idx >> 5]) & (1 << (idx & 31)));
 
             combo |= bit << c_iB[o];
 
-            d_bit_array_sieve += nBitArray_Size >> 5;
+            d_bit_array_sieve_B += nBitArray_Size >> 5;
         }
 
         /* Get the count of the remaining zero bits and compare to threshold. */
         uint32_t nCount = __popc(combo);
-
 
         /* Count the bits for this combo. */
         if(nCount >= nThreshold)
@@ -254,21 +258,14 @@ void comboA_launch(uint8_t thr_id,
     /* fall-through switch logic, zero-based indexing */
     switch(nOffsetsB)
     {
-        case 15: COMBO_A_LAUNCH(14);
-        case 14: COMBO_A_LAUNCH(13);
-        case 13: COMBO_A_LAUNCH(12);
-        case 12: COMBO_A_LAUNCH(11);
-        case 11: COMBO_A_LAUNCH(10);
-        case 10: COMBO_A_LAUNCH(9);
-        case 9:  COMBO_A_LAUNCH(8);
-        case 8:  COMBO_A_LAUNCH(7);
-        case 7:  COMBO_A_LAUNCH(6);
-        case 6:  COMBO_A_LAUNCH(5);
-        case 5:  COMBO_A_LAUNCH(4);
-        case 4:  COMBO_A_LAUNCH(3);
-        case 3:  COMBO_A_LAUNCH(2);
-        case 2:  COMBO_A_LAUNCH(1);
-        case 1:  COMBO_A_LAUNCH(0);
+        case 8:  COMBO_A_LAUNCH(8);
+        case 7:  COMBO_A_LAUNCH(7);
+        case 6:  COMBO_A_LAUNCH(6);
+        case 5:  COMBO_A_LAUNCH(5);
+        case 4:  COMBO_A_LAUNCH(4);
+        case 3:  COMBO_A_LAUNCH(3);
+        case 2:  COMBO_A_LAUNCH(2);
+        case 1:  COMBO_A_LAUNCH(1);
         break;
         default: debug::error("Unsupported Combo A Launch.");
         break;
@@ -304,21 +301,14 @@ void comboB_launch(uint8_t thr_id,
     /* fall-through switch logic, zero-based indexing */
     switch(nOffsetsB)
     {
-        case 15: COMBO_B_LAUNCH(14);
-        case 14: COMBO_B_LAUNCH(13);
-        case 13: COMBO_B_LAUNCH(12);
-        case 12: COMBO_B_LAUNCH(11);
-        case 11: COMBO_B_LAUNCH(10);
-        case 10: COMBO_B_LAUNCH(9);
-        case 9:  COMBO_B_LAUNCH(8);
-        case 8:  COMBO_B_LAUNCH(7);
-        case 7:  COMBO_B_LAUNCH(6);
-        case 6:  COMBO_B_LAUNCH(5);
-        case 5:  COMBO_B_LAUNCH(4);
-        case 4:  COMBO_B_LAUNCH(3);
-        case 3:  COMBO_B_LAUNCH(2);
-        case 2:  COMBO_B_LAUNCH(1);
-        case 1:  COMBO_B_LAUNCH(0);
+        case 8:  COMBO_B_LAUNCH(8);
+        case 7:  COMBO_B_LAUNCH(7);
+        case 6:  COMBO_B_LAUNCH(6);
+        case 5:  COMBO_B_LAUNCH(5);
+        case 4:  COMBO_B_LAUNCH(4);
+        case 3:  COMBO_B_LAUNCH(3);
+        case 2:  COMBO_B_LAUNCH(2);
+        case 1:  COMBO_B_LAUNCH(1);
         break;
         default: debug::error("Unsupported Combo B Launch.");
         break;
@@ -332,6 +322,7 @@ void comboB_launch(uint8_t thr_id,
     frameResources[thr_id].d_nonce_meta[curr_test], \
     frameResources[thr_id].d_nonce_count[curr_test], \
     frameResources[thr_id].d_bit_array_sieve[curr_sieve], \
+    &frameResources[thr_id].d_bit_array_sieve[curr_sieve][nBitArray_Size >> 5], \
     nBitArray_Size, \
     primorial_start, \
     threshold, \
@@ -354,13 +345,6 @@ void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, 
         case 6:  COMBO_COMPACT_LAUNCH(6);  break;
         case 7:  COMBO_COMPACT_LAUNCH(7);  break;
         case 8:  COMBO_COMPACT_LAUNCH(8);  break;
-        case 9:  COMBO_COMPACT_LAUNCH(9);  break;
-        case 10: COMBO_COMPACT_LAUNCH(10); break;
-        case 11: COMBO_COMPACT_LAUNCH(11); break;
-        case 12: COMBO_COMPACT_LAUNCH(12); break;
-        case 13: COMBO_COMPACT_LAUNCH(13); break;
-        case 14: COMBO_COMPACT_LAUNCH(14); break;
-        case 15: COMBO_COMPACT_LAUNCH(15); break;
         default: debug::error("Unsupported Combo Compact Launch."); break;
     }
 

@@ -64,10 +64,8 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
     {
         uint32_t nonce_meta = in_nonce_meta[idx];
 
-
         /* Since extra 0-bits will invert to 1, mask them off the end.  */
-        uint32_t count = __popc((~nonce_meta) & (0xFFFFFFFF >> nOffsets));
-
+        uint32_t count = __popc((~nonce_meta) & (0xFFFFFFFF >> (32 - nOffsets)));
 
 
         /* If the count meets the threshold, add to result buffer. */
@@ -92,8 +90,8 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
     /* Compute the global index for this nonce offset. */
     uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint32_t idx = position >> 4;
-    uint32_t o = position & 15;
+    uint32_t idx = position >> 3;
+    uint32_t o = position & 7;
 
     /* If the quit flag was set, early return to avoid wasting time. */
     if(c_quit)
@@ -185,8 +183,8 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     debug::log(3, FUNCTION, (uint32_t)thr_id,  ": nonce_count = ", nThreads);
 
     /* Loop unroll up to 8 offsets for testing. */
-    dim3 block(32 << 4);
-    dim3 grid((nThreads + block.x - 1) / (block.x >> 4));
+    dim3 block(32 << 3);
+    dim3 grid((nThreads + block.x - 1) / (block.x >> 3));
 
     /* Launcth the fermat testing kernel. */
     fermat_kernel<<<grid, block, 0, d_Streams[thr_id][STREAM::FERMAT]>>>(
@@ -279,7 +277,6 @@ extern "C" void cuda_results(uint32_t thr_id,
             primes_checked[i] =  frameResources[thr_id].h_primes_checked[curr_test][i];
             primes_found[i] =  frameResources[thr_id].h_primes_found[curr_test][i];
         }
-
 
         if(*result_count == 0)
             return;

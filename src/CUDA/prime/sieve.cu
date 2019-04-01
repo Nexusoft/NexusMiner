@@ -46,12 +46,28 @@ extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
     nOffsetsB = indicesB.size();
     uint32_t nOffsetsT = indicesT.size();
     uint32_t nOffsets = offsets.size();
+    uint32_t bitMaskA = 0;
 
-    if(nOffsetsA > 16 || nOffsetsB > 16 || nOffsetsT > 16)
+    if(nOffsets > 16)
     {
-        debug::error(FUNCTION, "Cannot have more than 16 offsets");
+        debug::error(FUNCTION, "Cannot have more than 16 total offsets.");
         return;
     }
+
+    if(nOffsetsA > 8 || nOffsetsB > 8 || nOffsetsT > 8)
+    {
+        debug::error(FUNCTION, "Cannot have more than 8 offsets");
+        return;
+    }
+
+    for(uint8_t i = 0; i < nOffsetsA; ++i)
+        bitMaskA |= (1 << indicesA[i]);
+
+    /* Invert the bits and mask off unwanted high bits. */
+    //bitMaskA = (~bitMaskA) & (0xFFFFFFFF >> (32 - nOffsets));
+
+    CHECK(cudaMemcpyToSymbol(c_bitmaskA, &bitMaskA,
+         sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
 
     CHECK(cudaMemcpyToSymbol(c_offsets, offsets.data(),
         nOffsets*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
@@ -89,7 +105,7 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
     uint32_t sharedSizeBits = sharedSizeKB * 1024 * 8;
     uint32_t allocSize = ((nBitArray_Size * 16  + sharedSizeBits - 1) / sharedSizeBits) * sharedSizeBits;
     uint32_t bitarray_size = (allocSize+31)/32 * sizeof(uint32_t);
-    uint32_t remainder_size = 2 * nPrimeLimitA * 16 * sizeof(uint32_t);
+    uint32_t remainder_size = 2 * nPrimeLimitA * 8 * sizeof(uint32_t);
 
     /* Allocate memory for the primes, inverses, and reciprocals that are used
        as the basis for prime sieve computation */
@@ -256,7 +272,7 @@ __global__ void primesieve_kernelA0(uint64_t origin,
         for(uint8_t o = 0; o < nOffsets; ++o)
         {
             tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
-            prime_remainders[(i << 4) + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+            prime_remainders[(i << 3) + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
         }
     }
 }
@@ -278,7 +294,7 @@ __global__ void primesieve_kernelB0(uint64_t origin,
         for(uint8_t o = 0; o < nOffsets; ++o)
         {
             tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iB[o]], tmp.x, recip);
-            prime_remainders[(i << 4) + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+            prime_remainders[(i << 3) + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
         }
     }
 }
@@ -312,7 +328,7 @@ __global__ void primesieve_kernelA_1024(uint32_t *g_bit_array_sieve,
         uint32_t pre1[offsetsA];
         auto pre = [&pre1, &prime_remainders, &i](uint32_t o)
         {
-            pre1[o] = prime_remainders[(i << 4) + o]; // << 4 because we have space for 16 offsets
+            pre1[o] = prime_remainders[(i << 3) + o]; // << 4 because we have space for 16 offsets
         };
 
         Unroller<0, offsetsA>::step(pre);
@@ -374,7 +390,7 @@ __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
         uint32_t pre1[offsetsA];
         auto pre = [&pre1, &prime_remainders, &i](uint32_t o)
         {
-            pre1[o] = prime_remainders[(i << 4) + o]; // << 4 because we have space for 16 offsets
+            pre1[o] = prime_remainders[(i << 3) + o]; // << 4 because we have space for 16 offsets
         };
 
         Unroller<0, offsetsA>::step(pre);
@@ -431,7 +447,7 @@ __global__ void primesieve_kernelA_256(uint32_t *g_bit_array_sieve,
         uint32_t pre1[offsetsA];
         auto pre = [&pre1, &prime_remainders, &i](uint32_t o)
         {
-            pre1[o] = prime_remainders[(i << 4) + o]; // << 4 because we have space for 16 offsets
+            pre1[o] = prime_remainders[(i << 3) + o]; // << 4 because we have space for 16 offsets
         };
 
         Unroller<0, offsetsA>::step(pre);
@@ -488,7 +504,7 @@ __global__ void primesieve_kernelA_128(uint32_t *g_bit_array_sieve,
         uint32_t pre1[offsetsA];
         auto pre = [&pre1, &prime_remainders, &i](uint32_t o)
         {
-            pre1[o] = prime_remainders[(i << 4) + o]; // << 4 because we have space for 16 offsets
+            pre1[o] = prime_remainders[(i << 3) + o]; // << 4 because we have space for 16 offsets
         };
 
         Unroller<0, offsetsA>::step(pre);
@@ -877,8 +893,6 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
                                 uint32_t sieve_index,
                                 uint32_t test_index)
 {
-
-
     /* Get the current working sieve and test indices */
     uint8_t curr_sieve = sieve_index % FRAME_COUNT;
     uint8_t curr_test = test_index % FRAME_COUNT;
@@ -894,11 +908,10 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     /* Calculate bit array size, sieve start bit, and base offset */
     uint64_t primorial_start = (uint64_t)nBitArray_Size * (uint64_t)sieve_index;
     uint64_t base_offsetted = base_offset + primorial * primorial_start;
-    uint8_t nComboThreshold = 8;
+    uint8_t nComboThreshold = nOffsetsA;
 
 
     {
-
         /* Wait for testing and compaction to finish before starting next round. */
         CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::COMPACT));
         CHECK(stream_wait_event(thr_id, prev_test, STREAM::CLEAR, EVENT::FERMAT));
@@ -908,6 +921,9 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
         CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::CLEAR));
 
         /* Precompute prime remainders. */
+        kernelA0_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
+          nPrimeLimitA, base_offsetted);
+
         kernelB0_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
           nPrimeLimitA, base_offsetted);
 
@@ -915,32 +931,37 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
 
     {  /* Launch small sieve, utilizing shared memory and signal */
-
         CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::CLEAR));
 
-        //kernelA_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
-        //              nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size);
+        /* Single sieve */
+        kernelA_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
+                      nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size);
+
+        /* Combo sieve */
         comboA_launch(thr_id, STREAM::SIEVE_A, curr_sieve,
                       nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size);
-        CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::SIEVE_A));
 
+        CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::SIEVE_A));
     }
 
 
     {  /* Launch large sieve, utilizing global memory and signal */
         CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_A));
 
-        //kernelB_launch(thr_id, STREAM::SIEVE_B, base_offsetted, curr_sieve,
-        //              nPrimeLimitA, nPrimeLimitB, nBitArray_Size);
+        /* Single sieve */
+        kernelB_launch(thr_id, STREAM::SIEVE_B, base_offsetted, curr_sieve,
+                      nPrimeLimitA, nPrimeLimitB, nBitArray_Size);
+
+        /* Combo sieve */
         comboB_launch(thr_id, STREAM::SIEVE_B, base_offsetted, curr_sieve,
                       nPrimeLimitA, nPrimeLimitB, nBitArray_Size);
+
         CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_B));
     }
 
 
 
     {   /* Launch compaction and signal */
-
         CHECK(stream_wait_events(thr_id, curr_sieve, STREAM::COMPACT, EVENT::SIEVE_A, EVENT::SIEVE_B));
 
         //kernel_compact_launch(thr_id, STREAM::COMPACT, curr_sieve, curr_test, next_test, nBitArray_Size, primorial_start);

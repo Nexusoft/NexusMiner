@@ -144,33 +144,21 @@ namespace LLC
                 if(combo & (1 << j))
                     continue;
 
+                /* Skip GPU offsets. Already Fermat tested. */
+                if(mapTest.find(j) != mapTest.end())
+                    continue;
+
                 /* Start fresh from each offset remaining. */
                 mpz_add_ui(zTempVar, zBaseOffsetted, vOffsets[j]);
 
-                /* Check for Miller-Rabin test */
-                if(mpz_probab_prime_p(zTempVar, 1) > 0)
-                {
-                    /* Skip GPU offsets. Already Fermat tested. */
-                    if(mapTest.find(j) != mapTest.end())
-                        continue;
 
-                    /* Check for Fermat test. */
-                    mpz_sub_ui(zN, zTempVar, 1);
-                    mpz_powm(zResidue, zTwo, zN, zTempVar);
-                    if (mpz_cmp_ui(zResidue, 1) == 0)
-                        ++PrimesFound[j];
-                    else
-                        combo |= (1 << j);
-                }
+                /* Check for Fermat test. */
+                mpz_sub_ui(zN, zTempVar, 1);
+                mpz_powm(zResidue, zTwo, zN, zTempVar);
+                if (mpz_cmp_ui(zResidue, 1) == 0)
+                    ++PrimesFound[j];
                 else
-                {
                     combo |= (1 << j);
-
-                    /* Take back passed test from GPU. Fermat liar. */
-                    if(mapTest.find(j) != mapTest.end())
-                        --PrimesFound[j];
-                }
-
 
 
                 ++PrimesChecked[j];
@@ -198,13 +186,13 @@ namespace LLC
             //" beg=", chain_offset_beg,
             //" end=", chain_offset_end);
 
-            if(chain_offset_beg >= nOffsets
-            || chain_offset_end >= nOffsets)
+            if(chain_offset_beg >= nOffsets || chain_offset_end >= nOffsets)
+            {
                 return debug::error("Offset index out of bounds.",
                 " beg=", chain_offset_beg,
                 " end=", chain_offset_end,
                 " combo=", std::bitset<32>(combo));
-
+            }
 
 
             chain_offset_beg = vOffsets[chain_offset_beg];
@@ -212,6 +200,7 @@ namespace LLC
 
 
             /* Search for primes after small cluster */
+            /*
             uint8_t nPrimeGap = 0;
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_end);
             while (nPrimeGap <= 12)
@@ -219,18 +208,17 @@ namespace LLC
                 if(fReset.load() || nHeight != pBlock->nHeight)
                     return false;
 
-                if(mpz_probab_prime_p(zTempVar, 1) > 0)
-                {
-                    mpz_sub_ui(zN, zTempVar, 1);
-                    mpz_powm(zResidue, zTwo, zN, zTempVar);
-                    if (mpz_cmp_ui(zResidue, 1) == 0)
-                    {
-                        //++PrimesFound;
-                        ++chain_length;
 
-                        nPrimeGap = 0;
-                    }
+                mpz_sub_ui(zN, zTempVar, 1);
+                mpz_powm(zResidue, zTwo, zN, zTempVar);
+                if (mpz_cmp_ui(zResidue, 1) == 0)
+                {
+                    //++PrimesFound;
+                    ++chain_length;
+
+                    nPrimeGap = 0;
                 }
+
                 //++PrimesChecked;
                 ++Tests_CPU;
 
@@ -238,9 +226,11 @@ namespace LLC
                 chain_offset_end += 2;
                 nPrimeGap += 2;
             }
+            */
 
 
             /* Search for primes before small cluster */
+            /*
             nPrimeGap = 0;
             uint32_t begin_offset = 0;
             uint32_t begin_next = 2;
@@ -249,18 +239,17 @@ namespace LLC
 
             while (nPrimeGap <= 12)
             {
-                if(mpz_probab_prime_p(zTempVar, 1) > 0)
+
+                mpz_sub_ui(zN, zTempVar, 1);
+                mpz_powm(zResidue, zTwo, zN, zTempVar);
+                if (mpz_cmp_ui(zResidue, 1) == 0)
                 {
-                    mpz_sub_ui(zN, zTempVar, 1);
-                    mpz_powm(zResidue, zTwo, zN, zTempVar);
-                    if (mpz_cmp_ui(zResidue, 1) == 0)
-                    {
-                        //++PrimesFound;
-                        ++chain_length;
-                        nPrimeGap = 0;
-                        begin_offset = begin_next;
-                    }
+                    //++PrimesFound;
+                    ++chain_length;
+                    nPrimeGap = 0;
+                    begin_offset = begin_next;
                 }
+
                 //++PrimesChecked;
                 ++Tests_CPU;
 
@@ -268,10 +257,11 @@ namespace LLC
                 begin_next += 2;
                 nPrimeGap += 2;
             }
+            */
 
             /* Translate nonce offset of begin prime to global offset. */
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
-            mpz_sub_ui(zTempVar, zTempVar, begin_offset);
+            //mpz_sub_ui(zTempVar, zTempVar, begin_offset);
             mpz_sub(zTempVar, zTempVar, zPrimeOrigin);
             nNonce = mpz_get_ui(zTempVar);
 
