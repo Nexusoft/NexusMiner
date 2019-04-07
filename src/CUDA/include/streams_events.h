@@ -62,5 +62,7 @@ cudaError_t stream_wait_event(uint8_t tid, uint8_t frame_index, uint8_t sid, uin
 
 cudaError_t stream_signal_event(uint8_t tid, uint8_t frame_index, uint8_t sid, uint8_t eid);
 
+cudaError_t synchronize_event(uint8_t tid, uint8_t frame_index, uint8_t eid);
+
 
 #endif

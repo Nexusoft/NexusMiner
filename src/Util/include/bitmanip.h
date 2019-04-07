@@ -31,7 +31,7 @@ namespace convert
      *  @return Returns the number of bits set in a word.
      *
      **/
-    uint32_t popc(uint32_t nWord)
+    inline uint32_t popc(uint32_t nWord)
     {
     #ifdef WIN32
         return __popcnt(nWord);
@@ -51,7 +51,7 @@ namespace convert
      *  @return Returns the count of leading zeroes.
      *
      **/
-    uint32_t clz(uint32_t nWord)
+    inline uint32_t clz(uint32_t nWord)
     {
     #ifdef WIN32
             return __popcnt(nWord);
@@ -71,7 +71,7 @@ namespace convert
      *  @return Returns the count of trailing zeroes.
      *
      **/
-    uint32_t ctz(uint32_t nWord)
+    inline uint32_t ctz(uint32_t nWord)
     {
     #ifdef WIN32
         uint32_t i = 0;

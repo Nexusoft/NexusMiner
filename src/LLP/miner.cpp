@@ -88,11 +88,12 @@ namespace LLP
         condition.notify_one();
     }
 
+
+    /* Wait for workers to be ready. */
     void Miner::Wait()
     {
         std::unique_lock<std::mutex> lk(mut);
         condition.wait(lk, [this] {return nReady.load() >= nWorkers.load();});
-        lk.unlock();
     }
 
 

@@ -14,6 +14,7 @@ ________________________________________________________________________________
 #include <CUDA/include/util.h>
 
 #include <LLC/include/global.h>
+#include <LLC/prime/origins.h>
 #include <LLC/types/cuda_prime.h>
 #include <LLC/types/cuda_hash.h>
 #include <LLC/types/cpu_hash.h>
@@ -82,6 +83,18 @@ int main(int argc, char **argv)
     uint8_t nPrimeWorkers = nPrimeGPU + nPrimeCPU;
     uint8_t nHashWorkers = nHashGPU + nHashCPU;
 
+    /* If prime origins is specified, generate a prime origin list. */
+    if(config::GetBoolArg(std::string("-primeorigins")))
+    {
+        if(!prime::load_offsets())
+            return 0;
+
+        LLC::InitializePrimes();
+        LLC::ComputeOrigins(base_offset, vOffsets, 8, 12);
+
+        return 0;
+    }
+
 
     /* If there are any prime workers at all, load primes. */
     if(nPrimeWorkers)
@@ -96,7 +109,7 @@ int main(int argc, char **argv)
         LLC::InitializePrimes();
     }
 
-    /* Initialize the Prime Miner. */
+    /* Initialize the miner. */
     LLP::Miner Miner(ip, port, nTimeout);
 
     /* Add workers to miner */

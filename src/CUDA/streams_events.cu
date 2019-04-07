@@ -93,3 +93,9 @@ cudaError_t stream_signal_event(uint8_t tid, uint8_t frame_index, uint8_t sid, u
 {
     return cudaEventRecord(d_Events[tid][frame_index][eid], d_Streams[tid][sid]);
 }
+
+
+cudaError_t synchronize_event(uint8_t tid, uint8_t frame_index, uint8_t eid)
+{
+    return cudaEventSynchronize(d_Events[tid][frame_index][eid]);
+}

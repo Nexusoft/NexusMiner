@@ -200,7 +200,6 @@ namespace LLC
 
 
             /* Search for primes after small cluster */
-            /*
             uint8_t nPrimeGap = 0;
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_end);
             while (nPrimeGap <= 12)
@@ -226,11 +225,9 @@ namespace LLC
                 chain_offset_end += 2;
                 nPrimeGap += 2;
             }
-            */
 
 
             /* Search for primes before small cluster */
-            /*
             nPrimeGap = 0;
             uint32_t begin_offset = 0;
             uint32_t begin_next = 2;
@@ -257,11 +254,10 @@ namespace LLC
                 begin_next += 2;
                 nPrimeGap += 2;
             }
-            */
 
             /* Translate nonce offset of begin prime to global offset. */
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_beg);
-            //mpz_sub_ui(zTempVar, zTempVar, begin_offset);
+            mpz_sub_ui(zTempVar, zTempVar, begin_offset);
             mpz_sub(zTempVar, zTempVar, zPrimeOrigin);
             nNonce = mpz_get_ui(zTempVar);
 

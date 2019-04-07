@@ -10,6 +10,7 @@ OBJS :=	build/main.o \
 				build/LLC_bignum.o \
 				build/LLC_global.o \
 				build/LLC_prime.o \
+				build/LLC_origins.o \
 				build/LLC_prime2.o \
 				build/LLC_cuda_prime.o \
 				build/LLC_cpu_primetest.o \
@@ -55,14 +56,14 @@ CXX := g++
 CC := gcc
 
 
-LIB := -lpthread -lgmp -lcrypto
+LIB := -lpthread -lgmp -lcrypto -lgomp
 
 CUDA_LIB := -L$(CUDA_PATH)/lib64 -lcudadevrt -lcudart -lcuda
 CUDA_INC += -I$(CUDA_PATH)/include
 CUDA_INC += $(addprefix -I, $(CURDIR) $(CURDIR)/build $(CURDIR)/src )
 
 CFLAGS   :=
-CXXFLAGS := -std=c++11 -msse2 -O2
+CXXFLAGS := -std=c++11 -msse2 -O2 -fopenmp
 INCLUDES += $(addprefix -I, $(CURDIR) $(CURDIR)/build $(CURDIR)/src )
 
 GPU_CARD := -gencode arch=compute_60,code=sm_60 \

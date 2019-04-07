@@ -17,7 +17,8 @@
 #include <Util/include/prime_config.h>
 
 template<uint8_t o>
-__global__ void combosieve_kernelA_512(uint32_t *g_bit_array_sieve,
+__global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
+                                       uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
                                        uint16_t nPrimorialEndPrime,
@@ -46,7 +47,11 @@ __global__ void combosieve_kernelA_512(uint32_t *g_bit_array_sieve,
             index = index - pr;
 
         for(index = index + pIdx; index < 262144; index += nAdd)
-            atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        {
+            if(g_sieve_hierarchy[index >> 5] & 1 << (index & 31) == 0)
+                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        }
+
     }
 
     __syncthreads();
@@ -61,7 +66,8 @@ __global__ void combosieve_kernelA_512(uint32_t *g_bit_array_sieve,
 }
 
 template<uint8_t o>
-__global__ void combosieve_kernelA_256(uint32_t *g_bit_array_sieve,
+__global__ void combosieve_kernelA_256(uint32_t *g_sieve_hierarchy,
+                                       uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
                                        uint16_t nPrimorialEndPrime,
@@ -90,7 +96,11 @@ __global__ void combosieve_kernelA_256(uint32_t *g_bit_array_sieve,
             index = index - pr;
 
         for(index = index + pIdx; index < 262144; index += nAdd)
-            atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        {
+            if(g_sieve_hierarchy[index >> 5] & 1 << (index & 31) == 0)
+                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        }
+
     }
 
     __syncthreads();
@@ -105,7 +115,8 @@ __global__ void combosieve_kernelA_256(uint32_t *g_bit_array_sieve,
 }
 
 template<uint8_t o>
-__global__ void combosieve_kernelA_128(uint32_t *g_bit_array_sieve,
+__global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
+                                       uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
                                        uint16_t nPrimorialEndPrime,
@@ -134,7 +145,10 @@ __global__ void combosieve_kernelA_128(uint32_t *g_bit_array_sieve,
             index = index - pr;
 
         for(index = index + pIdx; index < 262144; index += nAdd)
-            atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        {
+            if(g_sieve_hierarchy[index >> 5] & 1 << (index & 31) == 0)
+                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        }
     }
 
     __syncthreads();
@@ -151,6 +165,7 @@ __global__ void combosieve_kernelA_128(uint32_t *g_bit_array_sieve,
 
 template<uint8_t o>
 __global__ void combosieve_kernelB(uint64_t origin,
+                                   uint32_t *g_sieve_hierarchy,
                                    uint32_t *bit_array_sieve,
                                    uint32_t bit_array_size,
                                    uint4 *primes,
@@ -170,7 +185,8 @@ __global__ void combosieve_kernelB(uint64_t origin,
 
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
         {
-            atomicOr(&bit_array_sieve[tmp.w >> 5], 1 << (tmp.w & 31));
+            if(g_sieve_hierarchy[tmp.w >> 5] & 1 << (tmp.w & 31) == 0)
+                atomicOr(&bit_array_sieve[tmp.w >> 5], 1 << (tmp.w & 31));
         }
     }
 }
@@ -186,6 +202,11 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
                               uint8_t nOffsetsB,
                               uint8_t nOffsets)
 {
+    /* If the quit flag was set, early return to avoid wasting time. */
+    if(c_quit)
+        return;
+
+
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     //uint32_t sharedSizeBits = 32 * 1024 * 8;
@@ -199,40 +220,43 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
 
         /* Check the single sieve to see if offsets are valid. */
         if((d_bit_array_sieve_A[idx >> 5] & (1 << (idx & 31))) == 0)
+        {
             combo = c_bitmaskA;
 
-        /* Take the bit from each sieve and compact them into a single word. */
-        for(uint8_t o = 0; o < nOffsetsB; ++o)
-        {
-            /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
-            uint16_t bit = !((d_bit_array_sieve_B[idx >> 5]) & (1 << (idx & 31)));
-
-            combo |= bit << c_iB[o];
-
-            d_bit_array_sieve_B += nBitArray_Size >> 5;
-        }
-
-        /* Get the count of the remaining zero bits and compare to threshold. */
-        uint32_t nCount = __popc(combo);
-
-        /* Count the bits for this combo. */
-        if(nCount >= nThreshold)
-        {
-            //printf("combo=%08X, count=%d\n", combo, nCount);
-
-            uint32_t i = atomicAdd(d_nonce_count, 1);
-
-            if(i < OFFSETS_MAX)
+            /* Take the bit from each sieve and compact them into a single word. */
+            for(uint8_t o = 0; o < nOffsetsB; ++o)
             {
-                /* Assign the global nonce offset and meta data. */
-                d_nonce_offsets[i] = nonce_offset;
-                d_nonce_meta[i] = (~combo) & (0xFFFFFFFF >> nOffsets);
+                /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
+                uint16_t bit = !((d_bit_array_sieve_B[idx >> 5]) & (1 << (idx & 31)));
+
+                combo |= bit << c_iB[o];
+
+                d_bit_array_sieve_B += nBitArray_Size >> 5;
+            }
+
+            /* Get the count of the remaining zero bits and compare to threshold. */
+            uint32_t nRemaining = __popc(combo);
+
+            /* Count the remaining bits for this combo. */
+            if(nRemaining >= nThreshold)
+            {
+                //printf("%d: compact_sieve: combo=%08X, count=%d\n", idx, combo, nCount);
+
+                uint32_t i = atomicAdd(d_nonce_count, 1);
+
+                if(i < OFFSETS_MAX)
+                {
+                    /* Assign the global nonce offset and meta data. */
+                    d_nonce_offsets[i] = nonce_offset;
+                    d_nonce_meta[i] = (~combo) & (0xFFFFFFFF >> nOffsets);
+                }
             }
         }
     }
 }
 
 #define COMBO_A_LAUNCH(X) combosieve_kernelA_256<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
+frameResources[thr_id].d_bit_array_sieve[frame_index], \
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
 &frameResources[thr_id].d_prime_remainders[frame_index][nPrimeLimitA], \
 d_blockoffset_mod_p[thr_id], \
@@ -276,6 +300,7 @@ void comboA_launch(uint8_t thr_id,
 
 #define COMBO_B_LAUNCH(X)   combosieve_kernelB<X><<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
 origin, \
+frameResources[thr_id].d_bit_array_sieve[frame_index], \
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
 nBitArray_Size, \
 d_primesInverseInvk[thr_id], \

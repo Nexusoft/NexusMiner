@@ -57,6 +57,10 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
                                      uint32_t nThreshold,
                                      uint32_t nOffsets)
 {
+    /* If the quit flag was set, early return to avoid wasting time. */
+    if(c_quit)
+        return;
+
     /* Compute the global index for this nonce offset. */
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -65,12 +69,16 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
         uint32_t nonce_meta = in_nonce_meta[idx];
 
         /* Since extra 0-bits will invert to 1, mask them off the end.  */
-        uint32_t count = __popc((~nonce_meta) & (0xFFFFFFFF >> (32 - nOffsets)));
+        uint32_t combo = (~nonce_meta) & (0xFFFFFFFF >> (32 - nOffsets));
 
+        /* Get the count of zero bits. */
+        uint32_t nCount = __popc(combo);
 
         /* If the count meets the threshold, add to result buffer. */
-        if(count >= nThreshold)
+        if(nCount >= nThreshold)
         {
+            //printf("%d: compact_fermat: nonce_meta=%08X, combo=%08X, count=%d\n", idx, nonce_meta, combo, nCount);
+
             add_result(g_result_offsets, g_result_meta, g_result_count,
                        in_nonce_offsets[idx], nonce_meta, OFFSETS_MAX);
         }
@@ -87,15 +95,14 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
                               uint32_t nOffsets)
 {
 
-    /* Compute the global index for this nonce offset. */
-    uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
-
-    uint32_t idx = position >> 3;
-    uint32_t o = position & 7;
-
     /* If the quit flag was set, early return to avoid wasting time. */
     if(c_quit)
         return;
+
+    /* Compute the global index for this nonce offset. */
+    uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
+    uint32_t idx = position >> 3;
+    uint32_t o = position & 7;
 
     /* Make sure index is not out of bounds. */
     if(idx < *nonce_count && o < nTestOffsets)
@@ -143,8 +150,8 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
 
 
     /*Make sure compaction event is finished before testing. */
-    CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
-
+    //CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
+    CHECK(synchronize_event(thr_id, curr_sieve, EVENT::COMPACT));
 
     /* Reset host-side counts to zero. */
     *frameResources[thr_id].h_result_count[curr_test] = 0;
@@ -183,7 +190,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     debug::log(3, FUNCTION, (uint32_t)thr_id,  ": nonce_count = ", nThreads);
 
     /* Loop unroll up to 8 offsets for testing. */
-    dim3 block(32 << 3);
+    dim3 block(64 << 3);
     dim3 grid((nThreads + block.x - 1) / (block.x >> 3));
 
     /* Launcth the fermat testing kernel. */
@@ -207,7 +214,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         frameResources[thr_id].d_result_offsets[curr_test],
         frameResources[thr_id].d_result_meta[curr_test],
         frameResources[thr_id].d_result_count[curr_test],
-        nTestLevels,
+        8,
         vOffsets.size());
 
     /* Copy the result count. */
