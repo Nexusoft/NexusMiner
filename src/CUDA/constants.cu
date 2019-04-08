@@ -11,7 +11,7 @@
 
 //PRIME/////////////////////////////////////////////////////////////////////////
 __constant__ uint64_t c_zTempVar[17];
-__constant__ uint32_t c_offsets[16];
+__constant__ uint32_t c_offsets[OFFSETS_MAX];
 __constant__ uint32_t c_iA[16];
 __constant__ uint32_t c_iB[16];
 __constant__ uint32_t c_iT[16];

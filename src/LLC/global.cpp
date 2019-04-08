@@ -51,10 +51,10 @@ namespace LLC
     std::atomic<uint64_t> SievedBits;
     std::atomic<uint64_t> Tests_CPU;
     std::atomic<uint64_t> Tests_GPU;
-    std::atomic<uint64_t> PrimesFound[16];
-    std::atomic<uint64_t> PrimesChecked[16];
-    double minRatios[16] = {100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0 };
-    double maxRatios[16] = {0.0};
+    std::atomic<uint64_t> PrimesFound[OFFSETS_MAX];
+    std::atomic<uint64_t> PrimesChecked[OFFSETS_MAX];
+    double minRatios[OFFSETS_MAX];
+    double maxRatios[OFFSETS_MAX];
 
     std::atomic<uint64_t> nWeight;
     std::deque<double> vWPSValues;
@@ -142,6 +142,12 @@ namespace LLC
         mpz_clear(zPrime);
         mpz_clear(zInverse);
         mpz_clear(zResult);
+
+        for(uint32_t i = 0; i < OFFSETS_MAX; ++i)
+        {
+            minRatios[i] = 100.0;
+            maxRatios[i] = 0.0;
+        }
     }
 
 

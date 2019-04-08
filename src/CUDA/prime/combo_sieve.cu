@@ -244,11 +244,11 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
 
                 uint32_t i = atomicAdd(d_nonce_count, 1);
 
-                if(i < OFFSETS_MAX)
+                if(i < CANDIDATES_MAX)
                 {
                     /* Assign the global nonce offset and meta data. */
                     d_nonce_offsets[i] = nonce_offset;
-                    d_nonce_meta[i] = (~combo) & (0xFFFFFFFF >> nOffsets);
+                    d_nonce_meta[i] = (~combo) & (0xFFFFFFFF >> (32 - nOffsets));
                 }
             }
         }

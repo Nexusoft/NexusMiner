@@ -105,6 +105,9 @@ int main(int argc, char **argv)
         if(!prime::load_offsets())
             return 0;
 
+        if(!prime::load_origins())
+            return 0;
+
         /* Initialize primes used for prime mining. */
         LLC::InitializePrimes();
     }

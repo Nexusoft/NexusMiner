@@ -9,6 +9,7 @@
 *******************************************************************************************/
 #pragma once
 
-#define OFFSETS_MAX (1 << 18)
+#define CANDIDATES_MAX (1 << 18)
 #define GPU_MAX 8
 #define WORD_MAX 32
+#define OFFSETS_MAX 24

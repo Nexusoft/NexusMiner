@@ -22,6 +22,8 @@ ________________________________________________________________________________
 /* Sieve/Testing Specific Configurations. */
 uint32_t nPrimorialEndPrime;
 uint64_t base_offset = 0;
+
+std::vector<uint64_t> vOrigins;
 std::vector<uint32_t> vOffsets;
 std::vector<uint32_t> vOffsetsA;
 std::vector<uint32_t> vOffsetsB;
@@ -196,6 +198,29 @@ namespace prime
 
         fin.close();
         debug::log(0, "");
+
+        return true;
+    }
+
+
+    bool load_origins()
+    {
+        std::ifstream fin("origins.ini");
+        if (!fin.is_open())
+            return debug::error("could not find origins.ini!");
+
+        uint64_t nOrigin;
+        while(!fin.eof())
+        {
+            fin >> nOrigin;
+            if(fin.eof())
+                break;
+
+            vOrigins.push_back(nOrigin);
+        }
+
+        fin.close();
+        debug::log(0, vOrigins.size(), " Origins Loaded.");
 
         return true;
     }

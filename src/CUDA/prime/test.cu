@@ -80,7 +80,7 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
             //printf("%d: compact_fermat: nonce_meta=%08X, combo=%08X, count=%d\n", idx, nonce_meta, combo, nCount);
 
             add_result(g_result_offsets, g_result_meta, g_result_count,
-                       in_nonce_offsets[idx], nonce_meta, OFFSETS_MAX);
+                       in_nonce_offsets[idx], nonce_meta, CANDIDATES_MAX);
         }
     }
 }
@@ -155,7 +155,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
 
     /* Reset host-side counts to zero. */
     *frameResources[thr_id].h_result_count[curr_test] = 0;
-    for(uint8_t i = 0; i < 16; ++i)
+    for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
     {
         frameResources[thr_id].h_primes_checked[curr_test][i] = 0;
         frameResources[thr_id].h_primes_found[curr_test][i] = 0;
@@ -164,12 +164,12 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     /* Copy zeroed-out primes checked. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].d_primes_checked[curr_test],
                           frameResources[thr_id].h_primes_checked[curr_test],
-                          16 * sizeof(uint32_t), cudaMemcpyHostToDevice, d_Streams[thr_id][STREAM::FERMAT]));
+                          OFFSETS_MAX * sizeof(uint32_t), cudaMemcpyHostToDevice, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy zeroed-out primes found. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].d_primes_found[curr_test],
                           frameResources[thr_id].h_primes_found[curr_test],
-                          16 * sizeof(uint32_t), cudaMemcpyHostToDevice, d_Streams[thr_id][STREAM::FERMAT]));
+                          OFFSETS_MAX * sizeof(uint32_t), cudaMemcpyHostToDevice, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy zeroed-out result count. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].d_result_count[curr_test],
@@ -183,8 +183,8 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     if(nThreads == 0)
         return;
 
-    if(nThreads >= OFFSETS_MAX)
-        debug::error(FUNCTION, "WARNING: OFFSETS_MAX limit reached.");
+    if(nThreads >= CANDIDATES_MAX)
+        debug::error(FUNCTION, "WARNING: CANDIDATES_MAX limit reached.");
 
 
     debug::log(3, FUNCTION, (uint32_t)thr_id,  ": nonce_count = ", nThreads);
@@ -225,22 +225,22 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     /* Copy the result offsets. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_offsets[curr_test],
                           frameResources[thr_id].d_result_offsets[curr_test],
-                          OFFSETS_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          CANDIDATES_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* copy the result meta. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_meta[curr_test],
                           frameResources[thr_id].d_result_meta[curr_test],
-                          OFFSETS_MAX * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          CANDIDATES_MAX * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the amount of primes checked. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_checked[curr_test],
                           frameResources[thr_id].d_primes_checked[curr_test],
-                          16 * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          OFFSETS_MAX * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the amount of primes found. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_found[curr_test],
                           frameResources[thr_id].d_primes_found[curr_test],
-                          16 * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          OFFSETS_MAX * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Signal the Fermat event. */
     CHECK(stream_signal_event(thr_id, curr_test, STREAM::FERMAT, EVENT::FERMAT));
@@ -257,7 +257,7 @@ extern "C" void cuda_results(uint32_t thr_id,
 {
     /* Clear the stats. */
     *result_count = 0;
-    for(uint16_t i = 0; i < 16; ++i)
+    for(uint16_t i = 0; i < OFFSETS_MAX; ++i)
     {
         primes_checked[i] = 0;
         primes_found[i] = 0;
@@ -279,7 +279,7 @@ extern "C" void cuda_results(uint32_t thr_id,
 
 
         /* Update the primes checked/found for each offset from GPU. */
-        for(uint32_t i = 0; i < 16; ++i)
+        for(uint32_t i = 0; i < OFFSETS_MAX; ++i)
         {
             primes_checked[i] =  frameResources[thr_id].h_primes_checked[curr_test][i];
             primes_found[i] =  frameResources[thr_id].h_primes_found[curr_test][i];
@@ -300,8 +300,6 @@ extern "C" void cuda_results(uint32_t thr_id,
 
 extern "C" void cuda_init_counts(uint32_t thr_id)
 {
-    uint32_t zero[BUFFER_COUNT] = {0};
-
     debug::log(4, FUNCTION, thr_id);
 
     CHECK(cudaDeviceSynchronize());
@@ -311,8 +309,8 @@ extern "C" void cuda_init_counts(uint32_t thr_id)
         *frameResources[thr_id].h_nonce_count[i] = 0;
 
         CHECK(cudaMemcpy(frameResources[thr_id].d_nonce_count[i],
-                         zero,
-                         sizeof(uint32_t) * BUFFER_COUNT,
+                         frameResources[thr_id].h_nonce_count[i],
+                         sizeof(uint32_t),
                          cudaMemcpyHostToDevice));
     }
 }

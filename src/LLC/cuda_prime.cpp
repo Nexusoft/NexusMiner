@@ -63,7 +63,7 @@ namespace LLC
     , nSieveBits(0)
     , nTestLevel(0)
     {
-        for(uint8_t i = 0; i < 16; ++i)
+        for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
         {
             nPrimesChecked[i] = 0;
             nPrimesFound[i] = 0;
@@ -175,7 +175,7 @@ namespace LLC
         nCount = 0;
         nSieveIndex = 0;
         nTestIndex = 0;
-        for(uint8_t i = 0; i < 16; ++i)
+        for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
         {
             nPrimesChecked[i] = 0;
             nPrimesFound[i] = 0;
@@ -232,9 +232,16 @@ namespace LLC
         nTestLevel = nTestLevels[nID];
 
         /* Load the primes lists on the GPU device. */
-        cuda_init_primes(nID, primes, primesInverseInvk, nSievePrimes,
-        nSieveBits, 32,
-        nPrimorialEndPrime, primeLimitA);
+        cuda_init_primes(nID,
+                         vOrigins.data(),
+                         primes,
+                         primesInverseInvk,
+                         nSievePrimes,
+                         nSieveBits,
+                         32,
+                         nPrimorialEndPrime,
+                         primeLimitA,
+                         vOrigins.size());
 
         /* Set the primorial for this GPU device. */
         cuda_set_primorial(nID, nPrimorial);
@@ -243,8 +250,8 @@ namespace LLC
         cuda_set_offset_patterns(nID, vOffsets, vOffsetsA, vOffsetsB, vOffsetsT);
 
         /* Allocate memory for offsets testing meta and bit array sieve. */
-        g_nonce_offsets[nID] =   (uint64_t*)malloc(OFFSETS_MAX * sizeof(uint64_t));
-        g_nonce_meta[nID] =      (uint32_t*)malloc(OFFSETS_MAX * sizeof(uint32_t));
+        g_nonce_offsets[nID] =   (uint64_t*)malloc(CANDIDATES_MAX * sizeof(uint64_t));
+        g_nonce_meta[nID] =      (uint32_t*)malloc(CANDIDATES_MAX * sizeof(uint32_t));
         g_bit_array_sieve[nID] = (uint32_t *)malloc(16 * (nSieveBits >> 5) * sizeof(uint32_t));
 
         /* Initialize the GMP objects. */
@@ -297,7 +304,7 @@ namespace LLC
             uint32_t *nonce_meta = g_nonce_meta[nID];
 
             /* Total up global stats from each device. */
-            for(uint8_t i = 0; i < 16; ++i)
+            for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
             {
                 PrimesChecked[i] += nPrimesChecked[i];
                 Tests_GPU += nPrimesChecked[i];

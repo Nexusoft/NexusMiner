@@ -128,10 +128,15 @@ namespace LLC
             uint64_t offset = work.nonce_offsets[i];
             uint32_t combo = work.nonce_meta[i];
 
+            //combo = combo & (0xFFFFFFFF >> (32 - nOffsets));
+
 
             /* Compute the base offset of the nonce */
             mpz_mul_ui(zTempVar, zPrimorial, offset);
             mpz_add(zBaseOffsetted, zFirstSieveElement, zTempVar);
+
+            if(i % 100 == 0)
+                debug::log(0, "combo=", std::bitset<32>(combo));
 
 
             /* Loop through combo and test remaining offsets. */

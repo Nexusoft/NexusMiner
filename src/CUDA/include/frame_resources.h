@@ -12,7 +12,6 @@
 #include <cstdint>
 
 #define FRAME_COUNT 3
-#define BUFFER_COUNT 2
 
 struct FrameResource
 {

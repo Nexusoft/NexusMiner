@@ -49,9 +49,9 @@ extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
     uint32_t nOffsets = offsets.size();
     uint32_t bitMaskA = 0;
 
-    if(nOffsets > 16)
+    if(nOffsets > OFFSETS_MAX)
     {
-        debug::error(FUNCTION, "Cannot have more than 16 total offsets.");
+        debug::error(FUNCTION, "Cannot have more than 32 total offsets.");
         return;
     }
 
@@ -65,7 +65,7 @@ extern "C" void cuda_set_offset_patterns(uint8_t thr_id,
         bitMaskA |= (1 << indicesA[i]);
 
     /* Invert the bits and mask off unwanted high bits. */
-    //bitMaskA = (~bitMaskA) & (0xFFFFFFFF >> (32 - nOffsets));
+    bitMaskA = (~bitMaskA) & (0xFFFFFFFF >> (32 - nOffsets));
 
     CHECK(cudaMemcpyToSymbol(c_bitmaskA, &bitMaskA,
          sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
@@ -92,17 +92,19 @@ extern "C" void cuda_set_zTempVar(uint8_t thr_id, const uint64_t *limbs)
 
 
 extern "C" void cuda_init_primes(uint8_t thr_id,
+                                 uint64_t *origins,
                                  uint32_t *primes,
                                  uint32_t *primesInverseInvk,
                                  uint32_t nPrimeLimit,
                                  uint32_t nBitArray_Size,
                                  uint32_t sharedSizeKB,
                                  uint32_t nPrimorialEndPrime,
-                                 uint32_t nPrimeLimitA)
+                                 uint32_t nPrimeLimitA,
+                                 uint32_t nOrigins)
 {
     uint32_t primeinverseinvk_size = sizeof(uint32_t) * 4 * nPrimeLimit;
-    uint32_t nonce64_size = OFFSETS_MAX * sizeof(uint64_t);
-    uint32_t nonce32_size = OFFSETS_MAX * sizeof(uint32_t);
+    uint32_t nonce64_size = CANDIDATES_MAX * sizeof(uint64_t);
+    uint32_t nonce32_size = CANDIDATES_MAX * sizeof(uint32_t);
     uint32_t sharedSizeBits = sharedSizeKB * 1024 * 8;
     uint32_t allocSize = ((nBitArray_Size * 16  + sharedSizeBits - 1) / sharedSizeBits) * sharedSizeBits;
     uint32_t bitarray_size = (allocSize+31)/32 * sizeof(uint32_t);
@@ -120,6 +122,12 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
     CHECK(cudaMalloc(&d_primes[thr_id], nPrimeLimit * sizeof(uint32_t)));
     CHECK(cudaMemcpy(d_primes[thr_id], primes, nPrimeLimit * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
+
+    /* Allocate memory for prime origins. */
+    CHECK(cudaMalloc(&d_origins[thr_id], nOrigins * sizeof(uint64_t)));
+    CHECK(cudaMemcpy(d_origins[thr_id], origins, nOrigins * sizeof(uint64_t), cudaMemcpyHostToDevice));
+
+
     /* Allocate multiple frame resources so we can keep multiple frames in flight
        to further improve CPU/GPU utilization */
 
@@ -134,15 +142,15 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
         CHECK(cudaMallocHost(&frameResources[thr_id].h_result_count[i],   sizeof(uint32_t)));
 
         /* test stats */
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_primes_checked[i], 16 * sizeof(uint32_t)));
-        CHECK(cudaMallocHost(&frameResources[thr_id].h_primes_checked[i], 16 * sizeof(uint32_t)));
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_primes_found[i],   16 * sizeof(uint32_t)));
-        CHECK(cudaMallocHost(&frameResources[thr_id].h_primes_found[i],   16 * sizeof(uint32_t)));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_primes_checked[i], OFFSETS_MAX * sizeof(uint32_t)));
+        CHECK(cudaMallocHost(&frameResources[thr_id].h_primes_checked[i], OFFSETS_MAX * sizeof(uint32_t)));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_primes_found[i],   OFFSETS_MAX * sizeof(uint32_t)));
+        CHECK(cudaMallocHost(&frameResources[thr_id].h_primes_found[i],   OFFSETS_MAX * sizeof(uint32_t)));
 
         /* compaction */
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_offsets[i], nonce64_size * BUFFER_COUNT));
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_meta[i],    nonce32_size * BUFFER_COUNT));
-        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_count[i],   sizeof(uint32_t) * 4 * BUFFER_COUNT));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_offsets[i], nonce64_size));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_meta[i],    nonce32_size));
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_nonce_count[i],   sizeof(uint32_t)));
         CHECK(cudaMallocHost(&frameResources[thr_id].h_nonce_count[i],   sizeof(uint32_t)));
 
         /* sieving */
@@ -195,6 +203,7 @@ extern "C" void cuda_free_primes(uint8_t thr_id)
     CHECK(cudaFree(d_primesInverseInvk[thr_id]));
     CHECK(cudaFree(d_base_remainders[thr_id]));
     CHECK(cudaFree(d_primes[thr_id]));
+    CHECK(cudaFree(d_origins[thr_id]));
 
     for(uint8_t i = 0; i < FRAME_COUNT; ++i)
     {
@@ -587,7 +596,7 @@ __global__ void compact_offsets(uint64_t *d_nonce_offsets, uint32_t *d_nonce_met
         {
             uint32_t i = atomicAdd(d_nonce_count, 1);
 
-            if(i < OFFSETS_MAX)
+            if(i < CANDIDATES_MAX)
             {
                 d_nonce_offsets[i] = nonce_offset;
 

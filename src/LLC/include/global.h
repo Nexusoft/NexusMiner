@@ -17,6 +17,7 @@ ________________________________________________________________________________
 
 #include <LLC/include/work_info.h>
 #include <CUDA/include/util.h>
+#include <CUDA/include/macro.h>
 
 #include <cstdint>
 #include <deque>
@@ -55,10 +56,10 @@ namespace LLC
     extern std::atomic<uint64_t> SievedBits;
     extern std::atomic<uint64_t> Tests_CPU;
     extern std::atomic<uint64_t> Tests_GPU;
-    extern std::atomic<uint64_t> PrimesFound[16];
-    extern std::atomic<uint64_t> PrimesChecked[16];
-    extern double minRatios[16];
-    extern double maxRatios[16];
+    extern std::atomic<uint64_t> PrimesFound[OFFSETS_MAX];
+    extern std::atomic<uint64_t> PrimesChecked[OFFSETS_MAX];
+    extern double minRatios[OFFSETS_MAX];
+    extern double maxRatios[OFFSETS_MAX];
 
     extern std::atomic<uint64_t> nWeight;
     extern std::deque<double> vWPSValues;

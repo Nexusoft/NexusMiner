@@ -22,6 +22,7 @@ ________________________________________________________________________________
 extern uint32_t nPrimorialEndPrime;
 extern uint64_t base_offset;
 
+extern std::vector<uint64_t> vOrigins;
 extern std::vector<uint32_t> vOffsets;
 extern std::vector<uint32_t> vOffsetsA;
 extern std::vector<uint32_t> vOffsetsB;
@@ -38,6 +39,7 @@ extern uint32_t  nTestLevels[GPU_MAX];
 namespace prime
 {
     bool load_offsets();
+    bool load_origins();
     void load_config(uint8_t nThreadsGPU);
 }
 

@@ -13,13 +13,16 @@
 
 extern "C" void cuda_set_zTempVar(uint8_t thr_id, const uint64_t *limbs);
 
-extern "C" void cuda_init_primes(uint8_t thr_id, uint32_t *primes,
-                                uint32_t *primesInversesInvk,
-                                uint32_t nPrimeLimit,
-                                uint32_t nBitArray_Size,
-                                uint32_t sharedSizeKB,
-                                uint32_t nPrimorialEndPrime,
-                                uint32_t nPrimeLimitA);
+extern "C" void cuda_init_primes(uint8_t thr_id,
+                                 uint64_t *origins,
+                                 uint32_t *primes,
+                                 uint32_t *primesInversesInvk,
+                                 uint32_t nPrimeLimit,
+                                 uint32_t nBitArray_Size,
+                                 uint32_t sharedSizeKB,
+                                 uint32_t nPrimorialEndPrime,
+                                 uint32_t nPrimeLimitA,
+                                 uint32_t nOrigins);
 
 extern "C" void cuda_free_primes(uint8_t thr_id);
 
