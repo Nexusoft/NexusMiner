@@ -19,7 +19,11 @@ extern __constant__ uint32_t c_iA[16];
 extern __constant__ uint32_t c_iB[16];
 extern __constant__ uint32_t c_iT[16];
 
+extern __constant__ uint32_t c_iBeg;
+extern __constant__ uint32_t c_iEnd;
+
 extern __constant__ uint32_t c_bitmaskA;
+extern __constant__ uint32_t c_bitmaskT;
 
 extern __constant__ uint16_t c_primes[4096];
 

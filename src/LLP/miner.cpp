@@ -114,8 +114,12 @@ namespace LLP
             /* Run this thread at 1 cycle per second. */
             runtime::sleep(1000);
 
+            /* Check if shutdown occurred after sleep cycle. */
+            if(fStop.load())
+                break;
+
             /** Attempt with best efforts to keep the Connection Alive. **/
-            if (!Connected())
+            if (!fStop.load() && !Connected())
             {
                 if (!Connect())
                     continue;
@@ -124,9 +128,6 @@ namespace LLP
                 Reset();
             }
 
-            /* Check if shutdown occurred after sleep cycle. */
-            if(fStop.load())
-                break;
 
             /** Check the Block Height. **/
             uint32_t nHeight = GetHeight();
@@ -465,7 +466,7 @@ namespace LLP
     void Miner::Pause()
     {
         /* If we are already paused, don't pause again. */
-        if(!fPause.load())
+        if(!fPause.load() && !fStop.load())
         {
 
             debug::log(0, "Pausing Miner ", addrOut.ToString());
@@ -493,7 +494,11 @@ namespace LLP
 
         /* Stop the worker threads. */
         for(uint8_t i = 0; i < nWorkers.load(); ++i)
+        {
+            vWorkers[i]->Reset();
             vWorkers[i]->Stop();
+        }
+
 
         /* Wait for worker signals. */
         Wait();

@@ -54,6 +54,8 @@ namespace LLC
     , zPrimorialMod()
     , work()
     , mapTest()
+    , gpu_begin(32)
+    , gpu_end(0)
     {
     }
 
@@ -128,15 +130,18 @@ namespace LLC
             uint64_t offset = work.nonce_offsets[i];
             uint32_t combo = work.nonce_meta[i];
 
-            //combo = combo & (0xFFFFFFFF >> (32 - nOffsets));
-
 
             /* Compute the base offset of the nonce */
             mpz_mul_ui(zTempVar, zPrimorial, offset);
             mpz_add(zBaseOffsetted, zFirstSieveElement, zTempVar);
 
-            if(i % 100 == 0)
-                debug::log(0, "combo=", std::bitset<32>(combo));
+
+            /* Mask off high and low 1-bits not set by gpu sieve */
+            combo = (combo >> gpu_begin) << gpu_begin;
+            combo = (combo << (32 - gpu_end)) >> (32 - gpu_end);
+
+            debug::log(0, " gpu combo=", std::bitset<32>(combo));
+
 
 
             /* Loop through combo and test remaining offsets. */
@@ -173,23 +178,28 @@ namespace LLC
             /* Invert the bits and mask off the high bits. */
             combo = (~combo) & (0xFFFFFFFF >> nOffsets);
 
-
             /* If there are no more combo bits, this candidate will never lead to a solution. */
             if(combo == 0)
                 continue;
 
+            /* Get the begin and end offsets of the chain. */
+            uint32_t chain_offset_beg = convert::ctz(combo);
+            uint32_t chain_offset_end = nOffsets - convert::clz(combo << (32 - 1 - nOffsets));
+
             /* Get the number of survived offsets. */
             uint32_t chain_length = convert::popc(combo);
 
-            /* Get the begin and end offsets of the chain. */
-            uint32_t chain_offset_beg = convert::ctz(combo);
-            uint32_t chain_offset_end = nOffsets - convert::clz(combo << (32 - nOffsets - 1));
+            if(chain_length >= 2)
+                debug::log(0, "combo=", std::bitset<32>(combo),
+                " len=", chain_length,
+                " beg=", chain_offset_beg,
+                " end=", chain_offset_end);
 
-            //if(i % 100 == 0)
-            //debug::log(0, "combo=", std::bitset<11>(combo),
-            //" len=", chain_length,
-            //" beg=", chain_offset_beg,
-            //" end=", chain_offset_end);
+
+            if(chain_offset_beg > chain_offset_end)
+                return debug::error("Offset begin greater than end.",
+                " beg=", chain_offset_beg,
+                " end=", chain_offset_end);
 
             if(chain_offset_beg >= nOffsets || chain_offset_end >= nOffsets)
             {
@@ -347,6 +357,19 @@ namespace LLC
         /* Store a map of false positives for GPU Fermat offset tests. */
         for(uint8_t i = 0; i < vOffsetsT.size(); ++i)
             mapTest[vOffsetsT[i]] = i;
+
+        /* Find the begin and end offsets for gpu sieving */
+        for(uint8_t i = 0; i < vOffsetsA.size(); ++i)
+        {
+            gpu_begin = std::min(gpu_begin, vOffsetsA[i]);
+            gpu_end = std::max(gpu_end, vOffsetsA[i]);
+        }
+        for(uint8_t i = 0; i < vOffsetsB.size(); ++i)
+        {
+            gpu_begin = std::min(gpu_begin, vOffsetsB[i]);
+            gpu_end = std::max(gpu_end, vOffsetsB[i]);
+        }
+
     }
 
     void PrimeTestCPU::Init()

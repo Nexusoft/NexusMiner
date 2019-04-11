@@ -104,6 +104,8 @@ namespace LLC
         work_info work;
 
         std::map<uint32_t, uint32_t> mapTest;
+        uint32_t gpu_begin;
+        uint32_t gpu_end;
 
     };
 }

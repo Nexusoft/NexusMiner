@@ -40,7 +40,6 @@ struct FrameResource
 
     //sieving
   uint32_t  *d_bit_array_sieve[FRAME_COUNT];
-  uint32_t  *d_prime_remainders[FRAME_COUNT]; //need to do away with this
 
     //bucket sieve
   uint32_t  *d_bucket_o[FRAME_COUNT]; //prime and offset

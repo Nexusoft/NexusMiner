@@ -198,6 +198,8 @@ namespace LLC
         cuda_set_zTempVar(nID, (const uint64_t*)zTempVar[0]._mp_d);
         cuda_base_remainders(nID, nSievePrimes);
 
+        /* Compute prime remainders for each origin. */
+        cuda_set_origins(nID, primeLimitA, vOrigins.size());
 
         /* Compute first sieving element. */
         mpz_add_ui(zFirstSieveElement, zTempVar, base_offset);

@@ -68,16 +68,19 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
     {
         uint32_t nonce_meta = in_nonce_meta[idx];
 
-        /* Since extra 0-bits will invert to 1, mask them off the end.  */
-        uint32_t combo = (~nonce_meta) & (0xFFFFFFFF >> (32 - nOffsets));
+        /* Mask out the tested bits. */
+        uint32_t test_combo = nonce_meta & c_bitmaskT;
 
-        /* Get the count of zero bits. */
-        uint32_t nCount = __popc(combo);
+        /* Reverse tested bits to match sieved bits. */
+        nonce_meta = nonce_meta ^ c_bitmaskT;
+
+        /* Get the count of tested bits. */
+        uint32_t nCount = __popc(test_combo);
 
         /* If the count meets the threshold, add to result buffer. */
         if(nCount >= nThreshold)
         {
-            //printf("%d: compact_fermat: nonce_meta=%08X, combo=%08X, count=%d\n", idx, nonce_meta, combo, nCount);
+            //printf("%d: compact_fermat: nonce_meta=%08X, test_combo=%08X, count=%d\n", idx, nonce_meta, test_combo, nCount);
 
             add_result(g_result_offsets, g_result_meta, g_result_count,
                        in_nonce_offsets[idx], nonce_meta, CANDIDATES_MAX);
@@ -124,7 +127,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         atomicAdd(&g_primes_found[test_index], prime);
 
         /* Update the nonce combo. */
-        atomicOr(&nonce_meta[idx], (!prime) << test_index);
+        atomicOr(&nonce_meta[idx], prime << test_index);
 
         /* Increment primes checked. */
         atomicAdd(&g_primes_checked[test_index], 1);
@@ -214,7 +217,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         frameResources[thr_id].d_result_offsets[curr_test],
         frameResources[thr_id].d_result_meta[curr_test],
         frameResources[thr_id].d_result_count[curr_test],
-        8,
+        nTestLevels,
         vOffsets.size());
 
     /* Copy the result count. */

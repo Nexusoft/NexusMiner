@@ -15,10 +15,12 @@ extern "C" void cuda_reset_device()
 	cudaDeviceReset();
 }
 
+
 extern "C" void cuda_device_synchronize()
 {
   	cudaDeviceSynchronize();
 }
+
 
 extern "C" void cuda_runtime_version(int &major, int &minor)
 {
@@ -39,6 +41,7 @@ extern "C" void cuda_runtime_version(int &major, int &minor)
 	}
 }
 
+
 extern "C" void cuda_driver_version(int &major, int &minor)
 {
 	int driver_version;
@@ -58,6 +61,7 @@ extern "C" void cuda_driver_version(int &major, int &minor)
 	}
 }
 
+
 extern "C" uint32_t cuda_device_multiprocessors(uint8_t index)
 {
     cudaDeviceProp props;
@@ -67,6 +71,7 @@ extern "C" uint32_t cuda_device_multiprocessors(uint8_t index)
 
     return 0;
 }
+
 
 extern "C" int cuda_num_devices()
 {
@@ -91,6 +96,7 @@ extern "C" std::string cuda_devicename(uint8_t index)
 	return std::string();
 }
 
+
 extern "C" void cuda_init(uint8_t thr_id)
 {
   debug::log(0, "thread ", (uint32_t)thr_id, " maps to CUDA device #", static_cast<uint32_t>(device_map[thr_id]));
@@ -99,6 +105,7 @@ extern "C" void cuda_init(uint8_t thr_id)
 
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 }
+
 
 extern "C" void cuda_free(uint8_t thr_id)
 {

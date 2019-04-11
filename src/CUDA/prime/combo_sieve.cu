@@ -164,7 +164,8 @@ __global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
 
 
 template<uint8_t o>
-__global__ void combosieve_kernelB(uint64_t origin,
+__global__ void combosieve_kernelB(uint64_t *origins,
+                                   uint32_t origin_index,
                                    uint32_t *g_sieve_hierarchy,
                                    uint32_t *bit_array_sieve,
                                    uint32_t bit_array_size,
@@ -180,7 +181,7 @@ __global__ void combosieve_kernelB(uint64_t origin,
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
-        tmp.z = mod_p_small(origin + base_remainders[i] + c_offsets[c_iB[o]], tmp.x, recip);
+        tmp.z = mod_p_small(origins[origin_index] + base_remainders[i] + c_offsets[c_iB[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
@@ -197,7 +198,6 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
                               uint32_t *d_bit_array_sieve_A,
                               uint32_t *d_bit_array_sieve_B,
                               uint32_t nBitArray_Size,
-                              uint64_t sieve_start_index,
                               uint8_t nThreshold,
                               uint8_t nOffsetsB,
                               uint8_t nOffsets)
@@ -215,7 +215,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
 
     if(idx < nBitArray_Size)
     {
-        uint64_t nonce_offset = sieve_start_index + idx;
+        uint64_t nonce_offset = idx;
         uint32_t combo = 0;
 
         /* Check the single sieve to see if offsets are valid. */
@@ -227,7 +227,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
             for(uint8_t o = 0; o < nOffsetsB; ++o)
             {
                 /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
-                uint16_t bit = !((d_bit_array_sieve_B[idx >> 5]) & (1 << (idx & 31)));
+                uint32_t bit = !((d_bit_array_sieve_B[idx >> 5]) & (1 << (idx & 31)));
 
                 combo |= bit << c_iB[o];
 
@@ -248,7 +248,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
                 {
                     /* Assign the global nonce offset and meta data. */
                     d_nonce_offsets[i] = nonce_offset;
-                    d_nonce_meta[i] = (~combo) & (0xFFFFFFFF >> (32 - nOffsets));
+                    d_nonce_meta[i] = ~combo;
                 }
             }
         }
@@ -299,7 +299,8 @@ void comboA_launch(uint8_t thr_id,
 }
 
 #define COMBO_B_LAUNCH(X)   combosieve_kernelB<X><<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
-origin, \
+d_origins[thr_id], \
+origin_index, \
 frameResources[thr_id].d_bit_array_sieve[frame_index], \
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
 nBitArray_Size, \
@@ -310,7 +311,7 @@ nPrimeLimit)
 
 void comboB_launch(uint8_t thr_id,
                     uint8_t str_id,
-                    uint64_t origin,
+                    uint64_t origin_index,
                     uint8_t frame_index,
                     uint16_t nPrimorialEndPrime,
                     uint32_t nPrimeLimit,
@@ -349,13 +350,12 @@ void comboB_launch(uint8_t thr_id,
     frameResources[thr_id].d_bit_array_sieve[curr_sieve], \
     &frameResources[thr_id].d_bit_array_sieve[curr_sieve][nBitArray_Size >> 5], \
     nBitArray_Size, \
-    primorial_start, \
     threshold, \
     X, \
     vOffsets.size())
 
 void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, uint8_t curr_test,
-                            uint8_t next_test, uint32_t nBitArray_Size, uint64_t primorial_start, uint8_t threshold)
+                            uint8_t next_test, uint32_t nBitArray_Size, uint8_t threshold)
 {
     dim3 block(64);
     dim3 grid((nBitArray_Size + block.x - 1) / block.x);

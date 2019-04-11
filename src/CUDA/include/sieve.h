@@ -28,6 +28,8 @@ extern "C" void cuda_free_primes(uint8_t thr_id);
 
 extern "C" void cuda_base_remainders(uint8_t thr_id, uint32_t nPrimeLimit);
 
+extern "C" void cuda_set_origins(uint8_t thr_id, uint32_t nPrimeLimitA, uint32_t nOrigins);
+
 extern "C" bool cuda_primesieve(uint8_t thr_id,
                                 uint64_t base_offset,
                                 uint64_t primorial,
