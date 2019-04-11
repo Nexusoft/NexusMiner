@@ -102,7 +102,6 @@ namespace LLC
     private:
 
         mpz_t zPrimeOrigin;
-        mpz_t zFirstSieveElement;
         mpz_t zPrimorialMod;
         mpz_t zTempVar;
 

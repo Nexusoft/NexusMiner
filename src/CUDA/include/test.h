@@ -13,8 +13,7 @@
 
 extern "C" void cuda_set_primorial(uint8_t thr_id, uint64_t nPrimorial);
 
-extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id,
-                                           uint32_t *limbs);
+extern "C" void cuda_set_BaseOrigin(uint32_t thr_id, uint32_t *limbs);
 
 extern "C" void cuda_init_counts(uint32_t thr_id);
 

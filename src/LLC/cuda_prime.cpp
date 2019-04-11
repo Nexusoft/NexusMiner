@@ -52,7 +52,6 @@ namespace LLC
     PrimeCUDA::PrimeCUDA(uint8_t id, TAO::Ledger::Block *block)
     : Proof(id, block)
     , zPrimeOrigin()
-    , zFirstSieveElement()
     , zPrimorialMod()
     , zTempVar()
     , nCount(0)
@@ -98,9 +97,16 @@ namespace LLC
         }
 
         /* Sieve bit array and compact test candidate nonces */
-        if(cuda_primesieve(nID, base_offset, nPrimorial,
-                        nPrimorialEndPrime, primeLimitA, nSievePrimes,
-                        nSieveBits, nDifficulty, nSieveIndex, nTestIndex))
+        if(cuda_primesieve(nID,
+                           nPrimorial,
+                           nPrimorialEndPrime,
+                           primeLimitA,
+                           nSievePrimes,
+                           nSieveBits,
+                           nDifficulty,
+                           nSieveIndex,
+                           nTestIndex,
+                           vOrigins.size()))
         {
             /* Check for early out. */
             if(fReset.load())
@@ -181,10 +187,6 @@ namespace LLC
             nPrimesFound[i] = 0;
         }
 
-        /* Compute non-colliding origins for each GPU within 2^64 search space */
-        //uint64_t range = ~(0) / nPrimorial / GPU_MAX;
-        //uint64_t gpu_offset = base_offset + range * nPrimorial * nID;
-
         /* Set the prime origin from the block hash. */
         mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, pBlock->ProofHash().data());
 
@@ -194,25 +196,14 @@ namespace LLC
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
         mpz_add(zTempVar, zPrimeOrigin, zPrimorialMod);
 
-        /* Compute base remainders. */
+        /* Compute base remainders and base origin. */
+        std::vector<uint32_t> limbs = get_limbs(zTempVar);
         cuda_set_zTempVar(nID, (const uint64_t*)zTempVar[0]._mp_d);
+        cuda_set_BaseOrigin(nID, &limbs[0]);
         cuda_base_remainders(nID, nSievePrimes);
 
         /* Compute prime remainders for each origin. */
         cuda_set_origins(nID, primeLimitA, vOrigins.size());
-
-        /* Compute first sieving element. */
-        mpz_add_ui(zFirstSieveElement, zTempVar, base_offset);
-
-
-        /* Convert the first sieve element and set it on GPU. */
-        std::vector<uint32_t> limbs = get_limbs(zFirstSieveElement);
-        cuda_set_FirstSieveElement(nID, &limbs[0]);
-
-
-        /* Set the sieving primes for the first bucket (rest computed on the fly) */
-        //cuda_set_sieve(nID, base_offset, nPrimorial,
-        //               primeLimitA, prime_limit, sieve_bits_log2);
 
 
         /* Set the GPU quit flag to false. */
@@ -258,7 +249,6 @@ namespace LLC
 
         /* Initialize the GMP objects. */
         mpz_init(zPrimeOrigin);
-        mpz_init(zFirstSieveElement);
         mpz_init(zPrimorialMod);
         mpz_init(zTempVar);
 
@@ -291,7 +281,6 @@ namespace LLC
 
         /* Free the GMP object memory. */
         mpz_clear(zPrimeOrigin);
-        mpz_clear(zFirstSieveElement);
         mpz_clear(zPrimorialMod);
         mpz_clear(zTempVar);
     }

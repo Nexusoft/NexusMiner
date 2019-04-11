@@ -11,6 +11,9 @@
 
 //PRIME/////////////////////////////////////////////////////////////////////////
 __constant__ uint64_t c_zTempVar[17];
+__constant__ uint64_t c_primorial;
+__constant__ uint32_t c_zBaseOrigin[WORD_MAX];
+
 __constant__ uint32_t c_offsets[OFFSETS_MAX];
 __constant__ uint32_t c_iA[16];
 __constant__ uint32_t c_iB[16];
@@ -21,10 +24,11 @@ __constant__ uint32_t c_iEnd;
 __constant__ uint32_t c_bitmaskA;
 __constant__ uint32_t c_bitmaskT;
 
-__constant__ uint16_t c_primes[4096];
-__constant__ uint64_t c_primorial;
-__constant__ uint32_t c_zFirstSieveElement[WORD_MAX];
+
 __constant__ uint32_t c_quit;
+__constant__ uint16_t c_primes[4096];
+
+
 
 
 

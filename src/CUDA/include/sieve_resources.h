@@ -11,7 +11,9 @@
 #include <CUDA/include/macro.h>
 
 extern uint4 *d_primesInverseInvk[GPU_MAX];
+extern uint64_t *d_origins[GPU_MAX];
 extern uint32_t *d_primes[GPU_MAX];
+extern uint32_t *d_prime_remainders[GPU_MAX];
 extern uint32_t *d_base_remainders[GPU_MAX];
 extern uint16_t *d_blockoffset_mod_p[GPU_MAX];
 extern uint32_t nOffsetsA;

@@ -1,5 +1,5 @@
 #include <cuda.h>
-#include <cudaProfiler.h>
+#include <cuda_profiler_api.h>
 
 #include <CUDA/include/util.h>
 #include <CUDA/include/frame_resources.h>
@@ -118,5 +118,5 @@ extern "C" void cuda_free(uint8_t thr_id)
 
 extern "C" void cuda_shutdown()
 {
-	cuProfilerStop();
+	cudaProfilerStop();
 }

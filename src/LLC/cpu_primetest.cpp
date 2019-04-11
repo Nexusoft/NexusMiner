@@ -50,7 +50,6 @@ namespace LLC
     , zBaseOffsetted()
     , zPrimeOrigin()
     , zResidue()
-    , zFirstSieveElement()
     , zPrimorialMod()
     , work()
     , mapTest()
@@ -100,10 +99,7 @@ namespace LLC
         /* Compute the primorial mod from the origin. */
         mpz_mod(zPrimorialMod, zPrimeOrigin, zPrimorial);
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
-        mpz_add(zTempVar, zPrimeOrigin, zPrimorialMod);
-
-        /* Compute the first sieve element. */
-        mpz_add_ui(zFirstSieveElement, zTempVar, base_offset);
+        mpz_add(zBaseOffsetted, zPrimeOrigin, zPrimorialMod);
 
 
         uint64_t nNonce = 0;
@@ -132,15 +128,13 @@ namespace LLC
 
 
             /* Compute the base offset of the nonce */
-            mpz_mul_ui(zTempVar, zPrimorial, offset);
-            mpz_add(zBaseOffsetted, zFirstSieveElement, zTempVar);
-
+            mpz_add_ui(zBaseOffsetted, zBaseOffsetted, offset);
 
             /* Mask off high and low 1-bits not set by gpu sieve */
             combo = (combo >> gpu_begin) << gpu_begin;
             combo = (combo << (32 - gpu_end)) >> (32 - gpu_end);
 
-            debug::log(0, " gpu combo=", std::bitset<32>(combo));
+            //debug::log(0, " gpu combo=", std::bitset<32>(combo));
 
 
 
@@ -150,12 +144,12 @@ namespace LLC
                 if(fReset.load() || nHeight != pBlock->nHeight)
                     return false;
 
-                /* Don't test failed offsets. */
-                if(combo & (1 << j))
-                    continue;
-
                 /* Skip GPU offsets. Already Fermat tested. */
                 if(mapTest.find(j) != mapTest.end())
+                    continue;
+
+                /* Don't test failed offsets. */
+                if(combo & (1 << j))
                     continue;
 
                 /* Start fresh from each offset remaining. */
@@ -351,7 +345,6 @@ namespace LLC
         mpz_init(zN);
         mpz_init(zPrimeOrigin);
         mpz_init(zResidue);
-        mpz_init(zFirstSieveElement);
         mpz_init(zPrimorialMod);
 
         /* Store a map of false positives for GPU Fermat offset tests. */
@@ -404,7 +397,6 @@ namespace LLC
         mpz_clear(zBaseOffsetted);
         mpz_clear(zPrimeOrigin);
         mpz_clear(zResidue);
-        mpz_clear(zFirstSieveElement);
         mpz_clear(zPrimorialMod);
     }
 

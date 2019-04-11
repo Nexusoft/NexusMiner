@@ -98,7 +98,6 @@ namespace LLC
         mpz_t zBaseOffsetted;
         mpz_t zPrimeOrigin;
         mpz_t zResidue;
-        mpz_t zFirstSieveElement;
         mpz_t zPrimorialMod;
 
         work_info work;

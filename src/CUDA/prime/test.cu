@@ -30,11 +30,11 @@ extern "C" void cuda_set_primorial(uint8_t thr_id, uint64_t nPrimorial)
         sizeof(uint64_t), 0, cudaMemcpyHostToDevice));
 }
 
-extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id, uint32_t *limbs)
+extern "C" void cuda_set_BaseOrigin(uint32_t thr_id, uint32_t *limbs)
 {
     debug::log(4, FUNCTION, thr_id);
 
-    CHECK(cudaMemcpyToSymbol(c_zFirstSieveElement, limbs,
+    CHECK(cudaMemcpyToSymbol(c_zBaseOrigin, limbs,
         WORD_MAX*sizeof(uint32_t), 0, cudaMemcpyHostToDevice));
 }
 
@@ -97,7 +97,6 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
                               uint32_t nTestOffsets,
                               uint32_t nOffsets)
 {
-
     /* If the quit flag was set, early return to avoid wasting time. */
     if(c_quit)
         return;
@@ -114,11 +113,9 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         uint32_t test_index = c_iT[o];
 
         /* Compute the primorial offset from the primorial and
-         * offset pattern (i.e 510510*n + [0,4,6,10] ) */
-        uint64_t primorial_offset = c_primorial * nonce_offsets[idx] + (uint64_t)c_offsets[test_index];
-
-        /* Add to the first sieving element to compute prime to test. */
-        add_ui(p, c_zFirstSieveElement, primorial_offset);
+         * offset pattern (i.e (293257 + 510510*n) + [0,4,6,10] ).
+         * Add to the first sieving element to compute prime to test. */
+        add_ui(p, c_zBaseOrigin, nonce_offsets[idx] + (uint64_t)c_offsets[test_index]);
 
         /* Check if prime passes fermat test base 2. */
         uint8_t prime = fermat_prime(p);

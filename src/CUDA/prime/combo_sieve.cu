@@ -21,6 +21,7 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
                                        uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
+                                       uint32_t base_index,
                                        uint16_t nPrimorialEndPrime,
                                        uint16_t nPrimeLimitA)
 {
@@ -41,8 +42,7 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
         uint32_t pIdx = threadIdx.x * pr;
         uint32_t nAdd = pr << 9;
 
-        uint32_t index = prime_remainders[(i << 3) + o] + pre2; // << 4 because we have space for 16 offsets
-
+        uint32_t index = prime_remainders[(((base_index << 9) + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
         if(index >= pr)
             index = index - pr;
 
@@ -70,6 +70,7 @@ __global__ void combosieve_kernelA_256(uint32_t *g_sieve_hierarchy,
                                        uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
+                                       uint32_t base_index,
                                        uint16_t nPrimorialEndPrime,
                                        uint16_t nPrimeLimitA)
 {
@@ -90,8 +91,7 @@ __global__ void combosieve_kernelA_256(uint32_t *g_sieve_hierarchy,
         uint32_t pIdx = threadIdx.x * pr;
         uint32_t nAdd = pr << 8;
 
-        uint32_t index = prime_remainders[(i << 3) + o] + pre2; // << 4 because we have space for 16 offsets
-
+        uint32_t index = prime_remainders[(((base_index << 9) + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
         if(index >= pr)
             index = index - pr;
 
@@ -119,6 +119,7 @@ __global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
                                        uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
+                                       uint32_t base_index,
                                        uint16_t nPrimorialEndPrime,
                                        uint16_t nPrimeLimitA)
 {
@@ -139,7 +140,7 @@ __global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
         uint32_t pIdx = threadIdx.x * pr;
         uint32_t nAdd = pr << 7;
 
-        uint32_t index = prime_remainders[(i << 3) + o] + pre2; // << 4 because we have space for 16 offsets
+        uint32_t index = prime_remainders[(((base_index << 9) + i) << 3) + o] + pre2; // << 3 because we have space for 8 offsets
 
         if(index >= pr)
             index = index - pr;
@@ -192,12 +193,14 @@ __global__ void combosieve_kernelB(uint64_t *origins,
     }
 }
 
-__global__ void compact_combo(uint64_t *d_nonce_offsets,
+__global__ void compact_combo(uint64_t *d_origins,
+                              uint64_t *d_nonce_offsets,
                               uint32_t *d_nonce_meta,
                               uint32_t *d_nonce_count,
                               uint32_t *d_bit_array_sieve_A,
                               uint32_t *d_bit_array_sieve_B,
                               uint32_t nBitArray_Size,
+                              uint32_t origin_index,
                               uint8_t nThreshold,
                               uint8_t nOffsetsB,
                               uint8_t nOffsets)
@@ -215,7 +218,7 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
 
     if(idx < nBitArray_Size)
     {
-        uint64_t nonce_offset = idx;
+        uint64_t nonce_offset = c_primorial * (uint64_t)idx + d_origins[origin_index];
         uint32_t combo = 0;
 
         /* Check the single sieve to see if offsets are valid. */
@@ -258,17 +261,20 @@ __global__ void compact_combo(uint64_t *d_nonce_offsets,
 #define COMBO_A_LAUNCH(X) combosieve_kernelA_256<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
 frameResources[thr_id].d_bit_array_sieve[frame_index], \
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
-&frameResources[thr_id].d_prime_remainders[frame_index][nPrimeLimitA], \
+&d_prime_remainders[thr_id][nPrimeLimitA * nOrigins << 3], \
 d_blockoffset_mod_p[thr_id], \
+origin_index, \
 nPrimorialEndPrime, \
 nPrimeLimitA)
 
 void comboA_launch(uint8_t thr_id,
                    uint8_t str_id,
+                   uint32_t origin_index,
                    uint8_t frame_index,
                    uint16_t nPrimorialEndPrime,
                    uint16_t nPrimeLimitA,
-                   uint32_t nBitArray_Size)
+                   uint32_t nBitArray_Size,
+                   uint32_t nOrigins)
 {
     uint32_t sharedSizeBits = 32 * 1024 * 8;
     uint32_t nBlocks = (nBitArray_Size + sharedSizeBits-1) / sharedSizeBits;
@@ -311,7 +317,7 @@ nPrimeLimit)
 
 void comboB_launch(uint8_t thr_id,
                     uint8_t str_id,
-                    uint64_t origin_index,
+                    uint32_t origin_index,
                     uint8_t frame_index,
                     uint16_t nPrimorialEndPrime,
                     uint32_t nPrimeLimit,
@@ -344,18 +350,27 @@ void comboB_launch(uint8_t thr_id,
 }
 
 #define COMBO_COMPACT_LAUNCH(X) compact_combo<<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
+    d_origins[thr_id], \
     frameResources[thr_id].d_nonce_offsets[curr_test], \
     frameResources[thr_id].d_nonce_meta[curr_test], \
     frameResources[thr_id].d_nonce_count[curr_test], \
     frameResources[thr_id].d_bit_array_sieve[curr_sieve], \
     &frameResources[thr_id].d_bit_array_sieve[curr_sieve][nBitArray_Size >> 5], \
     nBitArray_Size, \
+    origin_index, \
     threshold, \
     X, \
     vOffsets.size())
 
-void kernel_ccompact_launch(uint8_t thr_id, uint8_t str_id, uint8_t curr_sieve, uint8_t curr_test,
-                            uint8_t next_test, uint32_t nBitArray_Size, uint8_t threshold)
+
+void kernel_ccompact_launch(uint8_t thr_id,
+                            uint8_t str_id,
+                            uint32_t origin_index,
+                            uint8_t curr_sieve,
+                            uint8_t curr_test,
+                            uint8_t next_test,
+                            uint32_t nBitArray_Size,
+                            uint8_t threshold)
 {
     dim3 block(64);
     dim3 grid((nBitArray_Size + block.x - 1) / block.x);

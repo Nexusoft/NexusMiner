@@ -20,26 +20,28 @@
 
 void comboA_launch(uint8_t thr_id,
                    uint8_t str_id,
+                   uint32_t origin_index,
                    uint8_t frame_index,
                    uint16_t nPrimorialEndPrime,
                    uint16_t nPrimeLimitA,
-                   uint32_t nBitArray_Size);
+                   uint32_t nBitArray_Size,
+                   uint32_t nOrigins);
 
 void comboB_launch(uint8_t thr_id,
-                    uint8_t str_id,
-                    uint64_t origin,
-                    uint8_t frame_index,
-                    uint16_t nPrimorialEndPrime,
-                    uint32_t nPrimeLimit,
-                    uint32_t nBitArray_Size);
+                   uint8_t str_id,
+                   uint32_t origin_index,
+                   uint8_t frame_index,
+                   uint16_t nPrimorialEndPrime,
+                   uint32_t nPrimeLimit,
+                   uint32_t nBitArray_Size);
 
 void kernel_ccompact_launch(uint8_t thr_id,
                             uint8_t str_id,
+                            uint32_t origin_index,
                             uint8_t curr_sieve,
                             uint8_t curr_test,
                             uint8_t next_test,
                             uint32_t nBitArray_Size,
-                            uint64_t primorial_start,
                             uint8_t threshold);
 
 #endif

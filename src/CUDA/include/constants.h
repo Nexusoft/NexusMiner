@@ -13,7 +13,9 @@
 #include <cstdint>
 
 //PRIME/////////////////////////////////////////////////////////////////////////
+extern __constant__ uint64_t c_primorial;
 extern __constant__ uint64_t c_zTempVar[17];
+extern __constant__ uint32_t c_zBaseOrigin[WORD_MAX];
 extern __constant__ uint32_t c_offsets[OFFSETS_MAX];
 extern __constant__ uint32_t c_iA[16];
 extern __constant__ uint32_t c_iB[16];
@@ -27,8 +29,8 @@ extern __constant__ uint32_t c_bitmaskT;
 
 extern __constant__ uint16_t c_primes[4096];
 
-extern __constant__ uint64_t c_primorial;
-extern __constant__ uint32_t c_zFirstSieveElement[WORD_MAX];
+
+
 extern __constant__ uint32_t c_quit;
 
 
