@@ -767,7 +767,10 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     uint32_t prev_test = (test_index - 1) % FRAME_COUNT;
 
     if(sieve_index >= nOrigins)
-        return debug::error("out of origins to test");
+    {
+        debug::error("out of origins to test");
+        return false;
+    }
 
     /* Make sure current working sieve is finished */
     if(cudaEventQuery(d_Events[thr_id][curr_sieve][EVENT::COMPACT]) == cudaErrorNotReady
@@ -781,26 +784,28 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
     {
         /* Wait for testing and compaction to finish before starting next round. */
-        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::COMPACT));
-        CHECK(stream_wait_event(thr_id, prev_test, STREAM::CLEAR, EVENT::FERMAT));
+        //CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::COMPACT));
+        //CHECK(stream_wait_event(thr_id, prev_test, STREAM::CLEAR, EVENT::FERMAT));
 
         /* Clear the current working sieve and signal */
-        kernel_clear_launch(thr_id, STREAM::CLEAR, curr_sieve, nBitArray_Size);
+        //kernel_clear_launch(thr_id, STREAM::CLEAR, curr_sieve, nBitArray_Size);
 
 
-        CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::CLEAR));
+        //CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::CLEAR, EVENT::CLEAR));
     }
 
 
     {
-        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::CLEAR));
+        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::COMPACT));
+        CHECK(stream_wait_event(thr_id, prev_test,  STREAM::SIEVE_A, EVENT::FERMAT));
+
 
         /* Single sieve (Launch small sieve, utilizing shared memory and signal) */
         kernelA_launch(thr_id, STREAM::SIEVE_A, sieve_index, curr_sieve,
                       nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size);
 
         CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::SIEVE_A));
-        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_A));
+        CHECK(stream_wait_event(thr_id,   curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_A));
 
         /* Single sieve (Launch large sieve, utilizing global memory and signal) */
         kernelB_launch(thr_id, STREAM::SIEVE_B, sieve_index, curr_sieve,
@@ -819,7 +824,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
                     nPrimorialEndPrime, nPrimeLimitA, nBitArray_Size, nOrigins);
 
         CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::SIEVE_A));
-        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_A));
+        CHECK(stream_wait_event(thr_id,  curr_sieve,  STREAM::SIEVE_B, EVENT::SIEVE_A));
 
         /* Combo sieve (Launch large sieve, utilizing global memory and signal) */
         comboB_launch(thr_id, STREAM::SIEVE_B, sieve_index, curr_sieve,

@@ -48,6 +48,7 @@ namespace LLC
     , zTempVar()
     , zN()
     , zBaseOffsetted()
+    , zBaseOrigin()
     , zPrimeOrigin()
     , zResidue()
     , zPrimorialMod()
@@ -99,7 +100,7 @@ namespace LLC
         /* Compute the primorial mod from the origin. */
         mpz_mod(zPrimorialMod, zPrimeOrigin, zPrimorial);
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
-        mpz_add(zBaseOffsetted, zPrimeOrigin, zPrimorialMod);
+        mpz_add(zBaseOrigin, zPrimeOrigin, zPrimorialMod);
 
 
         uint64_t nNonce = 0;
@@ -128,7 +129,7 @@ namespace LLC
 
 
             /* Compute the base offset of the nonce */
-            mpz_add_ui(zBaseOffsetted, zBaseOffsetted, offset);
+            mpz_add_ui(zBaseOffsetted, zBaseOrigin, offset);
 
             /* Mask off high and low 1-bits not set by gpu sieve */
             combo = (combo >> gpu_begin) << gpu_begin;
@@ -137,13 +138,9 @@ namespace LLC
             //debug::log(0, " gpu combo=", std::bitset<32>(combo));
 
 
-
             /* Loop through combo and test remaining offsets. */
             for(uint8_t j = 0; j < nOffsets; ++j)
             {
-                if(fReset.load() || nHeight != pBlock->nHeight)
-                    return false;
-
                 /* Skip GPU offsets. Already Fermat tested. */
                 if(mapTest.find(j) != mapTest.end())
                     continue;
@@ -154,7 +151,6 @@ namespace LLC
 
                 /* Start fresh from each offset remaining. */
                 mpz_add_ui(zTempVar, zBaseOffsetted, vOffsets[j]);
-
 
                 /* Check for Fermat test. */
                 mpz_sub_ui(zN, zTempVar, 1);
@@ -183,11 +179,11 @@ namespace LLC
             /* Get the number of survived offsets. */
             uint32_t chain_length = convert::popc(combo);
 
-            if(chain_length >= 2)
-                debug::log(0, "combo=", std::bitset<32>(combo),
-                " len=", chain_length,
-                " beg=", chain_offset_beg,
-                " end=", chain_offset_end);
+            //if(chain_length >= 3)
+            //    debug::log(0, "combo=", std::bitset<32>(combo),
+            //    " len=", chain_length,
+            //    " beg=", chain_offset_beg,
+            //    " end=", chain_offset_end);
 
 
             if(chain_offset_beg > chain_offset_end)
@@ -343,6 +339,7 @@ namespace LLC
         mpz_init(zTempVar);
         mpz_init(zBaseOffsetted);
         mpz_init(zN);
+        mpz_init(zBaseOrigin);
         mpz_init(zPrimeOrigin);
         mpz_init(zResidue);
         mpz_init(zPrimorialMod);
@@ -395,6 +392,7 @@ namespace LLC
         mpz_clear(zTempVar);
         mpz_clear(zN);
         mpz_clear(zBaseOffsetted);
+        mpz_clear(zBaseOrigin);
         mpz_clear(zPrimeOrigin);
         mpz_clear(zResidue);
         mpz_clear(zPrimorialMod);

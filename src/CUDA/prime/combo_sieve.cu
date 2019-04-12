@@ -61,7 +61,8 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
     for (uint8_t i = 0; i < 16; ++i) // fixed value
     {
         uint16_t j = threadIdx.x + (i << 9);
-        atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
     }
 }
 
@@ -110,7 +111,8 @@ __global__ void combosieve_kernelA_256(uint32_t *g_sieve_hierarchy,
     for (uint8_t i = 0; i < 32; ++i) // fixed value
     {
         uint16_t j = threadIdx.x + (i << 8);
-        atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
     }
 }
 
@@ -159,7 +161,8 @@ __global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
     for (uint8_t i = 0; i < 64; ++i) // fixed value
     {
         uint16_t j = threadIdx.x + (i << 7);
-        atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
     }
 }
 

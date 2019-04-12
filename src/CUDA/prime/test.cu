@@ -150,8 +150,8 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
 
 
     /*Make sure compaction event is finished before testing. */
-    //CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
-    CHECK(synchronize_event(thr_id, curr_sieve, EVENT::COMPACT));
+    CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::FERMAT, EVENT::COMPACT));
+    //CHECK(synchronize_event(thr_id, curr_sieve, EVENT::COMPACT));
 
     /* Reset host-side counts to zero. */
     *frameResources[thr_id].h_result_count[curr_test] = 0;
@@ -184,7 +184,11 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         return;
 
     if(nThreads >= CANDIDATES_MAX)
-        debug::error(FUNCTION, "WARNING: CANDIDATES_MAX limit reached.");
+    {
+        debug::error(FUNCTION, "CANDIDATES_MAX limit reached.");
+        return;
+    }
+
 
 
     debug::log(3, FUNCTION, (uint32_t)thr_id,  ": nonce_count = ", nThreads);

@@ -96,6 +96,7 @@ namespace LLC
         mpz_t zTempVar;
         mpz_t zN;
         mpz_t zBaseOffsetted;
+        mpz_t zBaseOrigin;
         mpz_t zPrimeOrigin;
         mpz_t zResidue;
         mpz_t zPrimorialMod;
