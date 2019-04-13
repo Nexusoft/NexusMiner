@@ -91,7 +91,11 @@ namespace LLC
     private:
 
         uint1024_t nTarget;
+        uint64_t nHashes;
         uint32_t nIntensity;
+        uint32_t nThroughput;
+        uint32_t nThreadsPerBlock;
+
 
 
     };

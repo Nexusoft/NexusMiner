@@ -449,7 +449,8 @@ __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
     for (int i = 0; i < 16; ++i) // fixed value
     {
         j = threadIdx.x + (i << 9);
-        atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
     }
 }
 
@@ -507,7 +508,8 @@ __global__ void primesieve_kernelA_256(uint32_t *g_bit_array_sieve,
     for (uint8_t i = 0; i < 32; ++i) // fixed value
     {
         uint16_t j = threadIdx.x + (i << 8);
-        atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
     }
 }
 
@@ -565,7 +567,8 @@ __global__ void primesieve_kernelA_128(uint32_t *g_bit_array_sieve,
     for (uint8_t i = 0; i < 64; ++i) // fixed value
     {
         uint16_t j = threadIdx.x + (i << 7);
-        atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
     }
 }
 
@@ -600,9 +603,11 @@ __global__ void primesieve_kernelB(uint64_t *origins,
         tmp.z = mod_p_small(origins[origin_index] + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
+
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
         {
-            atomicOr(&bit_array_sieve[tmp.w >> 5], 1 << (tmp.w & 31));
+            if((bit_array_sieve[tmp.w >> 5] & 1 << (tmp.w & 31)) == 0)
+                atomicOr(&bit_array_sieve[tmp.w >> 5], 1 << (tmp.w & 31));
         }
     }
 }
@@ -652,7 +657,7 @@ extern "C" void cuda_set_origins(uint8_t thr_id, uint32_t nPrimeLimitA, uint32_t
     kernelB0_launch(thr_id, STREAM::SIEVE_B, nPrimeLimitA, nOrigins);
 }
 
-#define KERNEL_A_LAUNCH(X) primesieve_kernelA_1024<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
+#define KERNEL_A_LAUNCH(X) primesieve_kernelA_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
 frameResources[thr_id].d_bit_array_sieve[frame_index], \
 d_prime_remainders[thr_id], \
 d_blockoffset_mod_p[thr_id], \
@@ -671,7 +676,7 @@ void kernelA_launch(uint8_t thr_id,
     const int sharedSizeBits = 32 * 1024 * 8;
     int nBlocks = (nBitArray_Size + sharedSizeBits-1) / sharedSizeBits;
 
-    dim3 block(1024);
+    dim3 block(512);
     dim3 grid(nBlocks);
 
     switch(nOffsetsA)

@@ -246,22 +246,45 @@ __global__ void compact_combo(uint64_t *d_origins,
             /* Count the remaining bits for this combo. */
             if(nRemaining >= nThreshold)
             {
-                //printf("%d: compact_sieve: combo=%08X, count=%d\n", idx, combo, nCount);
+                //printf("%d: compact_sieve: combo=%08X, count=%d\n", idx, combo, nRemaining);
 
-                uint32_t i = atomicAdd(d_nonce_count, 1);
+                /* Compute the end, tail, and next indices. */
+                uint32_t e = 32 - __clz(combo);
+                uint32_t t = 0;
+                uint32_t n = __ffs(combo);
 
-                if(i < CANDIDATES_MAX)
+                /* Iterate through sieved bits and determine if there is
+                 * a rule-breaking prime gap. */
+                uint32_t nCount = 1;
+                for(; nCount < nRemaining; ++nCount)
                 {
-                    /* Assign the global nonce offset and meta data. */
-                    d_nonce_offsets[i] = nonce_offset;
-                    d_nonce_meta[i] = ~combo;
+                    t = n;
+                    n = n + __ffs(combo >> (n+1) );
+
+                    if( (c_offsets[n] - c_offsets[t]) > 12)
+                        break;
                 }
+
+                /* Determine if combo will break prime gap or not. */
+                if(nCount >= nThreshold)
+                {
+                    uint32_t i = atomicAdd(d_nonce_count, 1);
+
+                    if(i < CANDIDATES_MAX)
+                    {
+                        /* Assign the global nonce offset and meta data. */
+                        d_nonce_offsets[i] = nonce_offset;
+                        d_nonce_meta[i] = ~combo;
+                    }
+                }
+                else
+                    printf("%d: combo=%08X, n=%d, t=%d, count=%d\n", idx, combo, n, t, nCount);
             }
         }
     }
 }
 
-#define COMBO_A_LAUNCH(X) combosieve_kernelA_256<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
+#define COMBO_A_LAUNCH(X) combosieve_kernelA_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
 frameResources[thr_id].d_bit_array_sieve[frame_index], \
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
 &d_prime_remainders[thr_id][nPrimeLimitA * nOrigins << 3], \
@@ -285,7 +308,7 @@ void comboA_launch(uint8_t thr_id,
     //uint32_t allocSize = ((nBitArray_Size + sharedSizeBits-1) / sharedSizeBits) * sharedSizeBits;
     //uint32_t nSieveWords = (allocSize + 31) >> 5;
 
-    dim3 block(256);
+    dim3 block(512);
     dim3 grid(nBlocks);
 
     /* fall-through switch logic, zero-based indexing */

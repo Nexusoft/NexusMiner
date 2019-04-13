@@ -60,6 +60,7 @@ namespace LLC
         uint32_t nThreads;
         uint32_t nTestCandidates;
         std::vector<uint64_t> vOrigins;
+        std::multimap<uint32_t, uint64_t> mapOrigins;
 
         /* Initialize GMP variables. */
         mpz_init_set_ui(zPrimorialSmall, 1);
@@ -84,7 +85,7 @@ namespace LLC
 
         /* Compute the number of origins to test. */
         nOrigins = nPrimorialLarge / nPrimorialSmall;
-        nTestCandidates = 1000;
+        nTestCandidates = 128;
 
         /* Compute the max sieve size in number of bits. */
         nMaxSieveBits = std::numeric_limits<uint64_t>::max();
@@ -178,10 +179,13 @@ namespace LLC
                 if(convert::popc(nMask) == nOffsets)
                 {
                     /* Print info and add it to the list of origins. */
-                    debug::log(0, FUNCTION, i, ": Found good origin: ", nOrigin);
+                    debug::log(0, FUNCTION, std::setw(6), std::left, i, " : Found good origin: ",
+                        std::setw(12), std::left, nOrigin, " in ",
+                        std::setw(3), std::left, j, " tests");
 
                     omp_set_lock(&lk);
-                    vOrigins.push_back(nOrigin);
+                    //vOrigins.push_back(nOrigin);
+                    mapOrigins.insert(std::pair<uint32_t, uint64_t>(j, nOrigin));
                     omp_unset_lock(&lk);
                     break;
                 }
@@ -199,20 +203,26 @@ namespace LLC
 
         }
 
-        debug::log(0, FUNCTION, "Generated ", vOrigins.size(), " origins");
+        //debug::log(0, FUNCTION, "Generated ", vOrigins.size(), " origins");
+        debug::log(0, FUNCTION, "Generated ", mapOrigins.size(), " origins");
 
         /* Sort any out of place origins from parallel testing. */
-        std::sort(vOrigins.begin(), vOrigins.end());
+        //std::sort(vOrigins.begin(), vOrigins.end());
 
-        /* Print the offset counts and ratios. */
-        for(uint32_t i = 0; i < vOrigins.size(); ++i)
-            debug::log(0, i, ": ", vOrigins[i]);
+        ///* Print the offset counts and ratios. */
+        //for(uint32_t i = 0; i < vOrigins.size(); ++i)
+        //    debug::log(0, i, ": ", vOrigins[i]);
+        i = 0;
+        for(auto it = mapOrigins.begin(); it != mapOrigins.end(); ++it, ++i)
+            debug::log(0, i, ": ", std::setw(3), std::left, it->first, " - ", std::setw(12), std::left, it->second);
 
 
         /* Store origins in a file named origins.ini. */
         std::ofstream fout("origins.ini");
-        for(uint32_t i = 0; i < vOrigins.size(); ++i)
-            fout << vOrigins[i] << "\n";
+        //for(uint32_t i = 0; i < vOrigins.size(); ++i)
+        //    fout << vOrigins[i] << "\n";
+        for(auto it = mapOrigins.begin(); it != mapOrigins.end(); ++it)
+            fout << it->second << "\n";
         fout.close();
 
         omp_destroy_lock(&lk);
