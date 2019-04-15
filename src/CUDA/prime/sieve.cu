@@ -600,14 +600,20 @@ __global__ void primesieve_kernelB(uint64_t *origins,
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
+        uint32_t index;
+        uint32_t mask;
+
         tmp.z = mod_p_small(origins[origin_index] + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
 
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
         {
-            if((bit_array_sieve[tmp.w >> 5] & 1 << (tmp.w & 31)) == 0)
-                atomicOr(&bit_array_sieve[tmp.w >> 5], 1 << (tmp.w & 31));
+            index = tmp.w >> 5;
+            mask = c_mark_mask[tmp.w & 31];
+
+            if((bit_array_sieve[index] & mask) == 0)
+                atomicOr(&bit_array_sieve[index], mask);
         }
     }
 }
@@ -770,12 +776,6 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     uint8_t curr_test = test_index % FRAME_COUNT;
     uint32_t next_test = (test_index + 1) % FRAME_COUNT;
     uint32_t prev_test = (test_index - 1) % FRAME_COUNT;
-
-    if(sieve_index >= nOrigins)
-    {
-        debug::error("out of origins to test");
-        return false;
-    }
 
     /* Make sure current working sieve is finished */
     if(cudaEventQuery(d_Events[thr_id][curr_sieve][EVENT::COMPACT]) == cudaErrorNotReady

@@ -30,6 +30,7 @@ extern "C" void cuda_results(uint32_t thr_id,
                              uint32_t *result_meta,
                              uint32_t *result_count,
                              uint32_t *primes_checked,
-                             uint32_t *primes_found);
+                             uint32_t *primes_found,
+                             bool fSynchronize = false);
 
 #endif

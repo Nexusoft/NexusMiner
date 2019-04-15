@@ -197,15 +197,21 @@ namespace LLP
         WritePacket(REQUEST);
     }
 
+    bool Miner::GetBlock(uint32_t nBlockID)
+    {
+        TAO::Ledger::Block *pBlock = mapBlocks[nBlockID];
+
+        std::unique_lock<std::mutex> lk(mut);
+        get_block(pBlock);
+
+        vWorkers[nBlockID]->Reset();
+
+        return true;
+    }
+
 
     bool Miner::GetBlocks()
     {
-        TAO::Ledger::Block block;
-        Packet REQUEST;
-        Packet RESPONSE;
-
-        REQUEST.HEADER = GET_BLOCK;
-
         uint32_t count = static_cast<uint32_t>(mapBlocks.size());
 
         debug::log(2, "");
@@ -218,45 +224,8 @@ namespace LLP
         {
             TAO::Ledger::Block *pBlock = it->second;
 
-            /* Set the channel of the worker channel. */
-            uint32_t nChannel = pBlock->nChannel;
-            SetChannel(nChannel);
-            WritePacket(REQUEST);
-            ReadNextPacket(RESPONSE);
-
-            /* Check for null packet. */
-            if(RESPONSE.IsNull())
-                return debug::error(FUNCTION, " invalid block response.");
-
-            /* Decode the response data into a block. */
-            block.Deserialize(RESPONSE.DATA);
-
-            /*Assign the block to the one we just recieved. */
-            *pBlock = block;
-
-            /* Make sure the channel from the block matches what was requested. */
-            if(pBlock->nChannel != nChannel)
-            {
-                debug::error("Recieved block channel: ", ChannelName[pBlock->nChannel],
-                    " does not match channel: ", ChannelName[nChannel], " as requested. Force setting block channel.");
-                pBlock->nChannel = nChannel;
-            }
-
-            uint1024_t proof_hash = pBlock->ProofHash();
-
-            debug::log(2, FUNCTION, "Recieved new ", proof_hash.BitCount(), "-Bit ", std::setw(5), ChannelName[pBlock->nChannel], " Block ",
-                proof_hash.ToString().substr(0, 20));
-
-                /* Set the global difficulty. */
-                if(pBlock->nChannel == 1)
-                    nPrimeDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 1);
-                else if(pBlock->nChannel == 2)
-                    nHashDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 2);
-                else
-                {
-                    nPrimeDifficulty = 0;
-                    nHashDifficulty = 0;
-                }
+            /* Send LLP messages to obtain a new block. */
+            get_block(pBlock);
         }
 
         /* Allow worker to continue work with new block. */
@@ -652,6 +621,58 @@ namespace LLP
             /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */
 
         }
+    }
+
+
+    bool Miner::get_block(TAO::Ledger::Block *pBlock)
+    {
+        TAO::Ledger::Block block;
+        Packet REQUEST;
+        Packet RESPONSE;
+
+        REQUEST.HEADER = GET_BLOCK;
+
+        /* Set the channel of the worker channel. */
+        uint32_t nChannel = pBlock->nChannel;
+        SetChannel(nChannel);
+        WritePacket(REQUEST);
+        ReadNextPacket(RESPONSE);
+
+        /* Check for null packet. */
+        if(RESPONSE.IsNull())
+            return debug::error(FUNCTION, " invalid block response.");
+
+        /* Decode the response data into a block. */
+        block.Deserialize(RESPONSE.DATA);
+
+        /*Assign the block to the one we just recieved. */
+        *pBlock = block;
+
+        /* Make sure the channel from the block matches what was requested. */
+        if(pBlock->nChannel != nChannel)
+        {
+            debug::error("Recieved block channel: ", ChannelName[pBlock->nChannel],
+                " does not match channel: ", ChannelName[nChannel], " as requested. Force setting block channel.");
+            pBlock->nChannel = nChannel;
+        }
+
+        uint1024_t proof_hash = pBlock->ProofHash();
+
+        debug::log(2, FUNCTION, "Recieved new ", proof_hash.BitCount(), "-Bit ", std::setw(5), ChannelName[pBlock->nChannel], " Block ",
+            proof_hash.ToString().substr(0, 20));
+
+        /* Set the global difficulty. */
+        if(pBlock->nChannel == 1)
+            nPrimeDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 1);
+        else if(pBlock->nChannel == 2)
+            nHashDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 2);
+        else
+        {
+            nPrimeDifficulty = 0;
+            nHashDifficulty = 0;
+        }
+
+        return true;
     }
 
 }

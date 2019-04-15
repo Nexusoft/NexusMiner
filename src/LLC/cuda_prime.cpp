@@ -83,11 +83,8 @@ namespace LLC
 
         /* Get difficulty. */
         uint32_t nDifficulty = pBlock->nBits;
+        uint32_t nOrigins = vOrigins.size();
 
-
-        /* Compute non-colliding origins for each GPU within 2^64 search space */
-        //uint64_t range = ~(0) / nPrimorial / GPU_MAX;
-        //gpu_offset = base_offset;// + range * nPrimorial * nID;
 
         /* Check for early out. */
         if(fReset.load())
@@ -106,7 +103,7 @@ namespace LLC
                            nDifficulty,
                            nSieveIndex,
                            nTestIndex,
-                           vOrigins.size()))
+                           nOrigins))
         {
             /* Check for early out. */
             if(fReset.load())
@@ -117,7 +114,8 @@ namespace LLC
 
             /* After the number of iterations have been satisfied,
              * start filling next queue */
-            if (nSieveIndex % nIterations == 0 && nSieveIndex > 0)
+            if ((nSieveIndex == (nOrigins - 1) || nSieveIndex % nIterations == 0)
+            && nSieveIndex > 0)
             {
                 /* Test results. */
                 cuda_fermat(nID, nSieveIndex, nTestIndex, nTestLevel);
@@ -138,8 +136,13 @@ namespace LLC
         /* Obtain the final results and push them onto the queue */
         if(nTestIndex)
         {
+            bool fSynchronize = false;
+
+            if(nSieveIndex == nOrigins)
+                fSynchronize = true;
+
             cuda_results(nID, nTestIndex-1, nonce_offsets, nonce_meta,
-                &nCount, nPrimesChecked, nPrimesFound);
+                &nCount, nPrimesChecked, nPrimesFound, fSynchronize);
         }
 
         /* Check for early out. */
@@ -157,6 +160,14 @@ namespace LLC
         /* Change frequency of looping for better GPU utilization, can lead to
         lower latency than from a calling thread waking a blocking-sync thread */
         runtime::sleep(1);
+
+        /* Tell worker we want to request a new block, the prime origins have been exhausted. */
+        if(nSieveIndex == nOrigins)
+        {
+            debug::log(0, FUNCTION, (uint32_t)nID, " - Requesting more work");
+            fReset = true;
+            return false;
+        }
 
         return false;
     }

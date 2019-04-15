@@ -76,6 +76,13 @@ namespace LLP
                     if(!fReset.load())
                         pMiner->SubmitBlock(nBlockID);
                 }
+
+                /* If the proof is reset, get more work. */
+                if(pProof->IsReset() && !fReset.load() && !fPause.load() && !fStop.load())
+                {
+                    pMiner->GetBlock(nBlockID);
+                    pProof->Init();
+                }
             }
 
             if(fStop.load())

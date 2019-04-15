@@ -21,6 +21,8 @@ extern __constant__ uint32_t c_iA[16];
 extern __constant__ uint32_t c_iB[16];
 extern __constant__ uint32_t c_iT[16];
 
+extern __constant__ uint32_t c_mark_mask[32];
+
 extern __constant__ uint32_t c_iBeg;
 extern __constant__ uint32_t c_iEnd;
 

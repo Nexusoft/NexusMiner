@@ -48,7 +48,7 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
 
         for(index = index + pIdx; index < 262144; index += nAdd)
         {
-            if(g_sieve_hierarchy[index >> 5] & 1 << (index & 31) == 0)
+            if( (g_sieve_hierarchy[index >> 5] & (1 << (index & 31)) ) == 0)
                 atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
         }
 
@@ -98,7 +98,7 @@ __global__ void combosieve_kernelA_256(uint32_t *g_sieve_hierarchy,
 
         for(index = index + pIdx; index < 262144; index += nAdd)
         {
-            if(g_sieve_hierarchy[index >> 5] & 1 << (index & 31) == 0)
+            if( (g_sieve_hierarchy[index >> 5] & (1 << (index & 31)) ) == 0)
                 atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
         }
 
@@ -149,7 +149,7 @@ __global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
 
         for(index = index + pIdx; index < 262144; index += nAdd)
         {
-            if(g_sieve_hierarchy[index >> 5] & 1 << (index & 31) == 0)
+            if( (g_sieve_hierarchy[index >> 5] & (1 << (index & 31)) ) == 0)
                 atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
         }
     }
@@ -184,14 +184,19 @@ __global__ void combosieve_kernelB(uint64_t *origins,
     {
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
+        uint32_t index;
+        uint32_t mask;
 
         tmp.z = mod_p_small(origins[origin_index] + base_remainders[i] + c_offsets[c_iB[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
         for(; tmp.w < bit_array_size; tmp.w += tmp.x)
         {
-            if(g_sieve_hierarchy[tmp.w >> 5] & 1 << (tmp.w & 31) == 0)
-                atomicOr(&bit_array_sieve[tmp.w >> 5], 1 << (tmp.w & 31));
+            index = tmp.w >> 5;
+            mask = c_mark_mask[tmp.w & 31];
+
+            if((g_sieve_hierarchy[index] & mask) == 0)
+                atomicOr(&bit_array_sieve[index], mask);
         }
     }
 }
@@ -277,8 +282,8 @@ __global__ void compact_combo(uint64_t *d_origins,
                         d_nonce_meta[i] = ~combo;
                     }
                 }
-                else
-                    printf("%d: combo=%08X, n=%d, t=%d, count=%d\n", idx, combo, n, t, nCount);
+                //else
+                //    printf("%d: combo=%08X, n=%d, t=%d, count=%d\n", idx, combo, n, t, nCount);
             }
         }
     }
