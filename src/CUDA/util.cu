@@ -103,7 +103,7 @@ extern "C" void cuda_init(uint8_t thr_id)
 
   cudaSetDevice(device_map[thr_id]);
 
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
+  cudaDeviceSetCacheConfig(cudaFuncCachePreferEqual);
 }
 
 

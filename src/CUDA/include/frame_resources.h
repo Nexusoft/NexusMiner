@@ -16,6 +16,9 @@
 struct FrameResource
 {
     //testing
+
+  uint32_t *d_window_data[FRAME_COUNT];
+
   uint64_t *d_result_offsets[FRAME_COUNT];
   uint64_t *h_result_offsets[FRAME_COUNT];
 

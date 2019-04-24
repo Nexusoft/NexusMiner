@@ -13,3 +13,4 @@
 #define GPU_MAX 8
 #define WORD_MAX 32
 #define OFFSETS_MAX 24
+#define WINDOW_SIZE 4

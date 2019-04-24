@@ -38,6 +38,7 @@ namespace LLC
     uint64_t nBitArray_StartIndex[GPU_MAX] = {0};
 
     uint16_t primeLimitA = 512;
+    uint32_t primeLimitB = 564164;
 
     std::atomic<uint32_t> nChainCounts[14];
 

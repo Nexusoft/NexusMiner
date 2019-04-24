@@ -46,6 +46,7 @@ namespace LLC
     extern uint64_t nBitArray_StartIndex[GPU_MAX];
 
     extern uint16_t primeLimitA;
+    extern uint32_t primeLimitB;
 
     extern std::mutex g_work_mutex;
     extern std::deque<work_info> g_work_queue;

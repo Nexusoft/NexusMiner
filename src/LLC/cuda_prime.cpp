@@ -98,6 +98,7 @@ namespace LLC
                            nPrimorial,
                            nPrimorialEndPrime,
                            primeLimitA,
+                           primeLimitB,
                            nSievePrimes,
                            nSieveBits,
                            nDifficulty,
@@ -188,6 +189,9 @@ namespace LLC
         /* Initialize the stats counts for this GPU. */
         cuda_init_counts(nID);
 
+        /* Set the GPU quit flag to false. */
+        cuda_set_quit(0);
+
         /* Initialize the stats for this CPU. */
         nCount = 0;
         nSieveIndex = 0;
@@ -217,8 +221,7 @@ namespace LLC
         cuda_set_origins(nID, primeLimitA, vOrigins.size());
 
 
-        /* Set the GPU quit flag to false. */
-        cuda_set_quit(0);
+
 
     }
 
@@ -246,6 +249,19 @@ namespace LLC
                          nPrimorialEndPrime,
                          primeLimitA,
                          vOrigins.size());
+
+
+        /* Find prime limit B which is the first prime larger than bit array size. */
+        primeLimitB = 564164;
+        for(int i = 0; i < nSievePrimes; ++i)
+        {
+            if(primes[i] > nSieveBits)
+            {
+                debug::log(0, i, ": First prime found larger than ", nSieveBits, " = ", primes[i]);
+                primeLimitB = i;
+                break;
+            }
+        }
 
         /* Set the primorial for this GPU device. */
         cuda_set_primorial(nID, nPrimorial);

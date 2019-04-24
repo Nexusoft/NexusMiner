@@ -266,27 +266,46 @@ extern "C" void cuda_free_primes(uint8_t thr_id)
 
 __global__ void base_remainders_kernel(uint4 *primes, uint32_t *base_remainders, uint32_t nPrimeLimit)
 {
-    uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+    uint32_t i = (blockDim.x * blockIdx.x + threadIdx.x);
+
+
     if (i < nPrimeLimit)
     {
         uint4 tmp = primes[i];
         uint64_t rec = make_uint64_t(tmp.z, tmp.w);
         base_remainders[i] = mpi_mod_int(c_zTempVar, tmp.x, rec);
     }
+
 }
 
 extern "C" void cuda_base_remainders(uint8_t thr_id, uint32_t nPrimeLimit)
 {
-    int nThreads = nPrimeLimit;
-    int nThreadsPerBlock = 256;
-    int nBlocks = (nThreads + nThreadsPerBlock-1) / nThreadsPerBlock;
+    int nThreadsPerBlock = 32;
 
-    dim3 block(nThreadsPerBlock);
-    dim3 grid(nBlocks);
+    for(uint8_t i = 0; i < 4; ++i)
+    {
 
-    base_remainders_kernel<<<grid, block, 0>>>(d_primesInverseInvk[thr_id],
-                                               d_base_remainders[thr_id],
-                                               nPrimeLimit);
+        dim3 block(nThreadsPerBlock);
+
+        int i_beg = i * nPrimeLimit / 4;
+        int i_end = (i+1) * nPrimeLimit / 4;
+
+        if(i == 3)
+            i_end = nPrimeLimit;
+
+        int nThreads = i_end - i_beg;
+        int nBlocks = (nThreads + nThreadsPerBlock - 1) / nThreadsPerBlock;
+        dim3 grid(nBlocks);
+
+        CHECK(stream_wait_event(thr_id, 0, i, i));
+
+        base_remainders_kernel<<<grid, block, 0, d_Streams[thr_id][i]>>>(&d_primesInverseInvk[thr_id][i_beg],
+                                                &d_base_remainders[thr_id][i_beg],
+                                                nThreads);
+
+        CHECK(stream_signal_event(thr_id, 0, i, i));
+
+    }
 }
 
 
@@ -329,6 +348,7 @@ __global__ void primesieve_kernelB0(uint64_t *origins,
         prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
     }
 }
+
 
 template<uint8_t offsetsA>
 __global__ void primesieve_kernelA_1024(uint32_t *g_bit_array_sieve,
@@ -592,10 +612,51 @@ __global__ void primesieve_kernelB(uint64_t *origins,
                                    uint32_t origin_index)
 {
     uint32_t position = blockDim.x * blockIdx.x + threadIdx.x;
-    uint32_t i = nPrimorialEndPrime + (position >> 3);
-    uint32_t o = position & 7;
+    uint32_t i = nPrimorialEndPrime + (position / nOffsets);
+    uint32_t o = position % nOffsets;
 
-    if(i < nPrimeLimit && o < nOffsets)
+    if(i < nPrimeLimit)
+    {
+        uint4 tmp = primes[i];
+
+        uint32_t index;
+        uint32_t mask;
+
+
+        uint64_t recip = make_uint64_t(tmp.z, tmp.w);
+        tmp.z = mod_p_small(origins[origin_index] + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
+        tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+
+
+        for(; tmp.w < bit_array_size; tmp.w += tmp.x)
+        {
+            index = tmp.w >> 5;
+            mask = c_mark_mask[tmp.w & 31];
+
+            if((bit_array_sieve[index] & mask) == 0)
+                atomicOr(&bit_array_sieve[index], mask);
+        }
+    }
+}
+
+
+__global__ void primesieve_kernelC(uint64_t *origins,
+                                   uint32_t *bit_array_sieve,
+                                   uint32_t bit_array_size,
+                                   uint4 *primes,
+                                   uint32_t *base_remainders,
+                                   uint32_t nPrimorialEndPrime,
+                                   uint32_t nPrimeLimit,
+                                   uint32_t nOffsets,
+                                   uint32_t origin_index)
+{
+    uint32_t position = blockDim.x * blockIdx.x + threadIdx.x;
+
+
+    uint32_t i = nPrimorialEndPrime + (position / nOffsets);
+    uint32_t o = position % nOffsets;
+
+    if(i < nPrimeLimit)
     {
         uint4 tmp = primes[i];
         uint64_t recip = make_uint64_t(tmp.z, tmp.w);
@@ -607,7 +668,7 @@ __global__ void primesieve_kernelB(uint64_t *origins,
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
 
-        for(; tmp.w < bit_array_size; tmp.w += tmp.x)
+        if(tmp.w < bit_array_size)
         {
             index = tmp.w >> 5;
             mask = c_mark_mask[tmp.w & 31];
@@ -659,8 +720,14 @@ extern "C" void cuda_set_origins(uint8_t thr_id, uint32_t nPrimeLimitA, uint32_t
 
     debug::log(4, FUNCTION, "nPrimeLimitA=", nPrimeLimitA, " nOrigins=", nOrigins);
 
+    for(uint8_t i = 0; i < 4; ++i)
+        CHECK(stream_wait_event(thr_id, 0, i, i));
+
     kernelA0_launch(thr_id, STREAM::SIEVE_A, nPrimeLimitA, nOrigins);
     kernelB0_launch(thr_id, STREAM::SIEVE_B, nPrimeLimitA, nOrigins);
+
+    CHECK(stream_signal_event(thr_id, 0, STREAM::SIEVE_A, EVENT::SIEVE_A));
+    CHECK(stream_signal_event(thr_id, 0, STREAM::SIEVE_B, EVENT::SIEVE_B));
 }
 
 #define KERNEL_A_LAUNCH(X) primesieve_kernelA_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
@@ -727,7 +794,7 @@ void kernelB_launch(uint8_t thr_id,
 {
     uint32_t nThreads = nPrimeLimitB - nPrimeLimitA;
     uint32_t nThreadsPerBlock = 128;
-    uint32_t nBlocks = (nThreads + (nThreadsPerBlock << 3) - 1) / (nThreadsPerBlock >> 3);
+    uint32_t nBlocks = (nThreads + (nThreadsPerBlock * nOffsetsA) - 1) / (nThreadsPerBlock / nOffsetsA);
 
     dim3 block(nThreadsPerBlock);
     dim3 grid(nBlocks);
@@ -742,6 +809,52 @@ void kernelB_launch(uint8_t thr_id,
         case 6: KERNEL_B_LAUNCH(6); break;
         case 7: KERNEL_B_LAUNCH(7); break;
         case 8: KERNEL_B_LAUNCH(8); break;
+    }
+}
+
+
+#define KERNEL_C_LAUNCH(X)   primesieve_kernelC<<<grid, block, 0, d_Streams[thr_id][str_id]>>>( \
+d_origins[thr_id], \
+frameResources[thr_id].d_bit_array_sieve[frame_index], \
+nBitArray_Size, \
+d_primesInverseInvk[thr_id], \
+d_base_remainders[thr_id], \
+nPrimeLimitB, \
+nPrimeLimit, \
+X, \
+origin_index )
+
+void kernelC_launch(uint8_t thr_id,
+                    uint8_t str_id,
+                    uint32_t origin_index,
+                    uint8_t frame_index,
+                    uint32_t nPrimeLimitB,
+                    uint32_t nPrimeLimit,
+                    uint32_t nBitArray_Size)
+{
+    uint32_t nThreads = nPrimeLimit - nPrimeLimitB;
+    uint32_t nThreadsPerBlock = 128;
+    uint32_t nBlocks = (nThreads + (nThreadsPerBlock * nOffsetsA) - 1) / (nThreadsPerBlock / nOffsetsA);
+
+    dim3 block(nThreadsPerBlock);
+    dim3 grid(nBlocks);
+
+    switch(nOffsetsA)
+    {
+        case 8: KERNEL_C_LAUNCH(8); break;
+        case 7: KERNEL_C_LAUNCH(7); break;
+        case 6: KERNEL_C_LAUNCH(6); break;
+        case 5: KERNEL_C_LAUNCH(5); break;
+        case 4: KERNEL_C_LAUNCH(4); break;
+        case 3: KERNEL_C_LAUNCH(3); break;
+        case 2: KERNEL_C_LAUNCH(2); break;
+        case 1: KERNEL_C_LAUNCH(1); break;
+
+
+
+
+
+
     }
 }
 
@@ -765,6 +878,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
                                 uint16_t nPrimorialEndPrime,
                                 uint16_t nPrimeLimitA,
                                 uint32_t nPrimeLimitB,
+                                uint32_t nPrimeLimit,
                                 uint32_t nBitArray_Size,
                                 uint32_t nDifficulty,
                                 uint32_t sieve_index,
@@ -772,6 +886,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
                                 uint32_t nOrigins)
 {
     /* Get the current working sieve and test indices */
+    uint8_t prev_sieve = (sieve_index - 1) % FRAME_COUNT;
     uint8_t curr_sieve = sieve_index % FRAME_COUNT;
     uint8_t curr_test = test_index % FRAME_COUNT;
     uint32_t next_test = (test_index + 1) % FRAME_COUNT;
@@ -801,7 +916,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
 
 
     {
-        CHECK(stream_wait_event(thr_id, curr_sieve, STREAM::SIEVE_A, EVENT::COMPACT));
+        CHECK(stream_wait_event(thr_id, prev_sieve, STREAM::SIEVE_A, EVENT::COMPACT));
         CHECK(stream_wait_event(thr_id, prev_test,  STREAM::SIEVE_A, EVENT::FERMAT));
 
 
@@ -815,6 +930,9 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
         /* Single sieve (Launch large sieve, utilizing global memory and signal) */
         kernelB_launch(thr_id, STREAM::SIEVE_B, sieve_index, curr_sieve,
                       nPrimeLimitA, nPrimeLimitB, nBitArray_Size);
+
+        kernelC_launch(thr_id, STREAM::SIEVE_B, sieve_index, curr_sieve,
+                      nPrimeLimitB, nPrimeLimit, nBitArray_Size);
 
         CHECK(stream_signal_event(thr_id, curr_sieve, STREAM::SIEVE_B, EVENT::SIEVE_B));
     }

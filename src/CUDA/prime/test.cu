@@ -97,19 +97,23 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
                               uint32_t nTestOffsets,
                               uint32_t nOffsets)
 {
-    /* If the quit flag was set, early return to avoid wasting time. */
-    if(c_quit)
-        return;
+    ///* If the quit flag was set, early return to avoid wasting time. */
+    //if(c_quit)
+    //    return;
 
     /* Compute the global index for this nonce offset. */
     uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
-    uint32_t idx = position >> 3;
-    uint32_t o = position & 7;
+    uint32_t idx = position / nTestOffsets;
+    uint32_t o = position % nTestOffsets;
 
     /* Make sure index is not out of bounds. */
-    if(idx < *nonce_count && o < nTestOffsets)
+    if(idx < *nonce_count)
     {
         uint32_t p[WORD_MAX];
+        uint32_t A[WORD_MAX];
+        uint32_t r[WORD_MAX];
+        uint32_t t[WORD_MAX + 1];
+
         uint32_t test_index = c_iT[o];
 
         /* Compute the primorial offset from the primorial and
@@ -118,7 +122,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         add_ui(p, c_zBaseOrigin, nonce_offsets[idx] + (uint64_t)c_offsets[test_index]);
 
         /* Check if prime passes fermat test base 2. */
-        uint8_t prime = fermat_prime(p);
+        uint8_t prime = fermat_prime(p, A, r, t);
 
         /* Increment primes found. */
         atomicAdd(&g_primes_found[test_index], prime);
@@ -194,11 +198,16 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     debug::log(3, FUNCTION, (uint32_t)thr_id,  ": nonce_count = ", nThreads);
 
     /* Loop unroll up to 8 offsets for testing. */
-    dim3 block(64 << 3);
-    dim3 grid((nThreads + block.x - 1) / (block.x >> 3));
+
+    uint32_t threadsPerBlock = 256;
+
+    dim3 block(threadsPerBlock);
+    dim3 grid((nThreads + (block.x * vOffsetsT.size()) - 1) / (block.x / vOffsetsT.size()));
+
+    uint32_t sharedSizeBytes = threadsPerBlock * WORD_MAX * sizeof(uint32_t);
 
     /* Launcth the fermat testing kernel. */
-    fermat_kernel<<<grid, block, 0, d_Streams[thr_id][STREAM::FERMAT]>>>(
+    fermat_kernel<<<grid, block, sharedSizeBytes, d_Streams[thr_id][STREAM::FERMAT]>>>(
         frameResources[thr_id].d_nonce_offsets[curr_test],
         frameResources[thr_id].d_nonce_meta[curr_test],
         frameResources[thr_id].d_nonce_count[curr_test],
