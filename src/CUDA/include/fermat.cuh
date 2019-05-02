@@ -321,35 +321,74 @@ void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
         sub_n(b, b, n);
 }
 
+__device__ __forceinline__
+void calcBar(uint32_t *a, uint32_t *n, uint32_t *t)
+{
+    assign_zero(a);
+
+    lshift(t, n, (WORD_MAX<<5) - bit_count(n));
+    sub_n(a, a, t);
+
+    while(cmp_ge_n(a, n))  //calculate R mod N;
+    {
+        rshift1(t, t);
+        if(cmp_ge_n(a, t))
+            sub_n(a, a, t);
+    }
+
+}
 
 /* Calculate The window table used for fixed window exponentiation. */
 __device__ __forceinline__
 void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
 {
-    for(uint8_t i = 0; i < (1 << WINDOW_SIZE); ++i)
-    {
+    lshift1(t, a);     //calculate 2R mod N;
+    if(cmp_ge_n(t, n))
+        sub_n(t, t, n);
 
+    assign(&table[WORD_MAX], t);
+
+
+    for(uint16_t i = 2; i < WINDOW_SIZE; ++i) //calculate 2^i R mod N
+    {
+        lshift1(t, t);
+        if(cmp_ge_n(t, n))
+            sub_n(t, t, n);
+
+        assign(&table[i * WORD_MAX], t);
     }
 }
 
 
 /* Calculate X = 2^Exp Mod N (Fermat test) */
 __device__ __forceinline__
-void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N)
+void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
 {
-    uint32_t A[WORD_MAX];
-    uint32_t t[WORD_MAX + 1];
-
+    uint32_t t[WORD_MAX + 2];
+    uint32_t wval = 0;
     uint32_t d = inv2adic(N[0]);
 
-    calcBar(X, A, N, t);
+    calcBar(X, N, t);
 
-    for(int16_t i = bit_count(Exp)-1; i >= 0; --i)
+    calcWindowTable(X, N, t, table);
+
+    uint32_t bits = bit_count(Exp);
+
+    for(int16_t i = bits-1; i >= 0; --i)
     {
-        mulredc(X, X, X, N, d, t);
+        if(i != bits-1)
+            mulredc(X, X, X, N, d, t);
+
+        wval <<= 1;
 
         if(Exp[i>>5] & (1 << (i & 31)))
-            mulredc(X, X, A, N, d, t);
+            wval |= 1;
+
+        if(((i % WINDOW_BITS) == 0) && wval)
+        {
+            mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
+            wval = 0;
+        }
     }
 
     redc(X, X, N, d, t);
@@ -361,7 +400,7 @@ __device__ __forceinline__
 void pow2m(uint32_t *X, uint32_t *N)
 {
     uint32_t A[WORD_MAX];
-    uint32_t t[WORD_MAX + 1];
+    uint32_t t[WORD_MAX + 2];
 
     uint32_t d = inv2adic(N[0]);
 
@@ -388,50 +427,18 @@ void pow2m(uint32_t *X, uint32_t *N)
     redc(X, X, N, d, t);
 }
 
-
-/* Calculate X = 2^(N-1) Mod N (Fermat test, assume no overflow (64-bit) ) */
-__device__ __forceinline__
-void pow2m(uint32_t *X, uint32_t *N, uint32_t *A, uint32_t *t)
-{
-    uint32_t d = inv2adic(N[0]);
-    uint64_t N0 = make_uint64_t(N[0], N[1]) - 1;
-
-    calcBar(X, A, N, t);
-
-    for(int16_t i = bit_count(N)-1; i >= 64; --i)
-    {
-        mulredc(X, X, X, N, d, t);
-
-        if(N[i>>5] & (1 << (i & 31)))
-            mulredc(X, X, A, N, d, t);
-    }
-
-    for(int16_t i = 63; i >= 0; --i)
-    {
-        mulredc(X, X, X, N, d, t);
-
-        if(N0 & ((uint64_t)1 << (i & 63)))
-            mulredc(X, X, A, N, d, t);
-    }
-
-
-    redc(X, X, N, d, t);
-}
 
 
 /* Test if number p passes Fermat Primality Test base 2. */
 __device__ __forceinline__
-bool fermat_prime(uint32_t *p, uint32_t *A, uint32_t *r, uint32_t *t)
+bool fermat_prime(uint32_t *p, uint32_t *table)
 {
-    //uint32_t e[WORD_MAX];
-    //uint32_t r[WORD_MAX];
+    uint32_t e[WORD_MAX];
+    uint32_t r[WORD_MAX];
 
-
-    //uint32_t t[WORD_MAX + 1];
-
-    //sub_ui(e, p, 1);
+    sub_ui(e, p, 1);
     //pow2m(r, e, p);
-    pow2m(r, p, A, t);
+    pow2m(r, e, p, table);
 
     uint32_t result = r[0] - 1;
 

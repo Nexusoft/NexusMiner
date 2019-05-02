@@ -92,6 +92,7 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
 __global__ void fermat_kernel(uint64_t *nonce_offsets,
                               uint32_t *nonce_meta,
                               uint32_t *nonce_count,
+                              uint32_t *window_data,
                               uint32_t *g_primes_checked,
                               uint32_t *g_primes_found,
                               uint32_t nTestOffsets,
@@ -110,9 +111,6 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
     if(idx < *nonce_count)
     {
         uint32_t p[WORD_MAX];
-        uint32_t A[WORD_MAX];
-        uint32_t r[WORD_MAX];
-        uint32_t t[WORD_MAX + 1];
 
         uint32_t test_index = c_iT[o];
 
@@ -122,7 +120,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         add_ui(p, c_zBaseOrigin, nonce_offsets[idx] + (uint64_t)c_offsets[test_index]);
 
         /* Check if prime passes fermat test base 2. */
-        uint8_t prime = fermat_prime(p, A, r, t);
+        uint8_t prime = fermat_prime(p, &window_data[position * WINDOW_SIZE * WORD_MAX]);
 
         /* Increment primes found. */
         atomicAdd(&g_primes_found[test_index], prime);
@@ -194,11 +192,12 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     }
 
 
+    debug::log(3, FUNCTION, (uint32_t)thr_id,
+        ": nonce_count = ", nThreads,
+        " queue filled = ", (nThreads * 100.0) / CANDIDATES_MAX, "%");
 
-    debug::log(3, FUNCTION, (uint32_t)thr_id,  ": nonce_count = ", nThreads);
 
     /* Loop unroll up to 8 offsets for testing. */
-
     uint32_t threadsPerBlock = 256;
 
     dim3 block(threadsPerBlock);
@@ -211,6 +210,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         frameResources[thr_id].d_nonce_offsets[curr_test],
         frameResources[thr_id].d_nonce_meta[curr_test],
         frameResources[thr_id].d_nonce_count[curr_test],
+        frameResources[thr_id].d_window_data[curr_test],
         frameResources[thr_id].d_primes_checked[curr_test],
         frameResources[thr_id].d_primes_found[curr_test],
         vOffsetsT.size(),

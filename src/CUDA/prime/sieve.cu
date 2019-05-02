@@ -166,6 +166,8 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
         CHECK(    cudaMalloc(&frameResources[thr_id].d_result_count[i],   sizeof(uint32_t)));
         CHECK(cudaMallocHost(&frameResources[thr_id].h_result_count[i],   sizeof(uint32_t)));
 
+        CHECK(    cudaMalloc(&frameResources[thr_id].d_window_data[i], nonce32_size * 8 * WORD_MAX * WINDOW_SIZE));
+
         /* test stats */
         CHECK(    cudaMalloc(&frameResources[thr_id].d_primes_checked[i], OFFSETS_MAX * sizeof(uint32_t)));
         CHECK(cudaMallocHost(&frameResources[thr_id].h_primes_checked[i], OFFSETS_MAX * sizeof(uint32_t)));
