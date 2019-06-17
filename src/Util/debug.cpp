@@ -109,48 +109,6 @@ namespace debug
     #endif
 
 
-        /* Log the configuration file parameters. */
-        std::string pathConfigFile = config::GetConfigFile();
-        if(!filesystem::exists(pathConfigFile))
-            log(0, "No configuration file");
-
-        else
-        {
-            log(0, "Using configuration file: ", pathConfigFile);
-
-
-            /* Log configuration file parameters. Need to read them into our own map copy first */
-            std::map<std::string, std::string> mapBasicConfig;  //not used
-            std::map<std::string, std::vector<std::string> > mapMultiConfig; //All values stored here whether multi or not, will use this
-
-            config::ReadConfigFile(mapBasicConfig, mapMultiConfig);
-
-            std::string confFileParams = "";
-
-            for(const auto& argItem : mapMultiConfig)
-            {
-                for(int i = 0; i < argItem.second.size(); ++i)
-                {
-                    confFileParams += argItem.first;
-
-                    /* Check for password parameters and hide them in the debug output. */
-                    if(argItem.first.compare(0, 12, "-rpcpassword") == 0
-                    || argItem.first.compare(0, 12, "-apipassword") == 0)
-                        confFileParams += "=XXXXXXXX";
-                    else if(!argItem.second[i].empty())
-                        confFileParams += "=" + argItem.second[i];
-
-                    confFileParams += " ";
-                }
-            }
-
-            if(confFileParams == "")
-                confFileParams = "(none)";
-
-            log(0, "Configuration file parameters: ", confFileParams);
-        }
-
-
         /* Log command line parameters (which can override conf file settings) */
         std::string cmdLineParms = "";
         for(const auto& arg : config::mapArgs)
