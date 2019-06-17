@@ -13,8 +13,7 @@
 
 extern "C" void cuda_set_primorial(uint8_t thr_id, uint64_t nPrimorial);
 
-extern "C" void cuda_set_FirstSieveElement(uint32_t thr_id,
-                                           uint32_t *limbs);
+extern "C" void cuda_set_BaseOrigin(uint32_t thr_id, uint32_t *limbs);
 
 extern "C" void cuda_init_counts(uint32_t thr_id);
 
@@ -28,11 +27,10 @@ extern "C" void cuda_fermat(uint32_t thr_id,
 extern "C" void cuda_results(uint32_t thr_id,
                              uint32_t test_index,
                              uint64_t *result_offsets,
-                             uint64_t *result_meta,
+                             uint32_t *result_meta,
                              uint32_t *result_count,
                              uint32_t *primes_checked,
-                             uint32_t *primes_found);
-
- extern "C" void cuda_set_test_offsets(uint32_t thr_id, uint32_t *OffsetsT, uint32_t T_count);
+                             uint32_t *primes_found,
+                             bool fSynchronize = false);
 
 #endif

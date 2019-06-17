@@ -15,7 +15,9 @@ ________________________________________________________________________________
 #ifndef NEXUS_LLP_TEMPLATES_WORKER_H
 #define NEXUS_LLP_TEMPLATES_WORKER_H
 
+#include <condition_variable>
 #include <thread>
+#include <mutex>
 #include <atomic>
 #include <cstdint>
 
@@ -104,9 +106,20 @@ namespace LLP
 
 
     private:
+
+        /** Wait
+         *
+         *  Wait for reset (and block to be ready).
+         *
+         **/
+        void Wait();
+
+
         Miner *pMiner;
         LLC::Proof *pProof;
 
+        std::condition_variable condition;
+        std::mutex mut;
         std::thread workerThread;
         std::atomic<bool> fReset;
         std::atomic<bool> fStop;

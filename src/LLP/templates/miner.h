@@ -139,6 +139,7 @@ namespace LLP
         void Stop();
 
         void SubmitBlock(uint8_t blockID);
+        bool GetBlock(uint32_t nBlockID);
 
     private:
 
@@ -146,12 +147,17 @@ namespace LLP
 
         void Pause();
         void SetChannel(uint32_t nChannel);
+
+
         bool GetBlocks();
         uint32_t GetHeight();
         void Reset();
         void PrintStats();
 
     private:
+
+        bool get_block(TAO::Ledger::Block *pBlock);
+
         std::vector<Worker *> vWorkers;
         std::map<uint32_t, TAO::Ledger::Block *> mapBlocks;
         std::queue<uint8_t> qSubmit;

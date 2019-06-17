@@ -21,6 +21,7 @@ ________________________________________________________________________________
 #include <LLC/prime/prime2.h>
 
 #include <cstdint>
+#include <map>
 
 #if defined(_MSC_VER)
 #include <mpir.h>
@@ -95,12 +96,16 @@ namespace LLC
         mpz_t zTempVar;
         mpz_t zN;
         mpz_t zBaseOffsetted;
+        mpz_t zBaseOrigin;
         mpz_t zPrimeOrigin;
         mpz_t zResidue;
-        mpz_t zFirstSieveElement;
         mpz_t zPrimorialMod;
 
         work_info work;
+
+        std::map<uint32_t, uint32_t> mapTest;
+        uint32_t gpu_begin;
+        uint32_t gpu_end;
 
     };
 }

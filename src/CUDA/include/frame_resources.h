@@ -12,16 +12,18 @@
 #include <cstdint>
 
 #define FRAME_COUNT 3
-#define BUFFER_COUNT 2
 
 struct FrameResource
 {
     //testing
+
+  uint32_t *d_window_data[FRAME_COUNT];
+
   uint64_t *d_result_offsets[FRAME_COUNT];
   uint64_t *h_result_offsets[FRAME_COUNT];
 
-  uint64_t *d_result_meta[FRAME_COUNT];
-  uint64_t *h_result_meta[FRAME_COUNT];
+  uint32_t *d_result_meta[FRAME_COUNT];
+  uint32_t *h_result_meta[FRAME_COUNT];
 
   uint32_t *d_result_count[FRAME_COUNT];
   uint32_t *h_result_count[FRAME_COUNT];
@@ -34,14 +36,13 @@ struct FrameResource
 
     //compacting
   uint64_t *d_nonce_offsets[FRAME_COUNT];
-  uint64_t *d_nonce_meta[FRAME_COUNT];
+  uint32_t *d_nonce_meta[FRAME_COUNT];
   uint32_t *d_nonce_count[FRAME_COUNT];
 
   uint32_t *h_nonce_count[FRAME_COUNT];
 
     //sieving
   uint32_t  *d_bit_array_sieve[FRAME_COUNT];
-  uint32_t  *d_prime_remainders[FRAME_COUNT]; //need to do away with this
 
     //bucket sieve
   uint32_t  *d_bucket_o[FRAME_COUNT]; //prime and offset

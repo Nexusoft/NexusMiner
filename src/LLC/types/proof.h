@@ -93,6 +93,13 @@ namespace LLC
              fReset = true;
          }
 
+         /** IsReset
+          *
+          *
+          *
+          **/
+         bool IsReset() const { return fReset.load(); }
+
 
     protected:
         TAO::Ledger::Block *pBlock;

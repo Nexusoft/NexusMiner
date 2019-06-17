@@ -16,9 +16,11 @@ ________________________________________________________________________________
 #include <TAO/Ledger/include/difficulty.h>
 #include <Util/include/convert.h>
 #include <Util/include/print_colors.h>
+#include <Util/include/prime_config.h>
 #include <functional>
 #include <numeric>
 #include <iomanip>
+#include <cmath>
 
 const char *ChannelName[3] =
 {
@@ -86,11 +88,12 @@ namespace LLP
         condition.notify_one();
     }
 
+
+    /* Wait for workers to be ready. */
     void Miner::Wait()
     {
         std::unique_lock<std::mutex> lk(mut);
         condition.wait(lk, [this] {return nReady.load() >= nWorkers.load();});
-        lk.unlock();
     }
 
 
@@ -111,8 +114,12 @@ namespace LLP
             /* Run this thread at 1 cycle per second. */
             runtime::sleep(1000);
 
+            /* Check if shutdown occurred after sleep cycle. */
+            if(fStop.load())
+                break;
+
             /** Attempt with best efforts to keep the Connection Alive. **/
-            if (!Connected())
+            if (!fStop.load() && !Connected())
             {
                 if (!Connect())
                     continue;
@@ -121,9 +128,6 @@ namespace LLP
                 Reset();
             }
 
-            /* Check if shutdown occurred after sleep cycle. */
-            if(fStop.load())
-                break;
 
             /** Check the Block Height. **/
             uint32_t nHeight = GetHeight();
@@ -193,15 +197,21 @@ namespace LLP
         WritePacket(REQUEST);
     }
 
+    bool Miner::GetBlock(uint32_t nBlockID)
+    {
+        TAO::Ledger::Block *pBlock = mapBlocks[nBlockID];
+
+        std::unique_lock<std::mutex> lk(mut);
+        get_block(pBlock);
+
+        vWorkers[nBlockID]->Reset();
+
+        return true;
+    }
+
 
     bool Miner::GetBlocks()
     {
-        TAO::Ledger::Block block;
-        Packet REQUEST;
-        Packet RESPONSE;
-
-        REQUEST.HEADER = GET_BLOCK;
-
         uint32_t count = static_cast<uint32_t>(mapBlocks.size());
 
         debug::log(2, "");
@@ -214,45 +224,8 @@ namespace LLP
         {
             TAO::Ledger::Block *pBlock = it->second;
 
-            /* Set the channel of the worker channel. */
-            uint32_t nChannel = pBlock->nChannel;
-            SetChannel(nChannel);
-            WritePacket(REQUEST);
-            ReadNextPacket(RESPONSE);
-
-            /* Check for null packet. */
-            if(RESPONSE.IsNull())
-                return debug::error(FUNCTION, " invalid block response.");
-
-            /* Decode the response data into a block. */
-            block.Deserialize(RESPONSE.DATA);
-
-            /*Assign the block to the one we just recieved. */
-            *pBlock = block;
-
-            /* Make sure the channel from the block matches what was requested. */
-            if(pBlock->nChannel != nChannel)
-            {
-                debug::error("Recieved block channel: ", ChannelName[pBlock->nChannel],
-                    " does not match channel: ", ChannelName[nChannel], " as requested. Force setting block channel.");
-                pBlock->nChannel = nChannel;
-            }
-
-            uint1024_t proof_hash = pBlock->ProofHash();
-
-            debug::log(2, FUNCTION, "Recieved new ", proof_hash.BitCount(), "-Bit ", std::setw(5), ChannelName[pBlock->nChannel], " Block ",
-                proof_hash.ToString().substr(0, 20));
-
-                /* Set the global difficulty. */
-                if(pBlock->nChannel == 1)
-                    nPrimeDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 1);
-                else if(pBlock->nChannel == 2)
-                    nHashDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 2);
-                else
-                {
-                    nPrimeDifficulty = 0;
-                    nHashDifficulty = 0;
-                }
+            /* Send LLP messages to obtain a new block. */
+            get_block(pBlock);
         }
 
         /* Allow worker to continue work with new block. */
@@ -462,7 +435,7 @@ namespace LLP
     void Miner::Pause()
     {
         /* If we are already paused, don't pause again. */
-        if(!fPause.load())
+        if(!fPause.load() && !fStop.load())
         {
 
             debug::log(0, "Pausing Miner ", addrOut.ToString());
@@ -490,7 +463,11 @@ namespace LLP
 
         /* Stop the worker threads. */
         for(uint8_t i = 0; i < nWorkers.load(); ++i)
+        {
+            vWorkers[i]->Reset();
             vWorkers[i]->Stop();
+        }
+
 
         /* Wait for worker signals. */
         Wait();
@@ -554,13 +531,19 @@ namespace LLP
             LLC::Tests_CPU = 0;
             LLC::Tests_GPU = 0;
 
-            uint64_t checked = LLC::PrimesChecked.load();
-            uint64_t found = LLC::PrimesFound.load();
+            uint64_t checked = 0;
+            uint64_t found = 0;
 
-            double pratio = 0.0;
+            for(uint8_t i = 0; i < vOffsets.size(); ++i)
+            {
+                checked += LLC::PrimesChecked[i].load();
+                found   += LLC::PrimesFound[i].load();
+            }
+
+            double ratio = 0.0;
 
             if (checked)
-                pratio = (double)(100 * found) / checked;
+             ratio = (double)(100 * found) / checked;
 
             double WPS = 1.0 * std::accumulate(LLC::vWPSValues.begin(), LLC::vWPSValues.end(), 0.0) / LLC::vWPSValues.size();
 
@@ -609,16 +592,87 @@ namespace LLP
             debug::log(1, "-----------------------------------------------------------------------------------------------");
 
             debug::log(0, "[PRIMES] ", "Sieved ", std::fixed, std::setprecision(2), (double)gibps / (1 << 30), " GiB/s | Tested ",
-                tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), pratio, " %");
+                tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), ratio, " %");
             debug::log(0, "");
+
+
+            /* Calculate and print the prime pattern offset ratios. */
+            debug::log(1, "[PRIMES] Offset Ratios: ");
+            for(uint16_t i = 0; i < vOffsets.size(); ++i)
+            {
+                found = LLC::PrimesFound[i].load();
+                checked = LLC::PrimesChecked[i].load();
+
+                /* Check for divide by zero. */
+                if(checked)
+                {
+                    ratio = (double)(100 * found) / checked;
+
+                    LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
+                    LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
+                }
+
+                debug::log(1, std::setw(2), std::right, i, ": ",
+                              std::setw(2), std::right, vOffsets[i], " = ",
+                              std::setprecision(3), std::fixed, "[", LLC::minRatios[i], "-", LLC::maxRatios[i],  "]", "%  ");
+            }
 
 
             /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */
 
         }
+    }
 
-        /* Print the total stats from each worker. */
-        //debug::log(0, statsTotal.ToString());
+
+    bool Miner::get_block(TAO::Ledger::Block *pBlock)
+    {
+        TAO::Ledger::Block block;
+        Packet REQUEST;
+        Packet RESPONSE;
+
+        REQUEST.HEADER = GET_BLOCK;
+
+        /* Set the channel of the worker channel. */
+        uint32_t nChannel = pBlock->nChannel;
+        SetChannel(nChannel);
+        WritePacket(REQUEST);
+        ReadNextPacket(RESPONSE);
+
+        /* Check for null packet. */
+        if(RESPONSE.IsNull())
+            return debug::error(FUNCTION, " invalid block response.");
+
+        /* Decode the response data into a block. */
+        block.Deserialize(RESPONSE.DATA);
+
+        /*Assign the block to the one we just recieved. */
+        *pBlock = block;
+
+        /* Make sure the channel from the block matches what was requested. */
+        if(pBlock->nChannel != nChannel)
+        {
+            debug::error("Recieved block channel: ", ChannelName[pBlock->nChannel],
+                " does not match channel: ", ChannelName[nChannel], " as requested. Force setting block channel.");
+            pBlock->nChannel = nChannel;
+        }
+
+        uint1024_t proof_hash = pBlock->ProofHash();
+
+        debug::log(2, FUNCTION, "Recieved new ", proof_hash.BitCount(), "-Bit ", std::setw(5), ChannelName[pBlock->nChannel], " Block ",
+            proof_hash.ToString().substr(0, 20));
+
+        /* Set the global difficulty. */
+        if(pBlock->nChannel == 1)
+            nPrimeDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 1);
+        else if(pBlock->nChannel == 2)
+            nHashDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 2);
+        else
+        {
+            nPrimeDifficulty = 0;
+            nHashDifficulty = 0;
+        }
+
+        return true;
     }
 
 }

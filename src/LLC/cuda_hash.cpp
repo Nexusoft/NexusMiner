@@ -12,7 +12,6 @@
 ____________________________________________________________________________________________*/
 
 #include <CUDA/include/util.h>
-//#include <CUDA/include/frame_resources.h>
 #include <CUDA/include/sk1024.h>
 
 #include <LLC/include/global.h>
@@ -34,7 +33,10 @@ namespace LLC
     HashCUDA::HashCUDA(uint8_t id, TAO::Ledger::Block *block)
     : Proof(id, block)
     , nTarget()
+    , nHashes(0)
     , nIntensity(0)
+    , nThroughput(0)
+    , nThreadsPerBlock(896)
     {
     }
 
@@ -46,39 +48,28 @@ namespace LLC
     bool HashCUDA::Work()
     {
         /* Check for early out. */
-		if (fReset.load())
+        if (fReset.load())
             return false;
 
-		uint64_t hashes = 0;
-
-
-        /* Get the data for this block. */
-		uint32_t *pData = reinterpret_cast<uint32_t *>(&pBlock->nVersion);
-
-        /* Calculate threads per block. */
-        uint32_t nThreadsPerBlock = 896;
-
-        /* Calcluate the throughput for the cuda hash mining. */
-        uint32_t nThroughput = 256 * nThreadsPerBlock * nIntensity;
-
+        nHashes = 0;
 
         /* Do hashing on a CUDA device. */
 		bool fFound = cuda_sk1024_hash(
             nID,
-            pData,
+            reinterpret_cast<uint32_t *>(&pBlock->nVersion),
             nTarget,
             pBlock->nNonce,
-            &hashes,
+            &nHashes,
             nThroughput,
             nThreadsPerBlock,
             pBlock->nHeight);
 
         /* Increment number of hashes for this round. */
-        if (hashes < 0x0000FFFFFFFFFFFF)
-			LLC::nHashes += hashes;
+        if (nHashes < 0x0000FFFFFFFFFFFF)
+			LLC::nHashes += nHashes;
 
         /* If a nonce with the right diffulty was found, return true and submit block. */
-		if(fFound)
+		if(fFound && !fReset.load())
         {
             /* Calculate the number of leading zero-bits and display. */
             uint32_t nBits = pBlock->ProofHash().BitCount();
@@ -127,6 +118,9 @@ namespace LLC
         /* Compute the intensity by determining number of multiprocessors. */
         nIntensity = 2 * cuda_device_multiprocessors(nID);
         debug::log(0, cuda_devicename(nID), " intensity set to ", nIntensity);
+
+        /* Calcluate the throughput for the cuda hash mining. */
+        nThroughput = 256 * nThreadsPerBlock * nIntensity;
     }
 
     void HashCUDA::Shutdown()

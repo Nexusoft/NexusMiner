@@ -10,6 +10,7 @@ OBJS :=	build/main.o \
 				build/LLC_bignum.o \
 				build/LLC_global.o \
 				build/LLC_prime.o \
+				build/LLC_origins.o \
 				build/LLC_prime2.o \
 				build/LLC_cuda_prime.o \
 				build/LLC_cpu_primetest.o \
@@ -40,33 +41,35 @@ OBJS :=	build/main.o \
 
 CUDA_SRCS := $(wildcard src/CUDA/*.cu)
 CUDA_OBJS := build/CUDA_prime_sieve.o \
-	         build/CUDA_prime_fermat.o \
+			 build/CUDA_prime_combo_sieve.o \
+	         build/CUDA_prime_test.o \
 			 build/CUDA_hash_sk1024.o \
 	         build/CUDA_util.o \
-			 build/CUDA_streams_events.o
+			 build/CUDA_streams_events.o \
+			 build/CUDA_constants.o
 
 CUDA_LINK_OBJ := build/CUDA_cuLink.o
 
-CUDA_PATH := /usr/local/cuda-10.0
+CUDA_PATH := /usr/local/cuda-10.1
 NVCC := $(CUDA_PATH)/bin/nvcc
 CXX := g++
 CC := gcc
 
 
-LIB := -lpthread -lgmp -lcrypto
+LIB := -lpthread -lgmp -lcrypto -lgomp
 
 CUDA_LIB := -L$(CUDA_PATH)/lib64 -lcudadevrt -lcudart -lcuda
 CUDA_INC += -I$(CUDA_PATH)/include
 CUDA_INC += $(addprefix -I, $(CURDIR) $(CURDIR)/build $(CURDIR)/src )
 
 CFLAGS   :=
-CXXFLAGS := -std=c++11 -msse2 -O2
+CXXFLAGS := -std=c++11 -msse2 -O2 -fopenmp
 INCLUDES += $(addprefix -I, $(CURDIR) $(CURDIR)/build $(CURDIR)/src )
 
 GPU_CARD := -gencode arch=compute_60,code=sm_60 \
             -gencode arch=compute_70,code=sm_70
 
-NVCC_FLAGS += -std=c++11 -O2 -D_FORCE_INLINES -Xptxas "-v" --ptxas-options=-v
+NVCC_FLAGS += -std=c++11 -rdc=true -O2 -D_FORCE_INLINES -Xptxas "-v" --ptxas-options=-v
 CUDA_LINK_FLAGS := -dlink
 
 ifdef ENABLE_DEBUG
@@ -106,8 +109,11 @@ build/Util_%.o:	src/Util/%.cpp
 build/CUDA_prime_sieve.o:	src/CUDA/prime/sieve.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
 
-build/CUDA_prime_fermat.o:	src/CUDA/prime/fermat.cu
-	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=128 -rdc=true -o $@ -c $< $(CUDA_INC)
+build/CUDA_prime_combo_sieve.o:	src/CUDA/prime/combo_sieve.cu
+	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
+
+build/CUDA_prime_test.o:	src/CUDA/prime/test.cu
+	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=128 -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_hash_sk1024.o:	src/CUDA/hash/sk1024.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=72 -o $@ -c $< $(CUDA_INC)

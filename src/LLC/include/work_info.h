@@ -33,7 +33,7 @@ namespace LLC
     public:
         work_info() {}
         work_info(const std::vector<uint64_t> &nOffsets,
-                  const std::vector<uint64_t> &nMeta,
+                  const std::vector<uint32_t> &nMeta,
                   TAO::Ledger::Block *block,
                   uint32_t tid)
         : nonce_offsets(nOffsets.begin(), nOffsets.end())
@@ -50,7 +50,7 @@ namespace LLC
 
         /* GPU intermediate results */
         std::vector<uint64_t> nonce_offsets;
-        std::vector<uint64_t> nonce_meta;
+        std::vector<uint32_t> nonce_meta;
         TAO::Ledger::Block *pBlock;
         uint32_t thr_id;
     };

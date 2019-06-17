@@ -17,6 +17,7 @@ ________________________________________________________________________________
 
 #include <LLC/include/work_info.h>
 #include <CUDA/include/util.h>
+#include <CUDA/include/macro.h>
 
 #include <cstdint>
 #include <deque>
@@ -38,13 +39,14 @@ namespace LLC
     extern mpz_t zTwo;
 
     extern uint64_t *g_nonce_offsets[GPU_MAX];
-    extern uint64_t *g_nonce_meta[GPU_MAX];
+    extern uint32_t *g_nonce_meta[GPU_MAX];
     extern uint32_t *g_bit_array_sieve[GPU_MAX];
 
     extern uint64_t nBitArray_Stride;
     extern uint64_t nBitArray_StartIndex[GPU_MAX];
 
     extern uint16_t primeLimitA;
+    extern uint32_t primeLimitB;
 
     extern std::mutex g_work_mutex;
     extern std::deque<work_info> g_work_queue;
@@ -55,8 +57,11 @@ namespace LLC
     extern std::atomic<uint64_t> SievedBits;
     extern std::atomic<uint64_t> Tests_CPU;
     extern std::atomic<uint64_t> Tests_GPU;
-    extern std::atomic<uint64_t> PrimesFound;
-    extern std::atomic<uint64_t> PrimesChecked;
+    extern std::atomic<uint64_t> PrimesFound[OFFSETS_MAX];
+    extern std::atomic<uint64_t> PrimesChecked[OFFSETS_MAX];
+    extern double minRatios[OFFSETS_MAX];
+    extern double maxRatios[OFFSETS_MAX];
+
     extern std::atomic<uint64_t> nWeight;
     extern std::deque<double> vWPSValues;
 

@@ -12,7 +12,7 @@
 ____________________________________________________________________________________________*/
 
 #include <CUDA/include/sieve.h>
-#include <CUDA/include/fermat.h>
+#include <CUDA/include/test.h>
 #include <CUDA/include/util.h>
 #include <CUDA/include/frame_resources.h>
 
@@ -52,12 +52,9 @@ namespace LLC
     PrimeCUDA::PrimeCUDA(uint8_t id, TAO::Ledger::Block *block)
     : Proof(id, block)
     , zPrimeOrigin()
-    , zFirstSieveElement()
     , zPrimorialMod()
     , zTempVar()
     , nCount(0)
-    , nPrimesChecked(0)
-    , nPrimesFound(0)
     , nSieveIndex(0)
     , nTestIndex(0)
     , nIterations(0)
@@ -65,6 +62,11 @@ namespace LLC
     , nSieveBits(0)
     , nTestLevel(0)
     {
+        for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
+        {
+            nPrimesChecked[i] = 0;
+            nPrimesFound[i] = 0;
+        }
     }
 
     PrimeCUDA::~PrimeCUDA()
@@ -77,15 +79,12 @@ namespace LLC
 
         /* Get thread local nonce offsets and meta. */
         uint64_t *nonce_offsets = g_nonce_offsets[nID];
-        uint64_t *nonce_meta = g_nonce_meta[nID];
+        uint32_t *nonce_meta = g_nonce_meta[nID];
 
         /* Get difficulty. */
         uint32_t nDifficulty = pBlock->nBits;
+        uint32_t nOrigins = vOrigins.size();
 
-
-        /* Compute non-colliding origins for each GPU within 2^64 search space */
-        //uint64_t range = ~(0) / nPrimorial / GPU_MAX;
-        //gpu_offset = base_offset;// + range * nPrimorial * nID;
 
         /* Check for early out. */
         if(fReset.load())
@@ -95,9 +94,17 @@ namespace LLC
         }
 
         /* Sieve bit array and compact test candidate nonces */
-        if(cuda_primesieve(nID, base_offset, nPrimorial,
-                        nPrimorialEndPrime, primeLimitA, nSievePrimes,
-                        nSieveBits, nDifficulty, nSieveIndex, nTestIndex))
+        if(cuda_primesieve(nID,
+                           nPrimorial,
+                           nPrimorialEndPrime,
+                           primeLimitA,
+                           primeLimitB,
+                           nSievePrimes,
+                           nSieveBits,
+                           nDifficulty,
+                           nSieveIndex,
+                           nTestIndex,
+                           nOrigins))
         {
             /* Check for early out. */
             if(fReset.load())
@@ -108,7 +115,8 @@ namespace LLC
 
             /* After the number of iterations have been satisfied,
              * start filling next queue */
-            if (nSieveIndex % nIterations == 0 && nSieveIndex > 0)
+            if ((nSieveIndex == (nOrigins - 1) || nSieveIndex % nIterations == 0)
+            && nSieveIndex > 0)
             {
                 /* Test results. */
                 cuda_fermat(nID, nSieveIndex, nTestIndex, nTestLevel);
@@ -129,15 +137,14 @@ namespace LLC
         /* Obtain the final results and push them onto the queue */
         if(nTestIndex)
         {
+            bool fSynchronize = false;
+
+            if(nSieveIndex == nOrigins)
+                fSynchronize = true;
+
             cuda_results(nID, nTestIndex-1, nonce_offsets, nonce_meta,
-                &nCount, &nPrimesChecked, &nPrimesFound);
+                &nCount, nPrimesChecked, nPrimesFound, fSynchronize);
         }
-
-
-        /* Total up global stats from each device. */
-        PrimesChecked += nPrimesChecked;
-        Tests_GPU += nPrimesChecked;
-        PrimesFound += nPrimesFound;
 
         /* Check for early out. */
         if(fReset.load())
@@ -154,6 +161,14 @@ namespace LLC
         /* Change frequency of looping for better GPU utilization, can lead to
         lower latency than from a calling thread waking a blocking-sync thread */
         runtime::sleep(1);
+
+        /* Tell worker we want to request a new block, the prime origins have been exhausted. */
+        if(nSieveIndex == nOrigins)
+        {
+            debug::log(0, FUNCTION, (uint32_t)nID, " - Requesting more work");
+            fReset = true;
+            return false;
+        }
 
         return false;
     }
@@ -174,16 +189,18 @@ namespace LLC
         /* Initialize the stats counts for this GPU. */
         cuda_init_counts(nID);
 
+        /* Set the GPU quit flag to false. */
+        cuda_set_quit(0);
+
         /* Initialize the stats for this CPU. */
         nCount = 0;
-        nPrimesChecked = 0;
-        nPrimesFound = 0;
         nSieveIndex = 0;
         nTestIndex = 0;
-
-        /* Compute non-colliding origins for each GPU within 2^64 search space */
-        //uint64_t range = ~(0) / nPrimorial / GPU_MAX;
-        //uint64_t gpu_offset = base_offset + range * nPrimorial * nID;
+        for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
+        {
+            nPrimesChecked[i] = 0;
+            nPrimesFound[i] = 0;
+        }
 
         /* Set the prime origin from the block hash. */
         mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, pBlock->ProofHash().data());
@@ -194,27 +211,17 @@ namespace LLC
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
         mpz_add(zTempVar, zPrimeOrigin, zPrimorialMod);
 
-        /* Compute base remainders. */
+        /* Compute base remainders and base origin. */
+        std::vector<uint32_t> limbs = get_limbs(zTempVar);
         cuda_set_zTempVar(nID, (const uint64_t*)zTempVar[0]._mp_d);
+        cuda_set_BaseOrigin(nID, &limbs[0]);
         cuda_base_remainders(nID, nSievePrimes);
 
-
-        /* Compute first sieving element. */
-        mpz_add_ui(zFirstSieveElement, zTempVar, base_offset);
-
-
-        /* Convert the first sieve element and set it on GPU. */
-        std::vector<uint32_t> limbs = get_limbs(zFirstSieveElement);
-        cuda_set_FirstSieveElement(nID, &limbs[0]);
+        /* Compute prime remainders for each origin. */
+        cuda_set_origins(nID, primeLimitA, vOrigins.size());
 
 
-        /* Set the sieving primes for the first bucket (rest computed on the fly) */
-        //cuda_set_sieve(nID, base_offset, nPrimorial,
-        //               primeLimitA, prime_limit, sieve_bits_log2);
 
-
-        /* Set the GPU quit flag to false. */
-        cuda_set_quit(0);
 
     }
 
@@ -232,28 +239,43 @@ namespace LLC
         nTestLevel = nTestLevels[nID];
 
         /* Load the primes lists on the GPU device. */
-        cuda_init_primes(nID, primes, primesInverseInvk, nSievePrimes,
-        nSieveBits, 32,
-        nPrimorialEndPrime, primeLimitA);
+        cuda_init_primes(nID,
+                         vOrigins.data(),
+                         primes,
+                         primesInverseInvk,
+                         nSievePrimes,
+                         nSieveBits,
+                         32,
+                         nPrimorialEndPrime,
+                         primeLimitA,
+                         vOrigins.size());
+
+
+        /* Find prime limit B which is the first prime larger than bit array size. */
+        primeLimitB = 564164;
+        for(int i = 0; i < nSievePrimes; ++i)
+        {
+            if(primes[i] > nSieveBits)
+            {
+                debug::log(0, i, ": First prime found larger than ", nSieveBits, " = ", primes[i]);
+                primeLimitB = i;
+                break;
+            }
+        }
 
         /* Set the primorial for this GPU device. */
         cuda_set_primorial(nID, nPrimorial);
 
         /* Load the sieve offsets configuration on the GPU device. */
-        cuda_set_sieve_offsets(nID, &offsetsA[0], (uint8_t)offsetsA.size(),
-            &offsetsB[0], (uint8_t)offsetsB.size());
-
-        /* Load the test offsets configuration on the GPU device. */
-        cuda_set_test_offsets(nID, &offsetsTest[0], (uint32_t)offsetsTest.size());
+        cuda_set_offset_patterns(nID, vOffsets, vOffsetsA, vOffsetsB, vOffsetsT);
 
         /* Allocate memory for offsets testing meta and bit array sieve. */
-        g_nonce_offsets[nID] =   (uint64_t*)malloc(OFFSETS_MAX * sizeof(uint64_t));
-        g_nonce_meta[nID] =      (uint64_t*)malloc(OFFSETS_MAX * sizeof(uint64_t));
+        g_nonce_offsets[nID] =   (uint64_t*)malloc(CANDIDATES_MAX * sizeof(uint64_t));
+        g_nonce_meta[nID] =      (uint32_t*)malloc(CANDIDATES_MAX * sizeof(uint32_t));
         g_bit_array_sieve[nID] = (uint32_t *)malloc(16 * (nSieveBits >> 5) * sizeof(uint32_t));
 
         /* Initialize the GMP objects. */
         mpz_init(zPrimeOrigin);
-        mpz_init(zFirstSieveElement);
         mpz_init(zPrimorialMod);
         mpz_init(zTempVar);
 
@@ -286,7 +308,6 @@ namespace LLC
 
         /* Free the GMP object memory. */
         mpz_clear(zPrimeOrigin);
-        mpz_clear(zFirstSieveElement);
         mpz_clear(zPrimorialMod);
         mpz_clear(zTempVar);
     }
@@ -298,74 +319,46 @@ namespace LLC
         {
             /* Get thread local nonce offsets and meta. */
             uint64_t *nonce_offsets = g_nonce_offsets[nID];
-            uint64_t *nonce_meta = g_nonce_meta[nID];
+            uint32_t *nonce_meta = g_nonce_meta[nID];
 
-            std::map<uint64_t, uint64_t> nonces;
-            std::vector<std::pair<uint64_t, uint64_t> > dups;
+            /* Total up global stats from each device. */
+            for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
+            {
+                PrimesChecked[i] += nPrimesChecked[i];
+                Tests_GPU += nPrimesChecked[i];
+                PrimesFound[i] += nPrimesFound[i];
+            }
+
+            std::map<uint64_t, uint32_t> nonces;
+            std::vector<std::pair<uint64_t, uint32_t> > dups;
 
             for(uint32_t i = 0; i < count; ++i)
             {
                 auto it = nonces.find(nonce_offsets[i]);
                 if(it != nonces.end())
                 {
-                    uint64_t meta = it->second;
                     // Extract combo bits and chain info.
-                    std::bitset<32> combo(meta >> 32);
-                    uint32_t chain_offset_beg = (meta >> 24) & 0xFF;
-                    uint32_t chain_offset_end = (meta >> 16) & 0xFF;
-                    uint32_t chain_length = meta & 0xFF;
+                    std::bitset<32> combo(it->second);
+                    std::bitset<32> combo2(nonce_meta[i]);
 
-                    uint64_t meta2 = nonce_meta[i];
-                    // Extract combo bits and chain info.
-                    std::bitset<32> combo2(meta2 >> 32);
-                    uint32_t chain_offset_beg2 = (meta2 >> 24) & 0xFF;
-                    uint32_t chain_offset_end2 = (meta2 >> 16) & 0xFF;
-                    uint32_t chain_length2 = meta2 & 0xFF;
 
                     debug::log(3, FUNCTION, std::hex, nonce_offsets[i], " existing:  ",
-                        " combo: ", combo,
-                        " beg: ", std::dec, chain_offset_beg,
-                        " end: ", chain_offset_end,
-                        " len: ", chain_length,
-                        " | duplicate: ", std::hex,
-                            " combo: ", combo2,
-                            " beg: ", std::dec, chain_offset_beg2,
-                            " end: ", chain_offset_end2,
-                            " len: ", chain_length2);
+                        combo, " | duplicate: ", combo2);
 
 
-
-                    dups.push_back(std::pair<uint64_t, uint64_t>(nonce_offsets[i], nonce_meta[i]));
+                    dups.push_back(std::pair<uint64_t, uint32_t>(nonce_offsets[i], nonce_meta[i]));
 
 
                 }
                 else
-                nonces[nonce_offsets[i]] = nonce_meta[i];
+                    nonces[nonce_offsets[i]] = nonce_meta[i];
             }
 
 
             std::vector<uint64_t> work_offsets;
-            std::vector<uint64_t> work_meta;
-
+            std::vector<uint32_t> work_meta;
 
             debug::log(3, FUNCTION, cuda_devicename(nID), "[", (uint32_t)nID, "] ",  dups.size(), "/", count, "(", (double)dups.size()/count * 100.0,"%) duplicates");
-
-            /*for(uint32_t i = 0; i < dups.size(); ++i)
-            {
-                uint64_t meta = dups[i].second;
-                // Extract combo bits and chain info.
-                uint32_t combo = meta >> 32;
-                uint32_t chain_offset_beg = (meta >> 24) & 0xFF;
-                uint32_t chain_offset_end = (meta >> 16) & 0xFF;
-                uint32_t chain_length = meta & 0xFF;
-
-                debug::log(3, FUNCTION, "nonce: ", std::hex, dups[i].first, std::dec,
-                    " combo: ", combo,
-                    " beg: ", chain_offset_beg,
-                    " end: ", chain_offset_end,
-                    " len: ", chain_length);
-            } */
-
 
             for(auto it = nonces.begin(); it != nonces.end(); ++it)
             {

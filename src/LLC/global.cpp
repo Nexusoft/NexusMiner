@@ -31,13 +31,14 @@ namespace LLC
     mpz_t zTwo;
 
     uint64_t *g_nonce_offsets[GPU_MAX] = {0};
-    uint64_t *g_nonce_meta[GPU_MAX] = {0};
+    uint32_t *g_nonce_meta[GPU_MAX] = {0};
     uint32_t *g_bit_array_sieve[GPU_MAX] = {0};
 
     uint64_t nBitArray_Stride;
     uint64_t nBitArray_StartIndex[GPU_MAX] = {0};
 
     uint16_t primeLimitA = 512;
+    uint32_t primeLimitB = 564164;
 
     std::atomic<uint32_t> nChainCounts[14];
 
@@ -51,8 +52,11 @@ namespace LLC
     std::atomic<uint64_t> SievedBits;
     std::atomic<uint64_t> Tests_CPU;
     std::atomic<uint64_t> Tests_GPU;
-    std::atomic<uint64_t> PrimesFound;
-    std::atomic<uint64_t> PrimesChecked;
+    std::atomic<uint64_t> PrimesFound[OFFSETS_MAX];
+    std::atomic<uint64_t> PrimesChecked[OFFSETS_MAX];
+    double minRatios[OFFSETS_MAX];
+    double maxRatios[OFFSETS_MAX];
+
     std::atomic<uint64_t> nWeight;
     std::deque<double> vWPSValues;
 
@@ -139,6 +143,12 @@ namespace LLC
         mpz_clear(zPrime);
         mpz_clear(zInverse);
         mpz_clear(zResult);
+
+        for(uint32_t i = 0; i < OFFSETS_MAX; ++i)
+        {
+            minRatios[i] = 100.0;
+            maxRatios[i] = 0.0;
+        }
     }
 
 

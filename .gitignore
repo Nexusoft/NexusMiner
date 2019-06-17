@@ -3,3 +3,5 @@ log
 *.ini
 *.prof
 nexusminer
+miner_profile
+

@@ -1,12 +1,17 @@
+/*******************************************************************************************
 
+ Nexus Earth 2018
+
+ [Scale Indefinitely] BlackJack. http://www.opensource.org/licenses/mit-license.php
+
+*******************************************************************************************/
 #pragma once
-#ifndef NEXUS_CUDA_HELPER_H
-#define NEXUS_CUDA_HELPER_H
+#ifndef NEXUS_CUDA_HASH_HELPER_CUH
+#define NEXUS_CUDA_HASH_HELPER_CUH
 
 #ifdef __INTELLISENSE__
 #define __launch_bounds__(x)
 #endif
-
 
 /* Ugly but needed to deal with the hash packing */
 #define v32(x,y) ((uint32_t*)(x))[((y) & 1)+2*(((y)/2)*threads+thread)]

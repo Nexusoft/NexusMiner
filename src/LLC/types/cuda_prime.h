@@ -16,6 +16,8 @@ ________________________________________________________________________________
 #define NEXUS_LLC_TYPES_CUDA_PRIME_H
 
 #include <LLC/types/proof.h>
+#include <CUDA/include/macro.h>
+
 #include <cstdint>
 
 #if defined(_MSC_VER)
@@ -100,13 +102,12 @@ namespace LLC
     private:
 
         mpz_t zPrimeOrigin;
-        mpz_t zFirstSieveElement;
         mpz_t zPrimorialMod;
         mpz_t zTempVar;
 
         uint32_t nCount;
-        uint32_t nPrimesChecked;
-        uint32_t nPrimesFound;
+        uint32_t nPrimesChecked[OFFSETS_MAX];
+        uint32_t nPrimesFound[OFFSETS_MAX];
         uint32_t nSieveIndex;
         uint32_t nTestIndex;
 

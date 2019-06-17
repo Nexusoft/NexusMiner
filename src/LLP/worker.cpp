@@ -26,7 +26,7 @@ namespace LLP
     : pMiner(miner)
     , pProof(proof)
     , workerThread()
-    , fReset(true)
+    , fReset(false)
     , fStop(false)
     , fPause(true)
     , nID(threadID)
@@ -61,6 +61,9 @@ namespace LLP
         /* Keep doing rounds of work until it is time to shutdown. */
         while (!fStop.load())
         {
+            /* Wait for the block to be ready. */
+            Wait();
+
             /* Initialize the proof of work. */
             if(!fReset.load() && !fPause.load())
                 pProof->Init();
@@ -73,13 +76,17 @@ namespace LLP
                     if(!fReset.load())
                         pMiner->SubmitBlock(nBlockID);
                 }
+
+                /* If the proof is reset, get more work. */
+                if(pProof->IsReset() && !fReset.load() && !fPause.load() && !fStop.load())
+                {
+                    pMiner->GetBlock(nBlockID);
+                    pProof->Init();
+                }
             }
 
             if(fStop.load())
                 break;
-
-            if(!fPause.load())
-                fReset = false;
 
             /* Sleep for a small amount of time to avoid burning CPU cycles. */
             runtime::sleep(100);
@@ -95,7 +102,6 @@ namespace LLP
 
     void Worker::Start()
     {
-        fReset = false;
         fStop = false;
         fPause = false;
     }
@@ -116,6 +122,18 @@ namespace LLP
         fReset = true;
         fPause = false;
         pProof->Reset();
+        condition.notify_one();
+    }
+
+
+    /* Wait for reset (and block to be ready). */
+    void Worker::Wait()
+    {
+        std::unique_lock<std::mutex> lk(mut);
+        condition.wait(lk, [this] {return fReset.load() && !fPause.load();});
+
+        if(!fPause.load())
+            fReset = false;
     }
 
 }
