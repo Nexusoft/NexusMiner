@@ -35,11 +35,11 @@ int main(int argc, char **argv)
     /* Setup the signal handler. */
     signals::Setup();
 
-    /* Open the debug log file. */
-    debug::init("debug.log");
-
     /* Parse the command line parameters. */
     config::ParseParameters(argc, argv);
+
+    /* Open the debug log file. */
+    debug::Initialize();
 
     /* Once we have read in the CLI paramters and config file, cache the args into global variables*/
     config::CacheArgs();
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
     cuda_shutdown();
 
     /* Close the debug log file. */
-    debug::shutdown();
+    debug::Shutdown();
 
     return 0;
 }
