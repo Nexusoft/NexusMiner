@@ -169,7 +169,6 @@ namespace LLC
         {
             debug::log(0, FUNCTION, (uint32_t)nID, " - Requesting more work");
             fReset = true;
-            return false;
         }
 
         return false;

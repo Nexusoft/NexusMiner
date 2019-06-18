@@ -67,14 +67,22 @@ namespace LLP
         /* Let miner know this worker is ready. */
         pMiner->Notify();
 
+        Wait();
+
         /* Keep doing rounds of work until it is time to shutdown. */
         while (!fStop.load())
         {
             /* Wait for the block to be ready. */
-            Wait();
+
+            if(fSubscribe)
+                pProof->SetBlock(pMiner->GetBlock(Channel()));
+
+            if(!fPause.load())
+                fReset = false;
+
 
             /* Initialize the proof of work. */
-            if(!fReset.load() && !fPause.load())
+            if(!fReset.load())
                 pProof->Init();
 
             /* Do work if there is no reset. */

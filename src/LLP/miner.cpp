@@ -168,11 +168,16 @@ namespace LLP
             /* Get blocks for workers if reset. */
             if(fReset.load() && !fStop.load())
             {
-                if(!GetBlocks())
-                  continue;
+                //if(!GetBlocks())
+                //  continue;
+
+                /* Tell the workers to restart it's work. */
+                for(const auto& worker : vWorkers)
+                    worker->Reset();
 
                 fReset = false;
             }
+
 
 
             /* Check a submit queue to see if there have been solutions submitted. */

@@ -133,7 +133,7 @@ int main(int argc, char **argv)
             Miner.AddWorker<LLC::PrimeCUDA>(primeIndices[tid]);
 
         /* Test */
-        for(uint8_t tid = 0; tid < nPrimeGPU; ++tid)
+        for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
             Miner.AddWorker<LLC::PrimeTestCPU>(primeIndices[tid], false);
     }
 
