@@ -30,8 +30,8 @@ ________________________________________________________________________________
 namespace LLC
 {
 
-    HashCUDA::HashCUDA(uint8_t id, TAO::Ledger::Block *block)
-    : Proof(id, block)
+    HashCUDA::HashCUDA(uint32_t id)
+    : Proof(id)
     , nTarget()
     , nHashes(0)
     , nIntensity(0)
@@ -40,9 +40,11 @@ namespace LLC
     {
     }
 
+
     HashCUDA::~HashCUDA()
     {
     }
+
 
     /* The main proof of work function. */
     bool HashCUDA::Work()
@@ -56,13 +58,13 @@ namespace LLC
         /* Do hashing on a CUDA device. */
 		bool fFound = cuda_sk1024_hash(
             nID,
-            reinterpret_cast<uint32_t *>(&pBlock->nVersion),
+            reinterpret_cast<uint32_t *>(&block.nVersion),
             nTarget,
-            pBlock->nNonce,
+            block.nNonce,
             &nHashes,
             nThroughput,
             nThreadsPerBlock,
-            pBlock->nHeight);
+            block.nHeight);
 
         /* Increment number of hashes for this round. */
         if (nHashes < 0x0000FFFFFFFFFFFF)
@@ -72,9 +74,10 @@ namespace LLC
 		if(fFound && !fReset.load())
         {
             /* Calculate the number of leading zero-bits and display. */
-            uint32_t nBits = pBlock->ProofHash().BitCount();
+            uint1024_t hashProof = block.ProofHash();
+            uint32_t nBits = hashProof.BitCount();
             uint32_t nLeadingZeroes = 1024 - nBits;
-            debug::log(0, "[MASTER] Found Hash Block with ",
+            debug::log(0, "[MASTER] Found Hash Block ", hashProof.ToString().substr(0, 20), " with ",
                 nLeadingZeroes, " Leading Zero-Bits");
 
             fReset = true;
@@ -90,18 +93,15 @@ namespace LLC
         fReset = false;
 
         /* Set the block for this device */
-        cuda_sk1024_setBlock(&pBlock->nVersion, pBlock->nHeight);
+        cuda_sk1024_setBlock(&block.nVersion, block.nHeight);
 
         /* Get the target difficulty. */
 		CBigNum target;
-		target.SetCompact(pBlock->nBits);
+		target.SetCompact(block.nBits);
         nTarget = target.getuint1024();
 
         /* Set the target hash on this device for the difficulty. */
         cuda_sk1024_set_Target((uint64_t *)nTarget.data());
-
-        uint32_t nHeight = pBlock->nHeight;
-
 
     }
 

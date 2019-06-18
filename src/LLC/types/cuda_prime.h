@@ -47,15 +47,18 @@ namespace LLC
     class PrimeCUDA : public Proof
     {
     public:
-        PrimeCUDA(uint8_t id, TAO::Ledger::Block *block);
+
+        PrimeCUDA(uint32_t id);
         virtual ~PrimeCUDA();
+
 
         /** Channel
          *
          *
          *
          **/
-        static uint32_t Channel() { return 1; }
+        virtual uint32_t Channel() override { return 1; }
+
 
         /** Work
          *

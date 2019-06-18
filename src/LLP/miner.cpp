@@ -35,7 +35,7 @@ namespace LLP
     Miner::Miner(const std::string &ip, uint16_t port, uint16_t timeout)
     : Outbound(ip, port, timeout)
     , vWorkers()
-    , mapBlocks()
+    , vSubscribed()
     , qSubmit()
     , minerThread()
     , condition()
@@ -46,7 +46,6 @@ namespace LLP
     , nBestHeight(0)
     , nHashDifficulty(0.0)
     , nPrimeDifficulty(0.0)
-    , nWorkers(0)
     , nReady(0)
     , fReset(true)
     , fStop(true)
@@ -69,14 +68,8 @@ namespace LLP
         for(auto it = vWorkers.begin(); it != vWorkers.end(); ++it)
             delete *it;
 
-        /* Free memory for blocks. */
-        for(auto it = mapBlocks.begin(); it != mapBlocks.end(); ++it)
-            delete it->second;
-
-        /* Set workers to zero. */
-        mapBlocks.clear();
+        /* Clear the workers. */
         vWorkers.clear();
-        nWorkers = 0;
         nReady = 0;
     }
 
@@ -93,7 +86,7 @@ namespace LLP
     void Miner::Wait()
     {
         std::unique_lock<std::mutex> lk(mut);
-        condition.wait(lk, [this] {return nReady.load() >= nWorkers.load();});
+        condition.wait(lk, [this] {return nReady.load() >= vWorkers.size();});
     }
 
 
@@ -181,6 +174,7 @@ namespace LLP
                 fReset = false;
             }
 
+
             /* Check a submit queue to see if there have been solutions submitted. */
             CheckSubmit();
         }
@@ -197,41 +191,55 @@ namespace LLP
         WritePacket(REQUEST);
     }
 
-    bool Miner::GetBlock(uint32_t nBlockID)
+    TAO::Ledger::Block Miner::GetBlock(uint32_t nChannel)
     {
-        TAO::Ledger::Block *pBlock = mapBlocks[nBlockID];
-
         std::unique_lock<std::mutex> lk(mut);
-        get_block(pBlock);
 
-        vWorkers[nBlockID]->Reset();
+        /* Send LLP messages to obtain a new block. */
+        TAO::Ledger::Block block = get_block(nChannel);
 
-        return true;
+        /* Print a debug log message for this block. */
+        uint1024_t hashProof = block.ProofHash();
+        debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[block.nChannel], " Block ",
+            hashProof.ToString().substr(0, 20));
+
+        return block;
     }
 
 
     bool Miner::GetBlocks()
     {
-        uint32_t count = static_cast<uint32_t>(mapBlocks.size());
-
+        /* Verbose output the number of blocks requested. */
+        uint32_t count = static_cast<uint32_t>(vSubscribed.size());
         debug::log(2, "");
         debug::log(2, FUNCTION, "Requesting ", count, " new Block", count > 1 ? "s." : ".");
 
         /* Lock all the blocks so miners can't submit stale blocks. */
         std::unique_lock<std::mutex> lk(mut);
 
-        for(auto it = mapBlocks.begin(); it != mapBlocks.end(); ++it)
+        /* Get a block for each worker. */
+        for(const auto& worker : vSubscribed)
         {
-            TAO::Ledger::Block *pBlock = it->second;
+            uint32_t nChannel = worker->Channel();
 
             /* Send LLP messages to obtain a new block. */
-            get_block(pBlock);
+            TAO::Ledger::Block block = get_block(nChannel);
+
+            if(block.IsNull())
+                return debug::error(FUNCTION, "Failed to get a block");
+
+            /* Print a debug log message for this block. */
+            uint1024_t hashProof = block.ProofHash();
+            debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[nChannel], " Block ",
+                hashProof.ToString().substr(0, 20));
+
+            /* Set the newly created block for this worker. */
+            worker->SetBlock(block);
         }
 
-        /* Allow worker to continue work with new block. */
-        for(uint8_t i = 0; i < nWorkers.load(); ++i)
-            vWorkers[i]->Reset();
-
+        /* Tell the workers to restart it's work. */
+        for(const auto& worker : vWorkers)
+            worker->Reset();
 
         return true;
     }
@@ -262,46 +270,57 @@ namespace LLP
     /* Check if there are any blocks to submit. */
     void Miner::CheckSubmit()
     {
-        uint8_t blockID = 0;
+        //uint8_t blockID = 0;
+        TAO::Ledger::Block block;
         bool have_submit = false;
+
+        /* Get the best height. */
+        uint32_t best_height = nBestHeight.load();
 
         /* Attempt to get a work result from queue. */
         {
             std::unique_lock<std::mutex> lk(mut);
-            if(!qSubmit.empty())
+            while(!qSubmit.empty())
             {
-                blockID = qSubmit.front();
+                block = qSubmit.front();
                 qSubmit.pop();
-                have_submit = true;
+
+                if(block.nHeight == best_height && best_height != 1)
+                {
+                    have_submit = true;
+                    break;
+                }
             }
         }
 
-        uint32_t nChannel = mapBlocks[blockID]->nChannel;
+        uint32_t nChannel = block.nChannel;
 
         /* Make sure there is work to submit. */
         if(have_submit == false || fReset.load())
             return;
 
         debug::log(0, "");
-        debug::log(0, "[MASTER] Submitting ", ChannelName[nChannel], " Block...");
+        debug::log(0, "[MASTER] Submitting ", ChannelName[nChannel], " Block ", block.ProofHash().ToString().substr(0, 20));
 
 
         Packet REQUEST;
         Packet RESPONSE;
 
+
+
         /* Make sure that the block to submit didn't come from a previous round. */
-        if(mapBlocks[blockID]->nHeight != nBestHeight.load() && nBestHeight.load() != 1)
-        {
-            debug::log(0, "[MASTER] ", KLYEL, "ORPHANED (Stale)", KNRM, mapBlocks[blockID]->nHeight, " ", nBestHeight.load());
-            return;
-        }
+        //if(block.nHeight != best_height && best_height != 1)
+        //{
+        //    debug::log(0, "[MASTER] ", KLYEL, "ORPHANED (Stale)", KNRM, block.nHeight, " ", best_height);
+        //    return;
+        //}
 
         /* Build a Submit block packet request. */
         REQUEST.HEADER = SUBMIT_BLOCK;
 
         /* Submit the merkle root and nonce as requirements for Mining LLP server. */
-        std::vector<uint8_t> vData = mapBlocks[blockID]->hashMerkleRoot.GetBytes();
-        std::vector<uint8_t> vNonce = convert::uint2bytes64(mapBlocks[blockID]->nNonce);
+        std::vector<uint8_t> vData = block.hashMerkleRoot.GetBytes();
+        std::vector<uint8_t> vNonce = convert::uint2bytes64(block.nNonce);
         vData.insert(vData.end(), vNonce.begin(), vNonce.end());
 
         /* Set the packet data and length. */
@@ -320,7 +339,7 @@ namespace LLP
         {
 
             REQUEST.HEADER = CHECK_BLOCK;
-            vData = mapBlocks[blockID]->GetHash().GetBytes();
+            vData = block.GetHash().GetBytes();
 
             REQUEST.DATA = vData;
             REQUEST.LENGTH = vData.size();
@@ -375,10 +394,15 @@ namespace LLP
     }
 
 
-    void Miner::SubmitBlock(uint8_t blockID)
+    void Miner::SubmitBlock(const TAO::Ledger::Block &block)
     {
         std::unique_lock<std::mutex> lk(mut);
-        qSubmit.push(blockID);
+
+        /* Get the block from the map of blocks. */
+        debug::log(2, FUNCTION, block.ProofHash().ToString().substr(0, 20));
+
+        /* Push the block onto the queue. */
+        qSubmit.push(block);
     }
 
 
@@ -395,7 +419,7 @@ namespace LLP
 
         /* Clear the submit queue. */
         std::unique_lock<std::mutex> lk(mut);
-        qSubmit = std::queue<uint8_t>();
+        qSubmit = std::queue<TAO::Ledger::Block>();
     }
 
 
@@ -415,14 +439,14 @@ namespace LLP
         minerTimer.Start();
 
         /* Start the workers. */
-        for(uint8_t i = 0; i < nWorkers.load(); ++i)
-            vWorkers[i]->Start();
+        for(const auto& worker : vWorkers)
+            worker->Start();
 
         /* Bind the miner thread. */
         if(!minerThread.joinable())
         {
             debug::log(0, "Initializing Miner ", addrOut.ToString(),
-                " Workers = ", static_cast<uint32_t>(nWorkers.load()),
+                " Workers = ", static_cast<uint32_t>(vWorkers.size()),
                 " Timeout = ", static_cast<uint32_t>(nTimeout));
 
             debug::log(0, "");
@@ -437,14 +461,14 @@ namespace LLP
         /* If we are already paused, don't pause again. */
         if(!fPause.load() && !fStop.load())
         {
-
             debug::log(0, "Pausing Miner ", addrOut.ToString());
 
+            /* Set the miner pause flag. */
             fPause = true;
 
-            for(uint8_t i = 0; i < nWorkers.load(); ++i)
-                vWorkers[i]->Pause();
-
+            /* Pause the workers. */
+            for(const auto& worker : vWorkers)
+                worker->Pause();
         }
     }
 
@@ -462,10 +486,10 @@ namespace LLP
         nReady = 0;
 
         /* Stop the worker threads. */
-        for(uint8_t i = 0; i < nWorkers.load(); ++i)
+        for(const auto& worker : vWorkers)
         {
-            vWorkers[i]->Reset();
-            vWorkers[i]->Stop();
+            worker->Reset();
+            worker->Stop();
         }
 
 
@@ -624,7 +648,7 @@ namespace LLP
     }
 
 
-    bool Miner::get_block(TAO::Ledger::Block *pBlock)
+    TAO::Ledger::Block Miner::get_block(uint32_t nChannel)
     {
         TAO::Ledger::Block block;
         Packet REQUEST;
@@ -633,46 +657,53 @@ namespace LLP
         REQUEST.HEADER = GET_BLOCK;
 
         /* Set the channel of the worker channel. */
-        uint32_t nChannel = pBlock->nChannel;
         SetChannel(nChannel);
         WritePacket(REQUEST);
         ReadNextPacket(RESPONSE);
 
         /* Check for null packet. */
         if(RESPONSE.IsNull())
-            return debug::error(FUNCTION, " invalid block response.");
+        {
+            debug::error(FUNCTION, " invalid block response.");
+            return block;
+        }
+
 
         /* Decode the response data into a block. */
         block.Deserialize(RESPONSE.DATA);
 
-        /*Assign the block to the one we just recieved. */
-        *pBlock = block;
-
         /* Make sure the channel from the block matches what was requested. */
-        if(pBlock->nChannel != nChannel)
+        if(block.nChannel != nChannel)
         {
-            debug::error("Recieved block channel: ", ChannelName[pBlock->nChannel],
-                " does not match channel: ", ChannelName[nChannel], " as requested. Force setting block channel.");
-            pBlock->nChannel = nChannel;
+            debug::error("Recieved block channel: ", ChannelName[block.nChannel],
+                " does not match channel: ", ChannelName[nChannel], " as requested");
+
+            block.SetNull();
         }
-
-        uint1024_t proof_hash = pBlock->ProofHash();
-
-        debug::log(2, FUNCTION, "Recieved new ", proof_hash.BitCount(), "-Bit ", std::setw(5), ChannelName[pBlock->nChannel], " Block ",
-            proof_hash.ToString().substr(0, 20));
 
         /* Set the global difficulty. */
-        if(pBlock->nChannel == 1)
-            nPrimeDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 1);
-        else if(pBlock->nChannel == 2)
-            nHashDifficulty = TAO::Ledger::GetDifficulty(pBlock->nBits, 2);
-        else
+        switch (nChannel)
         {
-            nPrimeDifficulty = 0;
-            nHashDifficulty = 0;
+            case 1:
+            {
+                nPrimeDifficulty = TAO::Ledger::GetDifficulty(block.nBits, 1);
+                break;
+            }
+            case 2:
+            {
+                nHashDifficulty = TAO::Ledger::GetDifficulty(block.nBits, 2);
+                break;
+            }
+            default:
+            {
+                nPrimeDifficulty = 0;
+                nHashDifficulty = 0;
+                break;
+            }
         }
 
-        return true;
+        /* Return the newly created block. */
+        return block;
     }
 
 }

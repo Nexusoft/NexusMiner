@@ -365,12 +365,13 @@ public:
 
     uint32_t BitCount() const
     {
-        uint32_t i = WIDTH << 5;
-        for(; i > 0; --i)
+        uint32_t i = (WIDTH << 5) - 1;
+        for(; i >= 0; --i)
         {
             if(pn[i >> 5] & (1 << (i & 31)))
                 break;
         }
+        
         /* Any number will have at least 1 bit. */
         return i + 1;
     }

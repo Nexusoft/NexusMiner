@@ -43,8 +43,8 @@ namespace LLC
     }
 
 
-    PrimeTestCPU::PrimeTestCPU(uint8_t id, TAO::Ledger::Block *block)
-    : Proof(id, block)
+    PrimeTestCPU::PrimeTestCPU(uint32_t id)
+    : Proof(id)
     , zTempVar()
     , zN()
     , zBaseOffsetted()
@@ -59,10 +59,10 @@ namespace LLC
     {
     }
 
+
     PrimeTestCPU::~PrimeTestCPU()
     {
     }
-
 
 
     bool PrimeTestCPU::Work()
@@ -90,11 +90,11 @@ namespace LLC
         if (!have_work || fReset.load())
             return false;
 
-        /* Set the block pointer. */
-        pBlock = work.pBlock;
+        /* Set the block. */
+        block = work.block;
 
         /* Get the prime origin from the block and import into GMP. */
-        uint1024_t nPrimeOrigin = pBlock->ProofHash();
+        uint1024_t nPrimeOrigin = block.ProofHash();
         mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, nPrimeOrigin.data());
 
         /* Compute the primorial mod from the origin. */
@@ -104,7 +104,7 @@ namespace LLC
 
 
         uint64_t nNonce = 0;
-        uint32_t nHeight = pBlock->nHeight;
+        uint32_t nHeight = block.nHeight;
         uint32_t nWorkCount = (uint32_t)work.nonce_offsets.size();
 
         /* Log message. */
@@ -116,7 +116,7 @@ namespace LLC
         /* Process each result from array of nonces. */
         for(uint32_t i = 0; i < nWorkCount; ++i)
         {
-            if(fReset.load() || nHeight != pBlock->nHeight)
+            if(fReset.load() || nHeight != block.nHeight)
                 return false;
 
 
@@ -209,7 +209,7 @@ namespace LLC
             mpz_add_ui(zTempVar, zBaseOffsetted, chain_offset_end);
             while (nPrimeGap <= 12)
             {
-                if(fReset.load() || nHeight != pBlock->nHeight)
+                if(fReset.load() || nHeight != block.nHeight)
                     return false;
 
 
@@ -266,7 +266,7 @@ namespace LLC
             mpz_sub(zTempVar, zTempVar, zPrimeOrigin);
             nNonce = mpz_get_ui(zTempVar);
 
-            if(fReset.load() || nHeight != pBlock->nHeight)
+            if(fReset.load() || nHeight != block.nHeight)
                 return false;
 
 
@@ -315,12 +315,12 @@ namespace LLC
 
 
                 /* Check Difficulty */
-                if (nPrimeDifficulty >= pBlock->nBits && !fReset.load() && nHeight == pBlock->nHeight)
+                if (nPrimeDifficulty >= block.nBits && !fReset.load() && nHeight == block.nHeight)
                 {
-                    debug::log(0, "[MASTER] Found Prime Block with Difficulty ", std::fixed, std::setprecision(7), nPrimeDifficulty/1e7);
+                    debug::log(0, "[MASTER] Found Prime Block ", block.ProofHash().ToString().substr(0,20), " with Difficulty ", std::fixed, std::setprecision(7), nPrimeDifficulty/1e7);
 
                     /* Set the block nonce and return. */
-                    pBlock->nNonce = nNonce;
+                    block.nNonce = nNonce;
                     fReset = true;
                     return true;
                 }

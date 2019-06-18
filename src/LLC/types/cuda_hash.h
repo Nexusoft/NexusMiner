@@ -46,7 +46,8 @@ namespace LLC
     class HashCUDA : public Proof
     {
     public:
-        HashCUDA(uint8_t id, TAO::Ledger::Block *block);
+
+        HashCUDA(uint32_t id);
         virtual ~HashCUDA();
 
         /** Channel
@@ -54,7 +55,8 @@ namespace LLC
          *
          *
          **/
-        static uint32_t Channel() { return 2; }
+        virtual uint32_t Channel() override { return 2; }
+
 
         /** Work
          *

@@ -120,34 +120,33 @@ int main(int argc, char **argv)
     {
         /* Sieve */
         for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
-            Miner.AddWorker<LLC::PrimeSieveCPU>(tid, tid);
+            Miner.AddWorker<LLC::PrimeSieveCPU>(tid);
 
         /* Test */
         for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
-            Miner.AddWorker<LLC::PrimeTestCPU>(tid, tid);
+            Miner.AddWorker<LLC::PrimeTestCPU>(tid, false);
     }
     else
     {
         /* Sieve */
         for(uint8_t tid = 0; tid < nPrimeGPU; ++tid)
-            Miner.AddWorker<LLC::PrimeCUDA>(primeIndices[tid], primeIndices[tid]);
+            Miner.AddWorker<LLC::PrimeCUDA>(primeIndices[tid]);
 
         /* Test */
         for(uint8_t tid = 0; tid < nPrimeGPU; ++tid)
-            Miner.AddWorker<LLC::PrimeTestCPU>(primeIndices[tid], primeIndices[tid]);
+            Miner.AddWorker<LLC::PrimeTestCPU>(primeIndices[tid], false);
     }
 
 
     if(config::GetBoolArg(std::string("-cpuhash"), false))
     {
         for(uint8_t tid = 0; tid < nThreadsCPU; ++tid)
-            Miner.AddWorker<LLC::HashCPU>(tid, tid);
+            Miner.AddWorker<LLC::HashCPU>(tid);
     }
     else
     {
         for(uint8_t tid = 0; tid < nHashGPU; ++tid)
-            Miner.AddWorker<LLC::HashCUDA>(hashIndices[tid], hashIndices[tid]);
-
+            Miner.AddWorker<LLC::HashCUDA>(hashIndices[tid]);
     }
 
 

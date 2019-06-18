@@ -99,47 +99,29 @@ namespace LLP
          *
          **/
         template <class ProofType>
-        void AddWorker(uint8_t threadID, uint8_t blockID)
+        void AddWorker(uint8_t threadID, bool fSubscribeBlock = true)
         {
-            /* Get the proof of work channel. */
-            uint32_t nProofChannel = ProofType::Channel();
+            /* Create a new proof for this worker. */
+            ProofType *pProof = new ProofType(threadID);
 
             /* Set the channel flags for the miner. */
-            nChannels |= nProofChannel;
+            nChannels |= pProof->Channel();
 
-
-            /* Add a new block to the map of blocks if it doesn't exist. */
-            if(mapBlocks.find(blockID) == mapBlocks.end())
-            {
-                mapBlocks[blockID] = new TAO::Ledger::Block();
-                mapBlocks[blockID]->nChannel = nProofChannel;
-            }
-
-            /* If the block exists, check to maker sure there isn't a mismatch
-               in worker channels among shared blocks. */
-            uint32_t nBlockChannel = mapBlocks[blockID]->nChannel;
-
-            if(nBlockChannel != nProofChannel)
-                debug::error(FUNCTION, "Proof with channel ", nProofChannel,
-                    " does not match existing block with channel ", nBlockChannel);
-
-            /* Create a new proof for this worker with assoicate block. */
-            ProofType *pProof = new ProofType(threadID, mapBlocks[blockID]);
-
-            /* Create a new worker with associated miner, proof, and block. */
-            Worker *pWorker = new Worker(threadID, blockID, this, pProof);
+            /* Create a new worker with associated miner and proof. */
+            Worker *pWorker = new Worker(threadID, this, pProof, fSubscribeBlock);
 
             /* Add a new worker to the list of workers. */
             vWorkers.push_back(pWorker);
-            ++nWorkers;
 
+            if(fSubscribeBlock)
+                vSubscribed.push_back(pWorker);
         }
 
         void Start();
         void Stop();
 
-        void SubmitBlock(uint8_t blockID);
-        bool GetBlock(uint32_t nBlockID);
+        void SubmitBlock(const TAO::Ledger::Block &block);
+        TAO::Ledger::Block GetBlock(uint32_t nChannel);
 
     private:
 
@@ -156,11 +138,11 @@ namespace LLP
 
     private:
 
-        bool get_block(TAO::Ledger::Block *pBlock);
+        TAO::Ledger::Block get_block(uint32_t nChannel);
 
         std::vector<Worker *> vWorkers;
-        std::map<uint32_t, TAO::Ledger::Block *> mapBlocks;
-        std::queue<uint8_t> qSubmit;
+        std::vector<Worker *> vSubscribed;
+        std::queue<TAO::Ledger::Block> qSubmit;
 
         std::thread minerThread;
         std::condition_variable condition;
@@ -177,7 +159,6 @@ namespace LLP
         double nHashDifficulty;
         double nPrimeDifficulty;
 
-        std::atomic<uint8_t> nWorkers;
         std::atomic<uint8_t> nReady;
         std::atomic<bool> fReset;
         std::atomic<bool> fStop;

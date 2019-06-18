@@ -50,10 +50,11 @@ namespace LLP
     {
     public:
 
-        /** Default constructor **/
-        Worker(uint8_t threadID, uint8_t blockID, Miner *miner, LLC::Proof *proof);
+        /** Default Constructor. **/
+        Worker(uint32_t threadID, Miner *miner, LLC::Proof *proof, bool fSubscribe_ = true);
 
 
+        /** Default Destructor. **/
         ~Worker();
 
 
@@ -62,7 +63,7 @@ namespace LLP
          *  Get the channel index this worker is on.
          *
          **/
-         uint32_t Channel();
+        uint32_t Channel();
 
 
         /** Thread
@@ -78,31 +79,39 @@ namespace LLP
          *  Starts the proof with the block.
          *
          **/
-         void Start();
+        void Start();
 
 
-         /** Stop
-          *
-          *  Stop this worker thread by stopping the proof of work.
-          *
-          **/
-         void Stop();
+        /** Stop
+         *
+         *  Stop this worker thread by stopping the proof of work.
+         *
+         **/
+        void Stop();
 
 
-         /** Pause
-          *
-          *  Pause this worker thread momentarily from doing work.
-          *
-          **/
-         void Pause();
+        /** Pause
+         *
+         *  Pause this worker thread momentarily from doing work.
+         *
+         **/
+        void Pause();
 
 
-         /** Reset
-          *
-          *  Reset this worker thread by stopping the proof of work.
-          *
-          **/
-         void Reset();
+        /** Reset
+         *
+         *  Reset this worker thread by stopping the proof of work.
+         *
+         **/
+        void Reset();
+
+
+        /** SetBlock
+         *
+         *  Set the block for this worker's proof
+         *
+         **/
+        void SetBlock(const TAO::Ledger::Block &block);
 
 
     private:
@@ -121,11 +130,12 @@ namespace LLP
         std::condition_variable condition;
         std::mutex mut;
         std::thread workerThread;
+        uint32_t nID;
+        bool fSubscribe;
         std::atomic<bool> fReset;
         std::atomic<bool> fStop;
         std::atomic<bool> fPause;
-        uint8_t nID;
-        uint8_t nBlockID;
+
     };
 }
 

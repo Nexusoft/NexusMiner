@@ -25,8 +25,8 @@ ________________________________________________________________________________
 
 namespace LLC
 {
-    PrimeSieveCPU::PrimeSieveCPU(uint8_t id, TAO::Ledger::Block *block)
-    : Proof(id, block)
+    PrimeSieveCPU::PrimeSieveCPU(uint32_t id)
+    : Proof(id)
     , vBaseRemainders()
     , nBitArraySize(1 << 23)
     , pBitArraySieve(nullptr)
@@ -96,7 +96,7 @@ namespace LLC
         {
             /* Atomic add nonces to work queue for testing. */
             std::unique_lock<std::mutex> lk(g_work_mutex);
-            g_work_queue.push_back(work_info(vNonces, vMeta, pBlock, nID));
+            g_work_queue.push_back(work_info(vNonces, vMeta, block, nID));
         }
 
         return false;
@@ -134,7 +134,7 @@ namespace LLC
         }
 
         /* Set the prime origin from the block hash. */
-        uint1024_t nPrimeOrigin = pBlock->ProofHash();
+        uint1024_t nPrimeOrigin = block.ProofHash();
         mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, nPrimeOrigin.data());
 
 
@@ -142,7 +142,6 @@ namespace LLC
         mpz_mod(zPrimorialMod, zPrimeOrigin, zPrimorial);
         mpz_sub(zPrimorialMod, zPrimorial, zPrimorialMod);
         mpz_add(zTempVar, zPrimeOrigin, zPrimorialMod);
-
     }
 
     void PrimeSieveCPU::Shutdown()

@@ -49,8 +49,8 @@ namespace LLC
       return limbs;
     }
 
-    PrimeCUDA::PrimeCUDA(uint8_t id, TAO::Ledger::Block *block)
-    : Proof(id, block)
+    PrimeCUDA::PrimeCUDA(uint32_t id)
+    : Proof(id)
     , zPrimeOrigin()
     , zPrimorialMod()
     , zTempVar()
@@ -69,9 +69,11 @@ namespace LLC
         }
     }
 
+
     PrimeCUDA::~PrimeCUDA()
     {
     }
+
 
     /* The main proof of work function. */
     bool PrimeCUDA::Work()
@@ -82,7 +84,7 @@ namespace LLC
         uint32_t *nonce_meta = g_nonce_meta[nID];
 
         /* Get difficulty. */
-        uint32_t nDifficulty = pBlock->nBits;
+        uint32_t nDifficulty = block.nBits;
         uint32_t nOrigins = vOrigins.size();
 
 
@@ -203,7 +205,7 @@ namespace LLC
         }
 
         /* Set the prime origin from the block hash. */
-        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, pBlock->ProofHash().data());
+        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, block.ProofHash().data());
 
 
         /* Compute the primorial mod from the origin. */
@@ -369,7 +371,7 @@ namespace LLC
             {
                 /* Atomic add nonces to work queue for testing. */
                 std::unique_lock<std::mutex> lk(g_work_mutex);
-                g_work_queue.emplace_back(work_info(work_offsets, work_meta, pBlock, nID));
+                g_work_queue.emplace_back(work_info(work_offsets, work_meta, block, nID));
             }
 
             count = 0;

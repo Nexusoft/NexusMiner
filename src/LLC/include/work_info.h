@@ -15,16 +15,10 @@ ________________________________________________________________________________
 #ifndef NEXUS_LLC_INCLUDE_WORK_INFO_H
 #define NEXUS_LLC_INCLUDE_WORK_INFO_H
 
+#include <TAO/Ledger/types/block.h>
+
 #include <cstdint>
 #include <vector>
-
-namespace TAO
-{
-    namespace Ledger
-    {
-        class Block;
-    }
-}
 
 namespace LLC
 {
@@ -34,11 +28,11 @@ namespace LLC
         work_info() {}
         work_info(const std::vector<uint64_t> &nOffsets,
                   const std::vector<uint32_t> &nMeta,
-                  TAO::Ledger::Block *block,
+                  const TAO::Ledger::Block &block_,
                   uint32_t tid)
         : nonce_offsets(nOffsets.begin(), nOffsets.end())
         , nonce_meta(nMeta.begin(), nMeta.end())
-        , pBlock(block)
+        , block(block_)
         , thr_id(tid)
         {
         }
@@ -51,7 +45,7 @@ namespace LLC
         /* GPU intermediate results */
         std::vector<uint64_t> nonce_offsets;
         std::vector<uint32_t> nonce_meta;
-        TAO::Ledger::Block *pBlock;
+        TAO::Ledger::Block block;
         uint32_t thr_id;
     };
 

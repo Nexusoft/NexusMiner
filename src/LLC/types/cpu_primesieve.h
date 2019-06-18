@@ -49,7 +49,8 @@ namespace LLC
     class PrimeSieveCPU : public Proof
     {
     public:
-        PrimeSieveCPU(uint8_t id, TAO::Ledger::Block *block);
+
+        PrimeSieveCPU(uint32_t id);
         virtual ~PrimeSieveCPU();
 
         /** Channel
@@ -57,7 +58,8 @@ namespace LLC
          *
          *
          **/
-        static uint32_t Channel() { return 1; }
+        virtual uint32_t Channel() override { return 1; }
+
 
         /** Work
          *

@@ -49,7 +49,8 @@ namespace LLC
     class PrimeTestCPU : public Proof
     {
     public:
-        PrimeTestCPU(uint8_t id, TAO::Ledger::Block *block);
+
+        PrimeTestCPU(uint32_t id);
         virtual ~PrimeTestCPU();
 
         /** Channel
@@ -57,7 +58,8 @@ namespace LLC
          *
          *
          **/
-        static uint32_t Channel() { return 1; }
+        virtual uint32_t Channel() override { return 1; }
+
 
         /** Work
          *

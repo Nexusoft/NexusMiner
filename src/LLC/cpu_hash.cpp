@@ -25,16 +25,18 @@ ________________________________________________________________________________
 namespace LLC
 {
 
-    HashCPU::HashCPU(uint8_t id, TAO::Ledger::Block *block)
-    : Proof(id, block)
+    HashCPU::HashCPU(uint32_t id)
+    : Proof(id)
     , nTarget()
     , nIntensity(0)
     {
     }
 
+
     HashCPU::~HashCPU()
     {
     }
+
 
     /* The main proof of work function. */
     bool HashCPU::Work()
@@ -52,14 +54,14 @@ namespace LLC
             if(fReset.load())
                 return false;
 
-            if(pBlock->ProofHash() < nTarget)
+            if(block.ProofHash() < nTarget)
             {
                 fFound = true;
                 ++hashes;
                 break;
             }
 
-            ++pBlock->nNonce;
+            ++block.nNonce;
             ++hashes;
         }
 
@@ -70,9 +72,10 @@ namespace LLC
 		if(fFound)
         {
             /* Calculate the number of leading zero-bits and display. */
-            uint32_t nBits = pBlock->ProofHash().BitCount();
+            uint1024_t hashProof = block.ProofHash();
+            uint32_t nBits = hashProof.BitCount();
             uint32_t nLeadingZeroes = 1024 - nBits;
-            debug::log(0, "[MASTER] Found Hash Block with ",
+            debug::log(0, "[MASTER] Found Hash Block ", hashProof.ToString().substr(0, 20), " with ",
                 nLeadingZeroes, " Leading Zero-Bits");
 
             fReset = true;
@@ -89,7 +92,7 @@ namespace LLC
 
         /* Get the target difficulty. */
 		CBigNum target;
-		target.SetCompact(pBlock->nBits);
+		target.SetCompact(block.nBits);
         nTarget = target.getuint1024();
 
         debug::log(3, "Target ", nTarget.ToString().substr(0, 20));

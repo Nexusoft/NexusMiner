@@ -22,21 +22,24 @@ ________________________________________________________________________________
 
 namespace LLP
 {
-    Worker::Worker(uint8_t threadID, uint8_t blockID, Miner *miner, LLC::Proof *proof)
+
+    /** Default Constructor. **/
+    Worker::Worker(uint32_t threadID, Miner *miner, LLC::Proof *proof, bool fSubscribe_)
     : pMiner(miner)
     , pProof(proof)
     , workerThread()
+    , nID(threadID)
+    , fSubscribe(fSubscribe_)
     , fReset(false)
     , fStop(false)
     , fPause(true)
-    , nID(threadID)
-    , nBlockID(blockID)
     {
         /*Bind the worker thread. */
         workerThread = std::thread(std::bind(&Worker::Thread, this));
     }
 
 
+    /** Default Destructor. **/
     Worker::~Worker()
     {
         Stop();
@@ -47,6 +50,12 @@ namespace LLP
         /* Join the worker thread. */
         if(workerThread.joinable())
             workerThread.join();
+    }
+
+
+    uint32_t Worker::Channel()
+    {
+        return pProof->Channel();
     }
 
 
@@ -74,15 +83,13 @@ namespace LLP
                 if(pProof->Work())
                 {
                     if(!fReset.load())
-                        pMiner->SubmitBlock(nBlockID);
+                        pMiner->SubmitBlock(pProof->GetBlock());
                 }
 
                 /* If the proof is reset, get more work. */
-                if(pProof->IsReset() && !fReset.load() && !fPause.load() && !fStop.load())
-                {
-                    pMiner->GetBlock(nBlockID);
-                    pProof->Init();
-                }
+                if(pProof->IsReset())
+                    break;
+
             }
 
             if(fStop.load())
@@ -100,11 +107,23 @@ namespace LLP
     }
 
 
+    /* Set the block for this worker's proof. */
+    void Worker::SetBlock(const TAO::Ledger::Block &block)
+    {
+        if(fSubscribe)
+        {
+            pProof->SetBlock(block);
+            pProof->Init();
+        }
+    }
+
+
     void Worker::Start()
     {
         fStop = false;
         fPause = false;
     }
+
 
     void Worker::Pause()
     {
@@ -112,10 +131,12 @@ namespace LLP
         pProof->Reset();
     }
 
+
     void Worker::Stop()
     {
         fStop = true;
     }
+
 
     void Worker::Reset()
     {

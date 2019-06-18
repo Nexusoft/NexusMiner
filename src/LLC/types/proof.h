@@ -15,18 +15,12 @@ ________________________________________________________________________________
 #ifndef NEXUS_LLP_TEMPLATES_PROOF_H
 #define NEXUS_LLP_TEMPLATES_PROOF_H
 
+#include <TAO/Ledger/types/block.h>
+
 #include <cstdint>
 #include <atomic>
 #include <string>
-
-namespace TAO
-{
-    namespace Ledger
-    {
-        class Block;
-    }
-}
-
+#include <mutex>
 
 namespace LLC
 {
@@ -39,16 +33,53 @@ namespace LLC
     class Proof
     {
     public:
-        Proof(uint8_t id, TAO::Ledger::Block *block)
-        : pBlock(block)
+
+        Proof(uint32_t id)
+        : MUTEX()
+        , block()
         , nID(id)
         , fReset(false)
         {
         }
 
+
         virtual ~Proof()
         {
         }
+
+
+        /** Channel
+         *
+         *
+         *
+         **/
+        virtual uint32_t Channel() = 0;
+
+
+        /** SetBlock
+         *
+         *  Sets the block for this proof.
+         *
+         **/
+        void SetBlock(const TAO::Ledger::Block &block_)
+        {
+            std::unique_lock<std::mutex> lk(MUTEX);
+            block = block_;
+        }
+
+
+        /** GetBlock
+         *
+         *  Gets the block for this proof.
+         *
+         **/
+        TAO::Ledger::Block GetBlock()
+        {
+            std::unique_lock<std::mutex> lk(MUTEX);
+            return block;
+        }
+
+
 
 
         /** Work
@@ -93,6 +124,7 @@ namespace LLC
              fReset = true;
          }
 
+
          /** IsReset
           *
           *
@@ -102,8 +134,9 @@ namespace LLC
 
 
     protected:
-        TAO::Ledger::Block *pBlock;
-        uint8_t nID;
+        std::mutex MUTEX;
+        TAO::Ledger::Block block;
+        uint32_t nID;
         std::atomic<bool> fReset;
     };
 

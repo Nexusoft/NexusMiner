@@ -46,7 +46,8 @@ namespace LLC
     class HashCPU : public Proof
     {
     public:
-        HashCPU(uint8_t id, TAO::Ledger::Block *block);
+
+        HashCPU(uint32_t id);
         virtual ~HashCPU();
 
         /** Channel
@@ -54,7 +55,8 @@ namespace LLC
          *
          *
          **/
-        static uint32_t Channel() { return 2; }
+        virtual uint32_t Channel() override { return 2; }
+
 
         /** Work
          *
