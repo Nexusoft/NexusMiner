@@ -77,7 +77,7 @@ namespace config
             const std::string datadirSwitch("-datadir");
             const std::string configFileSwitch("-conf");
 
-            /* Form is -datadir=path so path setting starts at location 9. 
+            /* Form is -datadir=path so path setting starts at location 9.
              * Any length <9 on argv is either a different option or datadir with no value. Ignore these.
              */
             if (argValue.length() > 9 && argValue.compare(0, 8, datadirSwitch) == 0)
@@ -178,7 +178,7 @@ namespace config
     /* Get the Location of the Config File. */
     std::string GetConfigFile()
     {
-        static bool fPathLogged = false; //Used so we only log the conf file once 
+        static bool fPathLogged = false; //Used so we only log the conf file once
 
         std::string pathConfigFile(GetDataDir(false));
 
@@ -237,7 +237,7 @@ namespace config
                 path = filesystem::system_complete(path);
             }
 
-            /* Validate the resulting path length */            
+            /* Validate the resulting path length */
             if  (path.length() > MAX_PATH)
             {
                 debug::error(FUNCTION, "-datadir path exceeds maximum allowed path length. Using default.");
@@ -255,5 +255,25 @@ namespace config
         pathCached[fNetSpecific] =  path;
         fCachedPath[fNetSpecific] = true;
         return path;
+    }
+
+
+    /*  Get the comma seperated values from a string. */
+    void CommaSeperatedValues(std::vector<uint32_t> &values, std::string &strCSV)
+    {
+        std::stringstream ss(strCSV);
+        uint32_t i = 0;
+
+        if(ss.peek() == ',')
+            ss.ignore();
+
+        while(ss >> i)
+        {
+            values.push_back(i);
+
+            if(ss.peek() == ',')
+                ss.ignore();
+
+        }
     }
 }

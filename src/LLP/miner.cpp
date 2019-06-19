@@ -178,8 +178,6 @@ namespace LLP
                 fReset = false;
             }
 
-
-
             /* Check a submit queue to see if there have been solutions submitted. */
             CheckSubmit();
         }

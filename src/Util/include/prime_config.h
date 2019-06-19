@@ -40,7 +40,7 @@ namespace prime
 {
     bool load_offsets();
     bool load_origins();
-    void load_config(uint8_t nThreadsGPU);
+    void load_config(uint32_t nThreadsGPU);
 }
 
 #endif

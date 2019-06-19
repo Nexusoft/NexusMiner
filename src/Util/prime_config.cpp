@@ -40,7 +40,7 @@ uint32_t nTestLevels[GPU_MAX] = { 0 };
 namespace prime
 {
     /* Load the prime mining configuration for each GPU (Hash mining auto-computed.) */
-    void load_config(uint8_t nThreadsGPU)
+    void load_config(uint32_t nThreadsGPU)
     {
         debug::log(0, "Loading configuration...");
         debug::log(0, "");
@@ -57,40 +57,40 @@ namespace prime
             return;
         }
 
-        for (uint8_t i = 0; i < nThreadsGPU; ++i)
+        for (uint32_t i = 0; i < nThreadsGPU; ++i)
         {
-          /* Acquire the device name so we can parse the parameters for it. */
-          std::string devicename = cuda_devicename(device_map[i]);
+            /* Acquire the device name so we can parse the parameters for it. */
+            std::string devicename = cuda_devicename(device_map[i]);
 
-          #define PARSE(X) if (!parser.GetValueAsInteger(devicename.c_str(), #X, (int*)&X[i])) \
+            #define PARSE(X) if (!parser.GetValueAsInteger(devicename.c_str(), #X, (int*)&X[i])) \
             parser.GetValueAsInteger("GENERAL", #X, (int*)&X[i]);
 
-          /* Parse parameters in config.ini */
-          PARSE(nSievePrimesLog2);
-          PARSE(nSieveBitsLog2);
-          PARSE(nSieveIterationsLog2);
-          PARSE(nTestLevels);
+            /* Parse parameters in config.ini */
+            PARSE(nSievePrimesLog2);
+            PARSE(nSieveBitsLog2);
+            PARSE(nSieveIterationsLog2);
+            PARSE(nTestLevels);
 
-          uint32_t sieve_primes = 1 << nSievePrimesLog2[i];
-          uint32_t sieve_bits = 1 << nSieveBitsLog2[i];
-          uint32_t sieve_iterations = 1 << nSieveIterationsLog2[i];
+            uint32_t sieve_primes = 1 << nSievePrimesLog2[i];
+            uint32_t sieve_bits = 1 << nSieveBitsLog2[i];
+            uint32_t sieve_iterations = 1 << nSieveIterationsLog2[i];
 
-          if (nSievePrimeLimit < sieve_primes)
-            nSievePrimeLimit = sieve_primes;
+            if (nSievePrimeLimit < sieve_primes)
+                nSievePrimeLimit = sieve_primes;
 
-          debug::log(0, "GPU thread ", static_cast<uint32_t>(i), ", device ", device_map[i], " [", devicename, "]");
-          debug::log(0, "nSievePrimes = ", sieve_primes);
-          debug::log(0, "nBitArray_Size = ", sieve_bits);
-          debug::log(0, "nSieveIterations = ", sieve_iterations);
-          debug::log(0, "nTestLevels = ", nTestLevels[i]);
-          debug::log(0, "");
+            debug::log(0, "GPU thread ", i, ", device ", device_map[i], " [", devicename, "]");
+            debug::log(0, "nSievePrimes = ", sieve_primes);
+            debug::log(0, "nBitArray_Size = ", sieve_bits);
+            debug::log(0, "nSieveIterations = ", sieve_iterations);
+            debug::log(0, "nTestLevels = ", nTestLevels[i]);
+            debug::log(0, "");
         }
     }
 
     /* Helper function to read the next offset pattern. */
     bool read_offset_pattern(std::ifstream &fin,
-        std::vector<uint32_t> &offsets,
-        const std::string label, bool indices = true)
+    std::vector<uint32_t> &offsets,
+    const std::string label, bool indices = true)
     {
         std::string s;
         std::string strOffsets;
@@ -170,7 +170,7 @@ namespace prime
         std::string P, O;
 
         /* Read the primorial end prime used for sieving
-           (first N primes used to create primorial). */
+        (first N primes used to create primorial). */
         std::getline(fin, P, '#');
         std::stringstream sP(P);
         sP >> nPrimorialEndPrime;
@@ -195,7 +195,6 @@ namespace prime
             return false;
         }
 
-
         fin.close();
         debug::log(0, "");
 
@@ -214,7 +213,7 @@ namespace prime
         {
             fin >> nOrigin;
             if(fin.eof())
-                break;
+            break;
 
             vOrigins.push_back(nOrigin);
         }
@@ -224,5 +223,4 @@ namespace prime
 
         return true;
     }
-
 }

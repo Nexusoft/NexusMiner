@@ -31,19 +31,8 @@ namespace config
      *  @param[in] strCSV The comma seperated value string to parse for values.
      *
      **/
-    void CommaSeperatedValues(std::vector<uint32_t> &values, std::string &strCSV)
-    {
-        std::stringstream ss(strCSV);
-        uint32_t i = 0;
-
-        while(ss >> i)
-        {
-            values.push_back(i);
-
-            if(ss.peek() == ',')
-                ss.ignore();
-        }
-    }
+    void CommaSeperatedValues(std::vector<uint32_t> &values, std::string &strCSV);
+    
 }
 
 #endif

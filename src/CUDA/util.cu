@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 
-int device_map[GPU_MAX] = {0,1,2,3,4,5,6,7};
+uint32_t device_map[GPU_MAX] = {0,1,2,3,4,5,6,7};
 
 extern "C" void cuda_reset_device()
 {
@@ -73,16 +73,17 @@ extern "C" uint32_t cuda_device_multiprocessors(uint8_t index)
 }
 
 
-extern "C" int cuda_num_devices()
+extern "C" uint32_t cuda_num_devices()
 {
-    int GPU_N;
+    int32_t GPU_N;
     cudaError_t err = cudaGetDeviceCount(&GPU_N);
     if (err != cudaSuccess)
     {
         debug::log(0, "Unable to query number of CUDA devices! Is an nVidia driver installed?");
-        return -1;
+        return 0;
     }
-    return GPU_N;
+
+    return static_cast<uint32_t>(GPU_N);
 }
 
 

@@ -99,7 +99,7 @@ namespace LLP
          *
          **/
         template <class ProofType>
-        void AddWorker(uint8_t threadID, bool fSubscribeBlock = true)
+        void AddWorker(uint32_t threadID, bool fSubscribeBlock = true)
         {
             /* Create a new proof for this worker. */
             ProofType *pProof = new ProofType(threadID);
