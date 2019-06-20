@@ -95,7 +95,7 @@ namespace LLC
 
         /* Get the prime origin from the block and import into GMP. */
         uint1024_t nPrimeOrigin = block.ProofHash();
-        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, nPrimeOrigin.data());
+        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, nPrimeOrigin.begin());
 
         /* Compute the primorial mod from the origin. */
         mpz_mod(zPrimorialMod, zPrimeOrigin, zPrimorial);
@@ -317,7 +317,7 @@ namespace LLC
                 /* Check Difficulty */
                 if (nPrimeDifficulty >= block.nBits && !fReset.load() && nHeight == block.nHeight)
                 {
-                    debug::log(0, "[MASTER] Found Prime Block ", block.ProofHash().ToString().substr(0,20), " with Difficulty ", std::fixed, std::setprecision(7), nPrimeDifficulty/1e7);
+                    debug::log(0, "[MASTER] Found Prime Block ", block.ProofHash().ToString().substr(0, 20), " with Difficulty ", std::fixed, std::setprecision(7), nPrimeDifficulty/1e7);
 
                     /* Set the block nonce and return. */
                     block.nNonce = nNonce;

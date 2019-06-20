@@ -58,8 +58,8 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
                                      uint32_t nOffsets)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
-    if(c_quit)
-        return;
+    //if(c_quit)
+    //    return;
 
     /* Compute the global index for this nonce offset. */
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -105,13 +105,13 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
     /* Compute the global index for this nonce offset. */
     uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
     uint32_t idx = position / nTestOffsets;
-    uint32_t o = position % nTestOffsets;
 
     /* Make sure index is not out of bounds. */
     if(idx < *nonce_count)
     {
         uint32_t p[WORD_MAX];
 
+        uint32_t o = position % nTestOffsets;
         uint32_t test_index = c_iT[o];
 
         /* Compute the primorial offset from the primorial and

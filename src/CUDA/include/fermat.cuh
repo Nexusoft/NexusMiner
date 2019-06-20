@@ -24,7 +24,7 @@ void assign_zero(uint32_t *l)
 {
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
-        l[i] = 0;
+        l[i] ^= l[i];
 }
 
 
@@ -140,7 +140,7 @@ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t 
 
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX + 2; ++i)
-        t[i] = 0;
+        t[i] ^= t[i];
 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
@@ -181,7 +181,7 @@ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
 
     assign(t, x);
 
-    t[WORD_MAX] = 0;
+    t[WORD_MAX] ^= t[WORD_MAX];
 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
@@ -193,7 +193,7 @@ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
         for(uint8_t j = 0; j < WORD_MAX; ++j)
             t[j] = t[j+1];
 
-        t[WORD_MAX] = 0;
+        t[WORD_MAX] ^= t[WORD_MAX];
     }
 
     if(cmp_ge_n(t, n))
@@ -387,7 +387,7 @@ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
         if(((i % WINDOW_BITS) == 0) && wval)
         {
             mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
-            wval = 0;
+            wval ^= wval;
         }
     }
 

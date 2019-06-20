@@ -36,12 +36,12 @@ namespace LLC
         mpz_init(zN);
         mpz_init_set_ui(zA, 2);
 
-        mpz_import(zN, 32, -1, sizeof(uint32_t), 0, 0, n.data());
+        mpz_import(zN, 32, -1, sizeof(uint32_t), 0, 0, n.begin());
 
         mpz_sub_ui(zE, zN, 1);
         mpz_powm(zR, zA, zE, zN);
 
-        mpz_export(r.data(), 0, -1, sizeof(uint32_t), 0, 0, zR);
+        mpz_export(r.begin(), 0, -1, sizeof(uint32_t), 0, 0, zR);
 
         mpz_clear(zR);
         mpz_clear(zE);
@@ -81,8 +81,8 @@ namespace LLC
         uint1024_t nFermat = FermatTest(composite);
 
         /* Import into GMP for bignum calculations. */
-        mpz_import(zB, 32, -1, sizeof(uint32_t), 0, 0, nFermat.data());
-        mpz_import(zC, 32, -1, sizeof(uint32_t), 0, 0, composite.data());
+        mpz_import(zB, 32, -1, sizeof(uint32_t), 0, 0, nFermat.begin());
+        mpz_import(zC, 32, -1, sizeof(uint32_t), 0, 0, composite.begin());
 
         mpz_sub(zA, zC, zB);
         mpz_mul_2exp(zA, zA, 24);
@@ -120,7 +120,7 @@ namespace LLC
         mpz_t zN;
 
         mpz_init(zN);
-        mpz_import(zN, 32, -1, sizeof(uint32_t), 0, 0, n.data());
+        mpz_import(zN, 32, -1, sizeof(uint32_t), 0, 0, n.begin());
 
         /* Does small divisor tests and then Miller-Rabin. */
         int32_t result = mpz_probab_prime_p(zN, nChecks);
@@ -137,7 +137,7 @@ namespace LLC
         mpz_init(zR);
 
 
-        mpz_import(zN, 32, -1, sizeof(uint32_t), 0, 0, n.data());
+        mpz_import(zN, 32, -1, sizeof(uint32_t), 0, 0, n.begin());
 
         for(auto const &prime : smallPrimes)
         {

@@ -75,7 +75,7 @@ namespace LLC
             uint1024_t hashProof = block.ProofHash();
             uint32_t nBits = hashProof.BitCount();
             uint32_t nLeadingZeroes = 1024 - nBits;
-            debug::log(0, "[MASTER] Found Hash Block ", hashProof.ToString().substr(0, 20), " with ",
+            debug::log(0, "[MASTER] Found Hash Block ", hashProof.SubString(), " with ",
                 nLeadingZeroes, " Leading Zero-Bits");
 
             fReset = true;
@@ -95,7 +95,7 @@ namespace LLC
 		target.SetCompact(block.nBits);
         nTarget = target.getuint1024();
 
-        debug::log(3, "Target ", nTarget.ToString().substr(0, 20));
+        debug::log(3, "Target ", nTarget.SubString());
 
     }
 

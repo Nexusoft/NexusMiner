@@ -204,7 +204,7 @@ namespace LLC
         }
 
         /* Set the prime origin from the block hash. */
-        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, block.ProofHash().data());
+        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, block.ProofHash().begin());
 
 
         /* Compute the primorial mod from the origin. */

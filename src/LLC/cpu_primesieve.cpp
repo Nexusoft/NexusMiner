@@ -22,6 +22,7 @@ ________________________________________________________________________________
 #include <Util/include/prime_config.h>
 
 #include <iomanip>
+#include <cstring> //memset
 
 namespace LLC
 {
@@ -135,7 +136,7 @@ namespace LLC
 
         /* Set the prime origin from the block hash. */
         uint1024_t nPrimeOrigin = block.ProofHash();
-        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, nPrimeOrigin.data());
+        mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, nPrimeOrigin.begin());
 
 
         /* Compute the primorial mod from the origin. */

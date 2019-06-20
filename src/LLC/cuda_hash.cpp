@@ -77,7 +77,7 @@ namespace LLC
             uint1024_t hashProof = block.ProofHash();
             uint32_t nBits = hashProof.BitCount();
             uint32_t nLeadingZeroes = 1024 - nBits;
-            debug::log(0, "[MASTER] Found Hash Block ", hashProof.ToString().substr(0, 20), " with ",
+            debug::log(0, "[MASTER] Found Hash Block ", hashProof.SubString(), " with ",
                 nLeadingZeroes, " Leading Zero-Bits");
 
             fReset = true;
@@ -101,7 +101,7 @@ namespace LLC
         nTarget = target.getuint1024();
 
         /* Set the target hash on this device for the difficulty. */
-        cuda_sk1024_set_Target((uint64_t *)nTarget.data());
+        cuda_sk1024_set_Target((uint64_t *)nTarget.begin());
 
     }
 

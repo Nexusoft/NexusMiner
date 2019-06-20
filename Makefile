@@ -8,6 +8,7 @@ OBJS :=	build/main.o \
 				build/LLC_skein.o \
 				build/LLC_skein_block.o \
 				build/LLC_bignum.o \
+				build/LLC_base_uint.o \
 				build/LLC_global.o \
 				build/LLC_prime.o \
 				build/LLC_origins.o \

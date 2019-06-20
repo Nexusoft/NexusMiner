@@ -204,7 +204,7 @@ namespace LLP
         /* Print a debug log message for this block. */
         uint1024_t hashProof = block.ProofHash();
         debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[block.nChannel], " Block ",
-            hashProof.ToString().substr(0, 20));
+            hashProof.SubString());
 
         return block;
     }
@@ -234,7 +234,7 @@ namespace LLP
             /* Print a debug log message for this block. */
             uint1024_t hashProof = block.ProofHash();
             debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[nChannel], " Block ",
-                hashProof.ToString().substr(0, 20));
+                hashProof.SubString());
 
             /* Set the newly created block for this worker. */
             worker->SetBlock(block);
@@ -303,7 +303,7 @@ namespace LLP
             return;
 
         debug::log(0, "");
-        debug::log(0, "[MASTER] Submitting ", ChannelName[nChannel], " Block ", block.ProofHash().ToString().substr(0, 20));
+        debug::log(0, "[MASTER] Submitting ", ChannelName[nChannel], " Block ", block.ProofHash().SubString());
 
 
         Packet REQUEST;
@@ -402,7 +402,7 @@ namespace LLP
         std::unique_lock<std::mutex> lk(mut);
 
         /* Get the block from the map of blocks. */
-        debug::log(2, FUNCTION, block.ProofHash().ToString().substr(0, 20));
+        debug::log(2, FUNCTION, block.ProofHash().SubString());
 
         /* Push the block onto the queue. */
         qSubmit.push(block);
