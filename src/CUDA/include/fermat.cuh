@@ -58,28 +58,48 @@ uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
 
 
 __device__ __forceinline__
-uint8_t sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
+void sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
 {
-    uint32_t temp;
-    uint8_t c = 0;
+    //uint32_t temp;
+    //uint8_t c = 0;
+
+    asm(   "{\n\t"
+           "sub.cc.u32 %0,%1,%2;\n\t"
+           "}\n\t"
+           : "=r"(z[0]) : "r"(x[0]), "r"(y[0])
+       );
 
     #pragma unroll
-    for(uint8_t i = 0; i < WORD_MAX; ++i)
+    for(uint8_t i = 1; i < WORD_MAX - 1; ++i)
     {
-        temp = x[i] - y[i] - c;
-        c = (temp > x[i]);
-        z[i] = temp;
+        //temp = x[i] - y[i] - c;
+        //c = (temp > x[i]);
+        //z[i] = temp;
+        asm(   "{\n\t"
+               "subc.cc.u32 %0,%1,%2;\n\t"
+               "}\n\t"
+               : "=r"(z[i]) : "r"(x[i]), "r"(y[i])
+           );
     }
-    return c;
+
+
+    asm(   "{\n\t"
+           "subc.u32 %0,%1,%2;\n\t"
+           "}\n\t"
+           : "=r"(z[WORD_MAX - 1]) : "r"(x[WORD_MAX - 1]), "r"(y[WORD_MAX - 1])
+       );
 }
 
 
 __device__ __forceinline__
 void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
 {
+    /*
     uint32_t temp = x[0] - ui;
     uint8_t c = temp > x[0];
     z[0] = temp;
+
+
 
     #pragma unroll
     for(uint8_t i = 1; i < WORD_MAX; ++i)
@@ -88,6 +108,34 @@ void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
         c = (temp > x[i]);
         z[i] = temp;
     }
+
+    */
+
+    asm(   "{\n\t"
+           "sub.cc.u32 %0,%1,%2;\n\t"
+           "}\n\t"
+           : "=r"(z[0]) : "r"(x[0]), "r"(ui)
+       );
+
+    #pragma unroll
+    for(uint8_t i = 1; i < WORD_MAX - 1; ++i)
+    {
+        //temp = x[i] - y[i] - c;
+        //c = (temp > x[i]);
+        //z[i] = temp;
+        asm(   "{\n\t"
+               "subc.cc.u32 %0,%1,0;\n\t"
+               "}\n\t"
+               : "=r"(z[i]) : "r"(x[i])
+           );
+    }
+
+
+    asm(   "{\n\t"
+           "subc.u32 %0,%1,0;\n\t"
+           "}\n\t"
+           : "=r"(z[WORD_MAX - 1]) : "r"(x[WORD_MAX - 1])
+       );
 }
 
 
@@ -111,6 +159,19 @@ void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
     }
 }
 
+/* Calculate result = A * B + C */
+__device__ __forceinline__
+uint64_t mul_add(uint64_t a, uint64_t b, uint64_t c)
+{
+	uint64_t result;
+	asm(   "{\n\t"
+		   "mad.lo.u64 %0,%1,%2,%3;\n\t"
+		   "}\n\t"
+		   : "=l"(result) : "l"(a), "l"(b), "l"(c)
+       );
+	return result;
+}
+
 
 __device__ __forceinline__
 uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
@@ -121,9 +182,7 @@ uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
-        prod = static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y);
-        prod += c;
-        prod += z[i];
+        prod = mul_add(x[i], y, static_cast<uint64_t>(z[i]) + c);
         z[i] = prod;
         c = prod >> 32;
     }
@@ -217,7 +276,7 @@ uint16_t bit_count(uint32_t *x)
 }
 
 
-__device__  __forceinline__
+__device__ __forceinline__
 void lshift(uint32_t *r, uint32_t *a, uint16_t shift)
 {
     assign_zero(r);
@@ -268,35 +327,42 @@ void rshift(uint32_t *r, uint32_t *a, uint16_t shift)
 __device__ __forceinline__
 void lshift1(uint32_t *r, uint32_t *a)
 {
-    uint32_t t = a[0];
-    uint32_t t2;
-    r[0] = t << 1;
-
     #pragma unroll
-    for(uint8_t i = 1; i < WORD_MAX; ++i)
+    for(uint8_t i = WORD_MAX - 1; i > 0; --i)
     {
-        t2 = a[i];
-        r[i] = (t2 << 1) | (t >> 31);
-        t = t2;
+        asm(   "{\n\t"
+               "shf.l.wrap.b32 %0,%1,%2,1;\n\t"
+               "}\n\t"
+               : "=r"(r[i]) : "r"(a[i-1]), "r"(a[i])
+           );
     }
+
+    asm(   "{\n\t"
+           "shl.b32 %0,%1,1;\n\t"
+           "}\n\t"
+           : "=r"(r[0]) : "r"(a[0])
+       );
 }
 
 
 __device__ __forceinline__
 void rshift1(uint32_t *r, uint32_t *a)
 {
-    uint32_t t = a[WORD_MAX-1];
-    uint32_t t2;
-
-    r[WORD_MAX-1] = t >> 1;
-
     #pragma unroll
-    for(int8_t i = WORD_MAX-2; i >= 0; --i)
+    for(uint8_t i = 0; i < WORD_MAX - 1; ++i)
     {
-        t2 = a[i];
-        r[i] = (t2 >> 1) | (t << 31);
-        t = t2;
+        asm(   "{\n\t"
+               "shf.r.wrap.b32 %0,%1,%2,1;\n\t"
+               "}\n\t"
+               : "=r"(r[i]) : "r"(a[i]), "r"(a[i+1])
+           );
     }
+
+    asm(   "{\n\t"
+           "shr.b32 %0,%1,1;\n\t"
+           "}\n\t"
+           : "=r"(r[WORD_MAX - 1]) : "r"(a[WORD_MAX - 1])
+       );
 }
 
 
