@@ -94,23 +94,6 @@ void sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
 __device__ __forceinline__
 void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
 {
-    /*
-    uint32_t temp = x[0] - ui;
-    uint8_t c = temp > x[0];
-    z[0] = temp;
-
-
-
-    #pragma unroll
-    for(uint8_t i = 1; i < WORD_MAX; ++i)
-    {
-        temp = x[i] - c;
-        c = (temp > x[i]);
-        z[i] = temp;
-    }
-
-    */
-
     asm(   "{\n\t"
            "sub.cc.u32 %0,%1,%2;\n\t"
            "}\n\t"
@@ -120,16 +103,12 @@ void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
     #pragma unroll
     for(uint8_t i = 1; i < WORD_MAX - 1; ++i)
     {
-        //temp = x[i] - y[i] - c;
-        //c = (temp > x[i]);
-        //z[i] = temp;
         asm(   "{\n\t"
                "subc.cc.u32 %0,%1,0;\n\t"
                "}\n\t"
                : "=r"(z[i]) : "r"(x[i])
            );
     }
-
 
     asm(   "{\n\t"
            "subc.u32 %0,%1,0;\n\t"
@@ -176,16 +155,34 @@ uint64_t mul_add(uint64_t a, uint64_t b, uint64_t c)
 __device__ __forceinline__
 uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
 {
-    uint64_t prod;
+    //uint64_t prod;
     uint32_t c = 0;
+
+    asm(   "{\n\t"
+		   "mad.lo.cc.u32 %0,%1,%2,%3;\n\t"
+		   "}\n\t"
+		   : "=r"(z[0]) : "r"(x[0]), "r"(y), "r"(z[0])
+       );
 
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
-        prod = mul_add(x[i], y, static_cast<uint64_t>(z[i]) + c);
-        z[i] = prod;
-        c = prod >> 32;
+
+        asm(   "{\n\t"
+               "madc.lo.cc.u32 %0,%1,%2,%3;\n\t"
+               "}\n\t"
+               : "=r"(z[i]) : "r"(x[i]), "r"(y), "r"(z[i])
+           );
+        //prod = mul_add(x[i], y, static_cast<uint64_t>(z[i]) + c);
+        //z[i] = prod;
+        //c = prod >> 32;
     }
+
+    asm(   "{\n\t"
+           "madc.hi.u32 %0,%1,%2,%3;\n\t"
+           "}\n\t"
+           : "=r"(c) : "r"(x[WORD_MAX-1]), "r"(y), "r"(z[WORD_MAX-1])
+       );
 
     return c;
 }
