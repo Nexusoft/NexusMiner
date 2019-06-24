@@ -60,61 +60,26 @@ uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
 __device__ __forceinline__
 void sub_n(uint32_t *z, uint32_t *x, uint32_t *y)
 {
-    //uint32_t temp;
-    //uint8_t c = 0;
-
-    asm(   "{\n\t"
-           "sub.cc.u32 %0,%1,%2;\n\t"
-           "}\n\t"
-           : "=r"(z[0]) : "r"(x[0]), "r"(y[0])
-       );
+    asm("sub.cc.u32 %0, %1, %2;" : "=r"(z[0]) : "r"(x[0]), "r"(y[0]));
 
     #pragma unroll
     for(uint8_t i = 1; i < WORD_MAX - 1; ++i)
-    {
-        //temp = x[i] - y[i] - c;
-        //c = (temp > x[i]);
-        //z[i] = temp;
-        asm(   "{\n\t"
-               "subc.cc.u32 %0,%1,%2;\n\t"
-               "}\n\t"
-               : "=r"(z[i]) : "r"(x[i]), "r"(y[i])
-           );
-    }
+        asm("subc.cc.u32 %0, %1, %2;" : "=r"(z[i]) : "r"(x[i]), "r"(y[i]));
 
-
-    asm(   "{\n\t"
-           "subc.u32 %0,%1,%2;\n\t"
-           "}\n\t"
-           : "=r"(z[WORD_MAX - 1]) : "r"(x[WORD_MAX - 1]), "r"(y[WORD_MAX - 1])
-       );
+    asm("subc.u32 %0, %1, %2;" : "=r"(z[WORD_MAX - 1]) : "r"(x[WORD_MAX - 1]), "r"(y[WORD_MAX - 1]));
 }
 
 
 __device__ __forceinline__
 void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
 {
-    asm(   "{\n\t"
-           "sub.cc.u32 %0,%1,%2;\n\t"
-           "}\n\t"
-           : "=r"(z[0]) : "r"(x[0]), "r"(ui)
-       );
+    asm("sub.cc.u32 %0, %1, %2;" : "=r"(z[0]) : "r"(x[0]), "r"(ui));
 
     #pragma unroll
     for(uint8_t i = 1; i < WORD_MAX - 1; ++i)
-    {
-        asm(   "{\n\t"
-               "subc.cc.u32 %0,%1,0;\n\t"
-               "}\n\t"
-               : "=r"(z[i]) : "r"(x[i])
-           );
-    }
+        asm("subc.cc.u32 %0, %1, 0;" : "=r"(z[i]) : "r"(x[i]));
 
-    asm(   "{\n\t"
-           "subc.u32 %0,%1,0;\n\t"
-           "}\n\t"
-           : "=r"(z[WORD_MAX - 1]) : "r"(x[WORD_MAX - 1])
-       );
+    asm("subc.u32 %0, %1, 0;" : "=r"(z[WORD_MAX - 1]) : "r"(x[WORD_MAX - 1]));
 }
 
 
@@ -143,49 +108,77 @@ __device__ __forceinline__
 uint64_t mul_add(uint64_t a, uint64_t b, uint64_t c)
 {
 	uint64_t result;
-	asm(   "{\n\t"
-		   "mad.lo.u64 %0,%1,%2,%3;\n\t"
-		   "}\n\t"
-		   : "=l"(result) : "l"(a), "l"(b), "l"(c)
-       );
+	asm("mad.lo.u64 %0, %1, %2, %3;" : "=l"(result) : "l"(a), "l"(b), "l"(c));
+
 	return result;
+}
+
+__device__ __forceinline__
+uint64_t mad32(uint32_t a, uint32_t b, uint64_t c)
+{
+	uint64_t result;
+	asm("mad.wide.u32 %0, %1, %2, %3;" : "=l"(result) : "r"(a), "r"(b), "l"(c));
+
+	return result;
+}
+
+__device__ __forceinline__
+uint64_t mul32(uint32_t a, uint32_t b)
+{
+    uint64_t result;
+    asm("mul.wide.u32 %0, %1, %2;" : "=l"(result) : "r"(a), "r"(b));
+    return result;
 }
 
 
 __device__ __forceinline__
-uint32_t addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
+void addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
 {
-    //uint64_t prod;
-    uint32_t c = 0;
-
-    asm(   "{\n\t"
-		   "mad.lo.cc.u32 %0,%1,%2,%3;\n\t"
-		   "}\n\t"
-		   : "=r"(z[0]) : "r"(x[0]), "r"(y), "r"(z[0])
-       );
+    uint64_t prod = 0;
 
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
+        //prod >>= 32;
+        //prod += z[i];
+        //prod += static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y);
+        prod = mad32(x[i], y, z[i] + (prod >> 32));// + z[i] + (prod >> 32);
+        //prod = static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y) + z[i] + (prod >> 32);
+        //prod = mul_add(x[i], y, static_cast<uint64_t>(z[i]) + (prod >> 32));
+        z[i] = prod; //set the low word
 
-        asm(   "{\n\t"
-               "madc.lo.cc.u32 %0,%1,%2,%3;\n\t"
-               "}\n\t"
-               : "=r"(z[i]) : "r"(x[i]), "r"(y), "r"(z[i])
-           );
-        //prod = mul_add(x[i], y, static_cast<uint64_t>(z[i]) + c);
-        //z[i] = prod;
-        //c = prod >> 32;
+        //asm("mad.lo.cc.u32 %0, %1, %2, %3;" : "=r"(z[i]) : "r"(x[i]), "r"(y), "r"(z[i]));
+        //asm("madc.hi.cc.u32 %0, %1, %2, %3;" : "=r"(z[i+1]) : "r"(x[i]), "r"(y), "r"(z[i+1]));
+        //asm("addc.u32 %0, %1, 0;" : "=r"(z[i+2]) : "r"(z[i+2]));
     }
 
-    asm(   "{\n\t"
-           "madc.hi.u32 %0,%1,%2,%3;\n\t"
-           "}\n\t"
-           : "=r"(c) : "r"(x[WORD_MAX-1]), "r"(y), "r"(z[WORD_MAX-1])
-       );
+    //asm("mad.lo.cc.u32 %0, %1, %2, %3;" : "=r"(z[WORD_MAX-1]) : "r"(x[WORD_MAX-1]), "r"(y), "r"(z[WORD_MAX-1]));
+    //asm("madc.hi.u32 %0, %1, %2, %3;" : "=r"(z[WORD_MAX]) : "r"(x[WORD_MAX-1]), "r"(y), "r"(z[WORD_MAX]));
 
-    return c;
+
+    z[WORD_MAX] += prod >> 32;
+
 }
+
+__device__ __forceinline__
+void addmul_2(uint32_t *z, uint32_t *x, const uint32_t y)
+{
+    uint64_t prod = mad32(x[0], y, z[0]);
+
+    #pragma unroll
+    for(uint8_t i = 1; i < WORD_MAX; ++i)
+    {
+        prod = mad32(x[i], y, z[i] + (prod >> 32));// + z[i] + (prod >> 32);
+        z[i-1] = prod; //set the low word
+
+    }
+
+    prod = z[WORD_MAX] + (prod >> 32);
+    z[WORD_MAX - 1] = prod;
+    z[WORD_MAX] = z[WORD_MAX+1] + (prod >> 32);
+
+}
+
 
 
 __device__ __forceinline__
@@ -201,7 +194,7 @@ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
         //c = addmul_1(t, x, y[i]);
-        t[WORD_MAX] += addmul_1(t, x, y[i]);
+        addmul_1(t, x, y[i]);
         //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
         //t[WORD_MAX] = temp;
         //t[WORD_MAX] += c;
@@ -211,22 +204,21 @@ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t 
 
         //c = addmul_1(t, n, m);
         //t[WORD_MAX] += addmul_1(t, n, m);
-        t[WORD_MAX] += addmul_1(t, n, t[0]*d);
+        addmul_2(t, n, t[0]*d);
         //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
         //t[WORD_MAX] = temp;
         //t[WORD_MAX] += c;
         //t[WORD_MAX + 1] = temp >> 32;
 
-        #pragma unroll
-        for(uint8_t j = 0; j <= WORD_MAX; ++j)
-            t[j] = t[j+1];
+        //#pragma unroll
+        //for(uint8_t j = 0; j <= WORD_MAX; ++j)
+        //    t[j] = t[j+1];
     }
+
     if(cmp_ge_n(t, n))
         sub_n(t, t, n);
 
-    #pragma unroll
-    for(uint8_t i = 0; i < WORD_MAX; ++i)
-        z[i] = t[i];
+    assign(z, t);
 }
 
 
@@ -243,11 +235,11 @@ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
     {
         //m = t[0]*d;
         //t[WORD_MAX] = addmul_1(t, n, m);
-        t[WORD_MAX] = addmul_1(t, n, t[0]*d);
+        addmul_2(t, n, t[0]*d);
 
-        #pragma unroll
-        for(uint8_t j = 0; j < WORD_MAX; ++j)
-            t[j] = t[j+1];
+        //#pragma unroll
+        //for(uint8_t j = 0; j < WORD_MAX; ++j)
+        //    t[j] = t[j+1];
 
         t[WORD_MAX] ^= t[WORD_MAX];
     }
@@ -326,19 +318,9 @@ void lshift1(uint32_t *r, uint32_t *a)
 {
     #pragma unroll
     for(uint8_t i = WORD_MAX - 1; i > 0; --i)
-    {
-        asm(   "{\n\t"
-               "shf.l.wrap.b32 %0,%1,%2,1;\n\t"
-               "}\n\t"
-               : "=r"(r[i]) : "r"(a[i-1]), "r"(a[i])
-           );
-    }
+        asm("shf.l.wrap.b32 %0, %1, %2, 1;" : "=r"(r[i]) : "r"(a[i-1]), "r"(a[i]));
 
-    asm(   "{\n\t"
-           "shl.b32 %0,%1,1;\n\t"
-           "}\n\t"
-           : "=r"(r[0]) : "r"(a[0])
-       );
+    asm("shl.b32 %0, %1, 1;" : "=r"(r[0]) : "r"(a[0]));
 }
 
 
@@ -347,19 +329,42 @@ void rshift1(uint32_t *r, uint32_t *a)
 {
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX - 1; ++i)
+        asm("shf.r.wrap.b32 %0, %1, %2, 1;" : "=r"(r[i]) : "r"(a[i]), "r"(a[i+1]));
+
+    asm("shr.b32 %0, %1, 1;" : "=r"(r[WORD_MAX - 1]) : "r"(a[WORD_MAX - 1]));
+}
+
+
+__device__ __forceinline__
+void sqrredc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
+{
+
+    #pragma unroll
+    for(uint8_t i = 0; i < WORD_MAX + 2; ++i)
+        t[i] ^= t[i];
+
+    for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
-        asm(   "{\n\t"
-               "shf.r.wrap.b32 %0,%1,%2,1;\n\t"
-               "}\n\t"
-               : "=r"(r[i]) : "r"(a[i]), "r"(a[i+1])
-           );
+        uint64_t prod = 0;
+        #pragma unroll
+        for(uint8_t j = i; j < WORD_MAX; ++j)
+        {
+            prod = mad32(x[j], x[i], t[j] + (prod >> 32));
+
+            t[j] = prod; //set the low word
+        }
+        t[WORD_MAX] += (prod >> 32);
+
+        lshift1(t, t);
+
+
+        addmul_2(t, n, t[0]*d);
     }
 
-    asm(   "{\n\t"
-           "shr.b32 %0,%1,1;\n\t"
-           "}\n\t"
-           : "=r"(r[WORD_MAX - 1]) : "r"(a[WORD_MAX - 1])
-       );
+    if(cmp_ge_n(t, n))
+        sub_n(t, t, n);
+
+    assign(z, t);
 }
 
 
@@ -428,19 +433,28 @@ __device__ __forceinline__
 void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
 {
     uint32_t t[WORD_MAX + 2];
-    uint32_t wval = 0;
+    uint32_t wval = 1;
     uint32_t d = inv2adic(N[0]);
 
     calcBar(X, N, t);
 
     calcWindowTable(X, N, t, table);
 
-    uint32_t bits = bit_count(Exp);
+    int32_t i = bit_count(Exp) - 1;
 
-    for(int16_t i = bits-1; i >= 0; --i)
+    if(Exp[i>>5] & (1 << (i & 31)))
+        wval |= 1;
+
+    if(((i % WINDOW_BITS) == 0) && wval)
     {
-        if(i != bits-1)
-            mulredc(X, X, X, N, d, t);
+        mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
+        wval ^= wval;
+    }
+
+    for(--i; i >= 0; --i)
+    {
+        mulredc(X, X, X, N, d, t);
+        //sqrredc(X, X, N, d, t);
 
         wval <<= 1;
 
