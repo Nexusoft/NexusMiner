@@ -35,6 +35,7 @@ extern uint32_t nSievePrimesLog2[GPU_MAX];
 extern uint32_t nSieveBitsLog2[GPU_MAX];
 extern uint32_t nSieveIterationsLog2[GPU_MAX];
 extern uint32_t  nTestLevels[GPU_MAX];
+extern uint32_t nSievesPerOrigin[GPU_MAX];
 
 namespace prime
 {
