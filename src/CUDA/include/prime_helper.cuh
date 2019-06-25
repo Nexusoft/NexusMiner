@@ -13,7 +13,11 @@
 __device__ __forceinline__
 uint64_t make_uint64_t(uint32_t LO, uint32_t HI)
 {
-    return __double_as_longlong(__hiloint2double(HI, LO));
+    //return __double_as_longlong(__hiloint2double(HI, LO));
+
+    uint64_t result;
+    asm("mov.b64 %0, {%1, %2};" : "=l"(result) : "r"(LO), "r"(HI));
+    return result;
 }
 
 /* Given a 64-bit operand and reciprocal, and 32-bit modulo, return the 32-bit
@@ -21,7 +25,9 @@ modulus without using division.  */
 __device__ __forceinline__
 uint32_t mod_p_small(uint64_t a, uint32_t p, uint64_t recip)
 {
-    uint64_t q = __umul64hi(a, recip);
+    //uint64_t q = __umul64hi(a, recip);
+    uint64_t q;
+    asm("mul.hi.u64 %0, %1, %2;" : "=l"(q) : "l"(a), "l"(recip));
     int64_t r = a - p*q;
     if (r >= p)
         r -= p;
