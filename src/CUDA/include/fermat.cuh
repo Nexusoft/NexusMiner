@@ -40,6 +40,15 @@ int inv2adic(uint32_t x)
     return -x;
 }
 
+__device__ __forceinline__
+uint32_t cmp_ge_top(uint32_t *x, uint32_t *y, uint32_t top)
+{
+    if(x[top] < y[top])
+        return 0;
+
+    return 1;
+}
+
 
 __device__ __forceinline__
 uint32_t cmp_ge_n(uint32_t *x, uint32_t *y)
@@ -103,16 +112,8 @@ void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
     }
 }
 
+
 /* Calculate result = A * B + C */
-__device__ __forceinline__
-uint64_t mul_add(uint64_t a, uint64_t b, uint64_t c)
-{
-	uint64_t result;
-	asm("mad.lo.u64 %0, %1, %2, %3;" : "=l"(result) : "l"(a), "l"(b), "l"(c));
-
-	return result;
-}
-
 __device__ __forceinline__
 uint64_t mad32(uint32_t a, uint32_t b, uint64_t c)
 {
@@ -120,14 +121,6 @@ uint64_t mad32(uint32_t a, uint32_t b, uint64_t c)
 	asm("mad.wide.u32 %0, %1, %2, %3;" : "=l"(result) : "r"(a), "r"(b), "l"(c));
 
 	return result;
-}
-
-__device__ __forceinline__
-uint64_t mul32(uint32_t a, uint32_t b)
-{
-    uint64_t result;
-    asm("mul.wide.u32 %0, %1, %2;" : "=l"(result) : "r"(a), "r"(b));
-    return result;
 }
 
 
@@ -139,25 +132,12 @@ void addmul_1(uint32_t *z, uint32_t *x, const uint32_t y)
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
-        //prod >>= 32;
-        //prod += z[i];
-        //prod += static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y);
         prod = mad32(x[i], y, z[i] + (prod >> 32));// + z[i] + (prod >> 32);
         //prod = static_cast<uint64_t>(x[i]) * static_cast<uint64_t>(y) + z[i] + (prod >> 32);
-        //prod = mul_add(x[i], y, static_cast<uint64_t>(z[i]) + (prod >> 32));
         z[i] = prod; //set the low word
-
-        //asm("mad.lo.cc.u32 %0, %1, %2, %3;" : "=r"(z[i]) : "r"(x[i]), "r"(y), "r"(z[i]));
-        //asm("madc.hi.cc.u32 %0, %1, %2, %3;" : "=r"(z[i+1]) : "r"(x[i]), "r"(y), "r"(z[i+1]));
-        //asm("addc.u32 %0, %1, 0;" : "=r"(z[i+2]) : "r"(z[i+2]));
     }
 
-    //asm("mad.lo.cc.u32 %0, %1, %2, %3;" : "=r"(z[WORD_MAX-1]) : "r"(x[WORD_MAX-1]), "r"(y), "r"(z[WORD_MAX-1]));
-    //asm("madc.hi.u32 %0, %1, %2, %3;" : "=r"(z[WORD_MAX]) : "r"(x[WORD_MAX-1]), "r"(y), "r"(z[WORD_MAX]));
-
-
     z[WORD_MAX] += prod >> 32;
-
 }
 
 __device__ __forceinline__
@@ -170,7 +150,6 @@ void addmul_2(uint32_t *z, uint32_t *x, const uint32_t y)
     {
         prod = mad32(x[i], y, z[i] + (prod >> 32));// + z[i] + (prod >> 32);
         z[i-1] = prod; //set the low word
-
     }
 
     prod = z[WORD_MAX] + (prod >> 32);
@@ -184,35 +163,15 @@ void addmul_2(uint32_t *z, uint32_t *x, const uint32_t y)
 __device__ __forceinline__
 void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t d, uint32_t *t)
 {
-    //uint32_t m;//, c;
-    //uint64_t temp;
-
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX + 2; ++i)
         t[i] ^= t[i];
 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
-        //c = addmul_1(t, x, y[i]);
         addmul_1(t, x, y[i]);
-        //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
-        //t[WORD_MAX] = temp;
-        //t[WORD_MAX] += c;
-        //t[WORD_MAX + 1] = temp >> 32;
 
-        //m = t[0]*d;
-
-        //c = addmul_1(t, n, m);
-        //t[WORD_MAX] += addmul_1(t, n, m);
         addmul_2(t, n, t[0]*d);
-        //temp = static_cast<uint64_t>(t[WORD_MAX]) + c;
-        //t[WORD_MAX] = temp;
-        //t[WORD_MAX] += c;
-        //t[WORD_MAX + 1] = temp >> 32;
-
-        //#pragma unroll
-        //for(uint8_t j = 0; j <= WORD_MAX; ++j)
-        //    t[j] = t[j+1];
     }
 
     if(cmp_ge_n(t, n))
@@ -225,22 +184,12 @@ void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t 
 __device__ __forceinline__
 void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
 {
-    //uint32_t m;
-
     assign(t, x);
-
     t[WORD_MAX] ^= t[WORD_MAX];
 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
-        //m = t[0]*d;
-        //t[WORD_MAX] = addmul_1(t, n, m);
         addmul_2(t, n, t[0]*d);
-
-        //#pragma unroll
-        //for(uint8_t j = 0; j < WORD_MAX; ++j)
-        //    t[j] = t[j+1];
-
         t[WORD_MAX] ^= t[WORD_MAX];
     }
 
@@ -268,48 +217,21 @@ uint16_t bit_count(uint32_t *x)
 __device__ __forceinline__
 void lshift(uint32_t *r, uint32_t *a, uint16_t shift)
 {
-    assign_zero(r);
+    uint16_t k = shift >> 5;
+    uint16_t i;
 
-    uint8_t ik;
-    uint8_t ik1;
-    uint8_t k = shift >> 5;
     shift = shift & 31;
 
-    #pragma unroll
-    for(int8_t i = 0; i < WORD_MAX; ++i)
-    {
-        ik = i + k;
-        ik1 = ik + 1;
+    for(i = 0; i < k; ++i)
+        r[i] ^= r[i];
 
-        if(ik1 < WORD_MAX && shift != 0)
-            r[ik1] |= (a[i] >> (32-shift));
-        if(ik < WORD_MAX)
-            r[ik] |= (a[i] << shift);
-    }
-}
+    for(i = k; i < WORD_MAX; ++i)
+        r[i] = a[i - k];
 
+    for(i = WORD_MAX - 1; i > k; --i)
+        asm("shf.l.wrap.b32 %0, %1, %2, %3;" : "=r"(r[i]) : "r"(r[i-1]), "r"(r[i]), "r"((uint32_t)shift));
 
-__device__ __forceinline__
-void rshift(uint32_t *r, uint32_t *a, uint16_t shift)
-{
-    assign_zero(r);
-
-    int8_t ik;
-    int8_t ik1;
-    uint8_t k = shift >> 5;
-    shift = shift & 31;
-
-    #pragma unroll
-    for(int8_t i = 0; i < WORD_MAX; ++i)
-    {
-        ik = i - k;
-        ik1 = ik - 1;
-
-        if(ik1 >= 0 && shift != 0)
-            r[ik1] |= (a[i] << (32-shift));
-        if(ik >= 0)
-            r[ik] |= (a[i] >> shift);
-    }
+    asm("shl.b32 %0, %1, %2;" : "=r"(r[k]) : "r"(r[k]), "r"((uint32_t)shift));
 }
 
 

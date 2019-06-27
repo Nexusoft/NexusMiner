@@ -26,6 +26,12 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
                                        uint16_t nPrimeLimitA)
 {
     extern __shared__ uint32_t shared_array_sieve[];
+    uint32_t nAdd;
+    uint32_t index;
+    uint32_t mask;
+    uint32_t id;
+    uint16_t i, j;
+    uint16_t pr, pre2;
 
     #pragma unroll 16
     for (uint8_t i= 0; i <  16; ++i)
@@ -33,23 +39,29 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
 
     __syncthreads();
 
-    for (uint16_t i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
+    base_index = base_index << 9;
+
+    for (i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
     {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
+        pr = c_primes[i];
+        pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
 
         // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 9;
+        nAdd = pr << 9;
 
-        uint32_t index = prime_remainders[(((base_index << 9) + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
+        index = prime_remainders[((base_index + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
         if(index >= pr)
             index = index - pr;
 
-        for(index = index + pIdx; index < 262144; index += nAdd)
+        index = threadIdx.x * pr + index;
+
+        for(; index < 262144; index += nAdd)
         {
-            if( (g_sieve_hierarchy[index >> 5] & (1 << (index & 31)) ) == 0)
-                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+            mask = 1 << (index & 31);
+            id = index >> 5;
+
+            if((g_sieve_hierarchy[id] & mask) == 0)
+                atomicOr(&shared_array_sieve[id], mask);
         }
 
     }
@@ -60,7 +72,7 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
     #pragma unroll 16
     for (uint8_t i = 0; i < 16; ++i) // fixed value
     {
-        uint16_t j = threadIdx.x + (i << 9);
+        j = threadIdx.x + (i << 9);
         //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
         g_bit_array_sieve[j] = shared_array_sieve[j];
     }
@@ -214,8 +226,8 @@ __global__ void compact_combo(uint64_t *d_origins,
                               uint8_t nOffsets)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
-    if(c_quit)
-        return;
+    //if(c_quit)
+    //    return;
 
 
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -229,8 +241,12 @@ __global__ void compact_combo(uint64_t *d_origins,
         uint64_t nonce_offset = c_primorial * (uint64_t)idx + d_origins[origin_index];
         uint32_t combo = 0;
 
+        uint32_t index = idx >> 5;
+        uint32_t mask = c_mark_mask[idx & 31];
+        uint32_t nBitArray_Words = nBitArray_Size >> 5;
+
         /* Check the single sieve to see if offsets are valid. */
-        if((d_bit_array_sieve_A[idx >> 5] & (1 << (idx & 31))) == 0)
+        if((d_bit_array_sieve_A[index] & mask) == 0)
         {
             combo = c_bitmaskA;
 
@@ -238,11 +254,11 @@ __global__ void compact_combo(uint64_t *d_origins,
             for(uint8_t o = 0; o < nOffsetsB; ++o)
             {
                 /* Use logical not operator to reduce result into inverted 0 or 1 bit. */
-                uint32_t bit = !((d_bit_array_sieve_B[idx >> 5]) & (1 << (idx & 31)));
+                uint32_t bit = !(d_bit_array_sieve_B[index] & mask);
 
                 combo |= bit << c_iB[o];
 
-                d_bit_array_sieve_B += nBitArray_Size >> 5;
+                d_bit_array_sieve_B += nBitArray_Words;
             }
 
             /* Get the count of the remaining zero bits and compare to threshold. */

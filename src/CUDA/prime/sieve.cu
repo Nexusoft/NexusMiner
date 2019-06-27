@@ -424,8 +424,12 @@ __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
                                        uint16_t nPrimeLimitA)
 {
     extern __shared__ uint32_t shared_array_sieve[];
-
+    uint32_t pIdx;
+    uint32_t nAdd;
+    uint32_t pre1[offsetsA];
+    uint32_t index;
     uint16_t i, j;
+    uint16_t pr, pre2;
 
     #pragma unroll 16
     for (int i= 0; i <  16; ++i)
@@ -433,32 +437,37 @@ __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
 
     __syncthreads();
 
+    base_index = base_index << 9;
+
     for (i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
     {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
+        pr = c_primes[i];
+        pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
 
         // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 9;
+        pIdx = threadIdx.x * pr;
+        nAdd = (base_index + i) << 3;
 
-        uint32_t pre1[offsetsA];
-        auto pre = [&pre1, &prime_remainders, &base_index, &i](uint32_t o)
+        auto pre = [&pre1, &prime_remainders, &nAdd](uint32_t o)
         {
-            pre1[o] = prime_remainders[(((base_index << 9) + i) << 3) + o]; // << 3 because we have space for 8 offsets
+            pre1[o] = prime_remainders[nAdd + o]; // << 3 because we have space for 8 offsets
         };
 
         Unroller<0, offsetsA>::step(pre);
 
-        uint32_t index;
+        nAdd = pr << 9;
         auto loop = [&pIdx, &nAdd, &pre1, &pre2, &pr, &index](uint32_t o)
         {
             index = pre1[o] + pre2;
             if(index >= pr)
                 index = index - pr;
 
-                for(index = index + pIdx; index < 262144; index += nAdd)
-                    atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+            index = index + pIdx;
+
+            for(; index < 262144; index += nAdd)
+            {
+                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+            }
         };
 
         Unroller<0, offsetsA>::step(loop);
@@ -620,12 +629,11 @@ __global__ void primesieve_kernelB(uint64_t *origins,
     if(i < nPrimeLimit)
     {
         uint4 tmp = primes[i];
+        uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
         uint32_t index;
         uint32_t mask;
 
-
-        uint64_t recip = make_uint64_t(tmp.z, tmp.w);
         tmp.z = mod_p_small(origins[origin_index] + base_remainders[i] + c_offsets[c_iA[o]], tmp.x, recip);
         tmp.w = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
 
@@ -653,8 +661,6 @@ __global__ void primesieve_kernelC(uint64_t *origins,
                                    uint32_t origin_index)
 {
     uint32_t position = blockDim.x * blockIdx.x + threadIdx.x;
-
-
     uint32_t i = nPrimorialEndPrime + (position / nOffsets);
     uint32_t o = position % nOffsets;
 
