@@ -288,7 +288,7 @@ namespace LLP
                 block = qSubmit.front();
                 qSubmit.pop();
 
-                if(block.nHeight == best_height && best_height != 1)
+                if(block.nHeight == best_height && best_height)
                 {
                     have_submit = true;
                     break;
