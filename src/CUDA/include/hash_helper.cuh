@@ -40,10 +40,7 @@ __device__ uint32_t HIWORD(uint64_t x)
 
 __device__ void LOHI(uint32_t &lo, uint32_t &hi, uint64_t x)
 {
-	asm("{\n\t"
-		"mov.b64 {%0,%1},%2; \n\t"
-		"}"
-		: "=r"(lo), "=r"(hi) : "l"(x));
+	asm("mov.b64 {%0,%1}, %2;" : "=r"(lo), "=r"(hi) : "l"(x));
 }
 
 

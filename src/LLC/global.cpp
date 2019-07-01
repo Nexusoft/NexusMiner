@@ -84,14 +84,13 @@ namespace LLC
         mpz_init_set_ui(zPrimorial, 1);
         mpz_init_set_ui(zTwo, 2);
 
-        double max_sieve = std::pow(2.0, 64);
+        /* Get the primorial. */
         for (uint32_t i = 1; i < nPrimorialEndPrime; ++i)
-        {
             mpz_mul_ui(zPrimorial, zPrimorial, primes[i]);
-            max_sieve /= primes[i];
-        }
-
         nPrimorial = mpz_get_ui(zPrimorial);
+
+        double max_sieve = std::pow(2.0, 64) / nPrimorial;
+
         debug::log(0, "");
         debug::log(0, "Primorial: ", nPrimorial);
         debug::log(0, "Last Primorial Prime = ", primes[nPrimorialEndPrime - 1]);

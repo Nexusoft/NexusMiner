@@ -11,12 +11,14 @@
 
 ____________________________________________________________________________________________*/
 
+#include <LLC/include/global.h>
 #include <Util/include/debug.h>
 #include <Util/include/prime_config.h>
 #include <Util/include/ini_parser.h>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <numeric>
 
 
 /* Sieve/Testing Specific Configurations. */
@@ -36,6 +38,7 @@ uint32_t nSievePrimesLog2[GPU_MAX] = { 0 };
 uint32_t nSieveBitsLog2[GPU_MAX] = { 0 };
 uint32_t nSieveIterationsLog2[GPU_MAX] = { 0 };
 uint32_t nTestLevels[GPU_MAX] = { 0 };
+uint32_t nSievesPerOrigin[GPU_MAX] = { 0 };
 
 namespace prime
 {
@@ -75,6 +78,9 @@ namespace prime
             uint32_t sieve_bits = 1 << nSieveBitsLog2[i];
             uint32_t sieve_iterations = 1 << nSieveIterationsLog2[i];
 
+
+            nSievesPerOrigin[i] = (uint32_t)(std::numeric_limits<uint64_t>::max() / LLC::nPrimorial) / sieve_bits;
+
             if (nSievePrimeLimit < sieve_primes)
                 nSievePrimeLimit = sieve_primes;
 
@@ -83,6 +89,7 @@ namespace prime
             debug::log(0, "nBitArray_Size = ", sieve_bits);
             debug::log(0, "nSieveIterations = ", sieve_iterations);
             debug::log(0, "nTestLevels = ", nTestLevels[i]);
+            debug::log(0, "nSievesPerOrigin = ", nSievesPerOrigin[i]);
             debug::log(0, "");
         }
     }

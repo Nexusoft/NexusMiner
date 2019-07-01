@@ -101,6 +101,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
     ///* If the quit flag was set, early return to avoid wasting time. */
     //if(c_quit)
     //    return;
+    extern __shared__ uint32_t A[];
 
     /* Compute the global index for this nonce offset. */
     uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
@@ -120,7 +121,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         add_ui(p, c_zBaseOrigin, nonce_offsets[idx] + (uint64_t)c_offsets[test_index]);
 
         /* Check if prime passes fermat test base 2. */
-        uint8_t prime = fermat_prime(p, &window_data[position * WINDOW_SIZE * WORD_MAX]);
+        uint8_t prime = fermat_prime(p, &A[WORD_MAX * threadIdx.x], &window_data[position * WINDOW_SIZE * WORD_MAX]);
 
         /* Increment primes found. */
         atomicAdd(&g_primes_found[test_index], prime);

@@ -907,7 +907,7 @@ extern "C" bool cuda_primesieve(uint8_t thr_id,
     //CHECK(synchronize_event(thr_id, curr_sieve, EVENT::COMPACT));
     //CHECK(synchronize_event(thr_id, prev_test, EVENT::FERMAT));
 
-    uint8_t nComboThreshold = 8;
+    uint8_t nComboThreshold = 6;
 
 
     {

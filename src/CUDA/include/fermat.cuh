@@ -95,21 +95,14 @@ void sub_ui(uint32_t *z, uint32_t *x, const uint32_t &ui)
 __device__ __forceinline__
 void add_ui(uint32_t *z, uint32_t *x, const uint64_t &ui)
 {
-    uint32_t temp = x[0] + static_cast<uint32_t>(ui & 0xFFFFFFFF);
-    uint8_t c = temp < x[0];
-    z[0] = temp;
-
-    temp = x[1] + static_cast<uint32_t>(ui >> 32) + c;
-    c = temp < x[1];
-    z[1] = temp;
+    asm("add.cc.u32 %0, %1, %2;" : "=r"(z[0]) : "r"(x[0]), "r"((uint32_t)ui));
+    asm("addc.cc.u32 %0, %1, %2;" : "=r"(z[1]) : "r"(x[1]), "r"((uint32_t)(ui >> 32)));
 
     #pragma unroll
-    for(uint8_t i = 2; i < WORD_MAX; ++i)
-    {
-        temp = x[i] + c;
-        c = (temp < x[i]);
-        z[i] = temp;
-    }
+    for(uint8_t i = 2; i < WORD_MAX-1; ++i)
+        asm("addc.cc.u32 %0, %1, 0;" : "=r"(z[i]) : "r"(x[i]));
+
+    asm("addc.u32 %0, %1, 0;" : "=r"(z[WORD_MAX-1]) : "r"(x[WORD_MAX-1]));
 }
 
 
@@ -148,34 +141,37 @@ void addmul_2(uint32_t *z, uint32_t *x, const uint32_t y)
     #pragma unroll
     for(uint8_t i = 1; i < WORD_MAX; ++i)
     {
-        prod = mad32(x[i], y, z[i] + (prod >> 32));// + z[i] + (prod >> 32);
+        prod = mad32(x[i], y, z[i] + (prod >> 32));
         z[i-1] = prod; //set the low word
     }
 
     prod = z[WORD_MAX] + (prod >> 32);
     z[WORD_MAX - 1] = prod;
     z[WORD_MAX] = z[WORD_MAX+1] + (prod >> 32);
-
 }
-
 
 
 __device__ __forceinline__
 void mulredc(uint32_t *z, uint32_t *x, uint32_t *y, uint32_t *n, const uint32_t d, uint32_t *t)
 {
+    //clear
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX + 2; ++i)
         t[i] ^= t[i];
 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
+        //multiply
         addmul_1(t, x, y[i]);
 
+        //reduce
         addmul_2(t, n, t[0]*d);
     }
 
-    if(cmp_ge_n(t, n))
-        sub_n(t, t, n);
+    /* Relax the rules for a corrective step by allowing numbers
+       from 0-(P-1) to exist instead with 0-(P-2)
+      if(cmp_ge_n(t, n))
+          sub_n(t, t, n); */
 
     assign(z, t);
 }
@@ -189,12 +185,15 @@ void redc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
 
     for(uint8_t i = 0; i < WORD_MAX; ++i)
     {
+        //reduce
         addmul_2(t, n, t[0]*d);
         t[WORD_MAX] ^= t[WORD_MAX];
     }
 
-    if(cmp_ge_n(t, n))
-        sub_n(t, t, n);
+    /* Relax the rules for a corrective step by allowing numbers
+       from 0-(P-1) to exist instead with 0-(P-2)
+      if(cmp_ge_n(t, n))
+          sub_n(t, t, n); */
 
     assign(z, t);
 }
@@ -215,27 +214,6 @@ uint16_t bit_count(uint32_t *x)
 
 
 __device__ __forceinline__
-void lshift(uint32_t *r, uint32_t *a, uint16_t shift)
-{
-    uint16_t k = shift >> 5;
-    uint16_t i;
-
-    shift = shift & 31;
-
-    for(i = 0; i < k; ++i)
-        r[i] ^= r[i];
-
-    for(i = k; i < WORD_MAX; ++i)
-        r[i] = a[i - k];
-
-    for(i = WORD_MAX - 1; i > k; --i)
-        asm("shf.l.wrap.b32 %0, %1, %2, %3;" : "=r"(r[i]) : "r"(r[i-1]), "r"(r[i]), "r"((uint32_t)shift));
-
-    asm("shl.b32 %0, %1, %2;" : "=r"(r[k]) : "r"(r[k]), "r"((uint32_t)shift));
-}
-
-
-__device__ __forceinline__
 void lshift1(uint32_t *r, uint32_t *a)
 {
     #pragma unroll
@@ -243,6 +221,16 @@ void lshift1(uint32_t *r, uint32_t *a)
         asm("shf.l.wrap.b32 %0, %1, %2, 1;" : "=r"(r[i]) : "r"(a[i-1]), "r"(a[i]));
 
     asm("shl.b32 %0, %1, 1;" : "=r"(r[0]) : "r"(a[0]));
+}
+
+__device__ __forceinline__
+void lshift1(uint32_t *r, uint32_t *a, uint32_t amount)
+{
+    #pragma unroll
+    for(uint8_t i = WORD_MAX - 1; i > 0; --i)
+        asm("shf.l.wrap.b32 %0, %1, %2, %3;" : "=r"(r[i]) : "r"(a[i-1]), "r"(a[i]), "r"(amount));
+
+    asm("shl.b32 %0, %1, %2;" : "=r"(r[0]) : "r"(a[0]), "r"(amount));
 }
 
 
@@ -258,36 +246,22 @@ void rshift1(uint32_t *r, uint32_t *a)
 
 
 __device__ __forceinline__
-void sqrredc(uint32_t *z, uint32_t *x, uint32_t *n, const uint32_t d, uint32_t *t)
+void store(uint32_t *a, uint32_t *table, uint32_t w)
 {
-
     #pragma unroll
-    for(uint8_t i = 0; i < WORD_MAX + 2; ++i)
-        t[i] ^= t[i];
-
     for(uint8_t i = 0; i < WORD_MAX; ++i)
-    {
-        uint64_t prod = 0;
-        #pragma unroll
-        for(uint8_t j = i; j < WORD_MAX; ++j)
-        {
-            prod = mad32(x[j], x[i], t[j] + (prod >> 32));
-
-            t[j] = prod; //set the low word
-        }
-        t[WORD_MAX] += (prod >> 32);
-
-        lshift1(t, t);
-
-
-        addmul_2(t, n, t[0]*d);
-    }
-
-    if(cmp_ge_n(t, n))
-        sub_n(t, t, n);
-
-    assign(z, t);
+        table[i * WORD_MAX + w] = a[i];
 }
+
+
+__device__ __forceinline__
+void load(uint32_t *a, uint32_t *table, uint32_t w)
+{
+    #pragma unroll
+    for(uint8_t i = 0; i < WORD_MAX; ++i)
+        a[i] = table[i * WORD_MAX + w];
+}
+
 
 
 /* Calculate ABar and BBar for Montgomery Modular Multiplication. */
@@ -296,7 +270,7 @@ void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
 {
     assign_zero(a);
 
-    lshift(t, n, (WORD_MAX<<5) - bit_count(n));
+    lshift1(t, n, __clz(n[WORD_MAX-1]));
     sub_n(a, a, t);
 
     while(cmp_ge_n(a, n))  //calculate R mod N;
@@ -316,10 +290,11 @@ void calcBar(uint32_t *a, uint32_t *n, uint32_t *t)
 {
     assign_zero(a);
 
-    lshift(t, n, (WORD_MAX<<5) - bit_count(n));
+    uint32_t bits = __clz(n[WORD_MAX-1]);
+    lshift1(t, n, bits);
     sub_n(a, a, t);
 
-    while(cmp_ge_n(a, n))  //calculate R mod N;
+    for(uint32_t i = 0; i < bits; ++i)  //calculate R mod N;
     {
         rshift1(t, t);
         if(cmp_ge_n(a, t))
@@ -336,7 +311,8 @@ void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
     if(cmp_ge_n(t, n))
         sub_n(t, t, n);
 
-    assign(&table[WORD_MAX], t);
+    //assign(&table[WORD_MAX], t);
+    store(t, table, 1);
 
 
     for(uint16_t i = 2; i < WINDOW_SIZE; ++i) //calculate 2^i R mod N
@@ -345,14 +321,17 @@ void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
         if(cmp_ge_n(t, n))
             sub_n(t, t, n);
 
-        assign(&table[i * WORD_MAX], t);
+        //assign(&table[i * WORD_MAX], t);
+        store(t, table, i);
     }
 }
 
 
+
+
 /* Calculate X = 2^Exp Mod N (Fermat test) */
 __device__ __forceinline__
-void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
+void pow2m(uint32_t *X, uint32_t *A, uint32_t *Exp, uint32_t *N, uint32_t *table)
 {
     uint32_t t[WORD_MAX + 2];
     uint32_t wval = 1;
@@ -385,7 +364,10 @@ void pow2m(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
 
         if(((i % WINDOW_BITS) == 0) && wval)
         {
-            mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
+            //assign(A, &table[wval * WORD_MAX]);
+            load(A, table, wval);
+            //mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
+            mulredc(X, X, A, N, d, t);
             wval ^= wval;
         }
     }
@@ -430,14 +412,17 @@ void pow2m(uint32_t *X, uint32_t *N)
 
 /* Test if number p passes Fermat Primality Test base 2. */
 __device__ __forceinline__
-bool fermat_prime(uint32_t *p, uint32_t *table)
+bool fermat_prime(uint32_t *p, uint32_t *a, uint32_t *table)
 {
     uint32_t e[WORD_MAX];
     uint32_t r[WORD_MAX];
 
     sub_ui(e, p, 1);
     //pow2m(r, e, p);
-    pow2m(r, e, p, table);
+    pow2m(r, a, e, p, table);
+
+    if(cmp_ge_n(r, p))
+        sub_n(r, r, p);
 
     uint32_t result = r[0] - 1;
 

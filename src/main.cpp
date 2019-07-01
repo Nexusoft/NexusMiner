@@ -101,17 +101,22 @@ int main(int argc, char **argv)
     /* If there are any prime workers at all, load primes. */
     if(nPrimeGPU || nPrimeCPU)
     {
-        /* Load in GPU config files for prime mining. */
-        prime::load_config(nPrimeGPU);
+
 
         if(!prime::load_offsets())
             return 0;
 
+            /* Initialize primes used for prime mining. */
+            LLC::InitializePrimes();
+
+
+            /* Load in GPU config files for prime mining. */
+            prime::load_config(nPrimeGPU);
+
         if(!prime::load_origins())
             return 0;
 
-        /* Initialize primes used for prime mining. */
-        LLC::InitializePrimes();
+
     }
 
     /* Initialize the miner. */
