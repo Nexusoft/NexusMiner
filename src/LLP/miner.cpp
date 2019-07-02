@@ -194,59 +194,6 @@ namespace LLP
         WritePacket(REQUEST);
     }
 
-    TAO::Ledger::Block Miner::GetBlock(uint32_t nChannel)
-    {
-        std::unique_lock<std::mutex> lk(mut);
-
-        /* Send LLP messages to obtain a new block. */
-        TAO::Ledger::Block block = get_block(nChannel);
-
-        /* Print a debug log message for this block. */
-        uint1024_t hashProof = block.ProofHash();
-        debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[block.nChannel], " Block ",
-            hashProof.SubString());
-
-        return block;
-    }
-
-
-    bool Miner::GetBlocks()
-    {
-        /* Verbose output the number of blocks requested. */
-        uint32_t count = static_cast<uint32_t>(vSubscribed.size());
-        debug::log(2, "");
-        debug::log(2, FUNCTION, "Requesting ", count, " new Block", count > 1 ? "s." : ".");
-
-        /* Lock all the blocks so miners can't submit stale blocks. */
-        std::unique_lock<std::mutex> lk(mut);
-
-        /* Get a block for each worker. */
-        for(const auto& worker : vSubscribed)
-        {
-            uint32_t nChannel = worker->Channel();
-
-            /* Send LLP messages to obtain a new block. */
-            TAO::Ledger::Block block = get_block(nChannel);
-
-            if(block.IsNull())
-                return debug::error(FUNCTION, "Failed to get a block");
-
-            /* Print a debug log message for this block. */
-            uint1024_t hashProof = block.ProofHash();
-            debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[nChannel], " Block ",
-                hashProof.SubString());
-
-            /* Set the newly created block for this worker. */
-            worker->SetBlock(block);
-        }
-
-        /* Tell the workers to restart it's work. */
-        for(const auto& worker : vWorkers)
-            worker->Reset();
-
-        return true;
-    }
-
 
     uint32_t Miner::GetHeight()
     {
@@ -409,9 +356,113 @@ namespace LLP
     }
 
 
+    TAO::Ledger::Block Miner::GetBlock(uint32_t nChannel)
+    {
+        std::unique_lock<std::mutex> lk(mut);
+
+        /* Send LLP messages to obtain a new block. */
+        TAO::Ledger::Block block = get_block(nChannel);
+
+        /* Print a debug log message for this block. */
+        uint1024_t hashProof = block.ProofHash();
+        debug::log(2, FUNCTION, hashProof.BitCount(), "-Bit ", std::setw(5), ChannelName[block.nChannel], " Block ",
+            hashProof.SubString());
+
+        return block;
+    }
+
+
+    /* Get your current balance in NXS that has not been included in a payout. */
+    void Miner::GetBalance()
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = POOL::GET_BALANCE;
+        WritePacket(REQUEST);
+    }
+
+
+    /* Get the Current Pending Payouts for the Next Coinbase Tx. */
+    void Miner::GetPayouts()
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = POOL::GET_PAYOUT;
+        WritePacket(REQUEST);
+    }
+
+
+    /* Ping the Pool Server to let it know Connection is Still Alive. */
+    void Miner::Ping()
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = PING;
+        WritePacket(REQUEST);
+    }
+
+
+    /* Send current PPS / WPS data to the pool */
+    void Miner::SubmitPPS(double PPS, double WPS)
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = POOL::SUBMIT_STATS;
+
+        std::vector<uint8_t> vPPSBytes = convert::uint2bytes64(static_cast<uint64_t>(PPS));
+        std::vector<uint8_t> vWPSBytes = convert::uint2bytes64(static_cast<uint64_t>(WPS));
+
+        /* Add PPS */
+        REQUEST.DATA.insert(REQUEST.DATA.end(), vPPSBytes.begin(), vPPSBytes.end());
+
+        /* Add WPS */
+        REQUEST.DATA.insert(REQUEST.DATA.end(), vWPSBytes.begin(), vWPSBytes.end());
+
+        /* Set the length. */
+        REQUEST.LENGTH = REQUEST.DATA.size();
+
+        WritePacket(REQUEST);
+    }
+
+
+    /* Send your address for Pool Login. */
+    void Miner::Login(const std::string &addr)
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = POOL::LOGIN;
+        REQUEST.DATA   = std::vector<uint8_t>(addr.begin(), addr.end());
+        REQUEST.LENGTH = REQUEST.DATA.size();
+
+        debug::log(0, "[MASTER] Logged in With Address: ", addr);
+        WritePacket(REQUEST);
+    }
+
+
+    /* Submit a Share to the Pool Server. */
+    void Miner::SubmitShare(const uint1024_t& nPrimeOrigin, uint64_t nNonce)
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = POOL::SUBMIT_SHARE;
+        REQUEST.DATA = nPrimeOrigin.GetBytes();
+        std::vector<uint8_t> NONCE  = convert::uint2bytes64(nNonce);
+
+        REQUEST.DATA.insert(REQUEST.DATA.end(), NONCE.begin(), NONCE.end());
+        REQUEST.LENGTH = 136;
+
+        WritePacket(REQUEST);
+    }
+
+
+    /* Tell the mining pool how many blocks to subscribe to. */
+    void Miner::Subscribe(uint32_t nBlocks)
+    {
+        Packet REQUEST;
+        REQUEST.HEADER = SUBSCRIBE;
+        REQUEST.DATA = convert::uint2bytes(nBlocks);
+        REQUEST.LENGTH = 4;
+
+        WritePacket(REQUEST);
+    }
+
+
     void Miner::Reset()
     {
-
         fReset = true;
 
         if(fPause.load())
@@ -523,7 +574,6 @@ namespace LLP
             std::setfill('0'), std::setw(2), (SecondsElapsed / 3600) % 24, ":",
             std::setfill('0'), std::setw(2), (SecondsElapsed / 60) % 60, ":",
             std::setfill('0'), std::setw(2), (SecondsElapsed) % 60);
-
 
 
         debug::log(0, "");

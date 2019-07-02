@@ -35,6 +35,35 @@ ________________________________________________________________________________
 
 namespace LLP
 {
+
+    namespace POOL
+    {
+        enum
+        {
+            /** DATA PACKETS **/
+            LOGIN            = 0,
+            BLOCK_DATA       = 1,
+            SUBMIT_SHARE     = 2,
+            ACCOUNT_BALANCE  = 3,
+            PENDING_PAYOUT   = 4,
+            SUBMIT_STATS     = 5,
+
+            /** REQUEST PACKETS **/
+            GET_BLOCK    = 129,
+            NEW_BLOCK    = 130,
+            GET_BALANCE  = 131,
+            GET_PAYOUT   = 132,
+
+
+            /** RESPONSE PACKETS **/
+            ACCEPT     = 200,
+            REJECT     = 201,
+            BLOCK      = 202,
+            STALE      = 203,
+        };
+    }
+
+
     enum
     {
         /** DATA PACKETS **/
@@ -65,31 +94,64 @@ namespace LLP
 
 
         /** RESPONSE PACKETS **/
-        BLOCK_ACCEPTED       = 200,
-        BLOCK_REJECTED       = 201,
+        BLOCK_ACCEPTED  = 200,
+        BLOCK_REJECTED  = 201,
 
 
         /** VALIDATION RESPONSES **/
         COINBASE_SET  = 202,
         COINBASE_FAIL = 203,
 
+
         /** ROUND VALIDATIONS. **/
         NEW_ROUND     = 204,
         OLD_ROUND     = 205,
+
 
         /** GENERIC **/
         PING     = 253,
         CLOSE    = 254
     };
 
+
+    /** Miner
+     *
+     *
+     *
+     **/
     class Miner : public Outbound
     {
     public:
+
+        /** Default constructor. **/
         Miner(const std::string &ip, uint16_t port, uint16_t timeout);
+
+
+        /** Default destructor. **/
         virtual ~Miner();
 
+
+        /** Thread
+         *
+         *
+         *
+         **/
         void Thread();
+
+
+        /** Notify
+         *
+         *
+         *
+         **/
         void Notify();
+
+
+        /** Wait
+         *
+         *
+         *
+         **/
         void Wait();
 
 
@@ -117,27 +179,151 @@ namespace LLP
                 vSubscribed.push_back(pWorker);
         }
 
+
+        /** Start
+         *
+         *
+         *
+         **/
         void Start();
+
+
+        /** Stop
+         *
+         *
+         *
+         **/
         void Stop();
 
+
+        /** SubmitBlock
+         *
+         *
+         *
+         **/
         void SubmitBlock(const TAO::Ledger::Block &block);
+
+
+        /** GetBlock
+         *
+         *
+         *
+         **/
         TAO::Ledger::Block GetBlock(uint32_t nChannel);
+
+
+        /** GetBalance
+         *
+         *  Get your current balance in NXS that has not been included in a payout.
+         *
+         **/
+        void GetBalance();
+
+
+        /** GetPayouts
+         *
+         *  Get the current pending payouts for the next coinbase tx.
+         *
+         **/
+        void GetPayouts();
+
+
+        /** Ping
+         *
+         *  Ping the Pool Server to let it know connection is still alive.
+         *
+         **/
+        void Ping();
+
+
+        /** SubmitPPS
+         *
+         *  Send current PPS / WPS data to the pool
+         *
+         **/
+        void SubmitPPS(double PPS, double WPS);
+
+
+        /** Login
+         *
+         *  Send your address for Pool Login.
+         *
+         **/
+        void Login(const std::string &addr);
+
+
+        /** SubmitShare
+         *
+         *  Submit a Share to the Pool Server.
+         *
+         **/
+        void SubmitShare(const uint1024_t& nPrimeOrigin, uint64_t nNonce);
+
+
+        /** Subscribe
+         *
+         *  Tell the mining pool how many blocks to subscribe to.
+         *
+         **/
+        void Subscribe(uint32_t nBlocks);
+
 
     private:
 
+        /** CheckSubmit
+         *
+         *
+         *
+         **/
         void CheckSubmit();
 
+
+        /** Pause
+         *
+         *
+         *
+         **/
         void Pause();
+
+
+        /** SetChannel
+         *
+         *
+         *
+         **/
         void SetChannel(uint32_t nChannel);
 
 
-        bool GetBlocks();
+        /** GetHeight
+         *
+         *
+         *
+         **/
         uint32_t GetHeight();
+
+
+        /** Reset
+         *
+         *
+         *
+         **/
         void Reset();
+
+
+        /** PrintStats
+         *
+         *
+         *
+         **/
         void PrintStats();
 
     private:
 
+        /** get_block
+         *
+         *
+         *
+         **/
         TAO::Ledger::Block get_block(uint32_t nChannel);
 
         std::vector<Worker *> vWorkers;
