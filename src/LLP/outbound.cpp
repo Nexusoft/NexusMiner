@@ -30,9 +30,7 @@ namespace LLP
 
     bool Outbound::Connect()
     {
-        ((BaseConnection<Packet> *)this)->Connect(addrOut);
-
-        if(Errors() || Timeout(nTimeout))
+        if(!((BaseConnection<Packet> *)this)->Connect(addrOut) || Timeout(nTimeout))
         {
             Disconnect();
             return debug::error("Failed to Connect to LLP Server");

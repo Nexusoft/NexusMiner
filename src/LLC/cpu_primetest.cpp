@@ -35,7 +35,7 @@ namespace LLC
             debug::log(0, "");
             debug::log(0, "[PRIMES] ",
                 color, (int)chain_length, "-Chain Found: ",
-                std::fixed, std::setprecision(7),(double)sieve_difficulty / 1e7,
+                std::fixed, std::setprecision(7), (double)sieve_difficulty / 1e7,
                 KNRM,
                 "  Nonce: ", std::hex, std::uppercase, std::setfill('0'), std::setw(16), nonce,
                 std::dec, " ", cuda_devicename(thr_id), "[", (uint32_t)thr_id, "]");

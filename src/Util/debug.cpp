@@ -50,7 +50,7 @@ ________________________________________________________________________________
 
 namespace debug
 {
-    /* Mutex to lock DEBUG and prevent race conditions. */
+    /* Mutex to lock debug and prevent race conditions. */
     std::mutex DEBUG_MUTEX;
 
     /* Main file object for debug logging. */

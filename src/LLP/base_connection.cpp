@@ -144,16 +144,13 @@ namespace LLP
 
         std::string connectStr = addrConnect.ToStringIP();
 
-        /* Check for connect to self */
-        //if(addr.ToStringIP() == connectStr)
-        //    return debug::error(NODE, "cannot self-connect");
 
-        debug::log(1, NODE, "Connecting to ", connectStr);
+        debug::log(3, NODE, "Connecting to ", connectStr);
 
         // Connect
-        if (Attempt(addrConnect))
+        if(Attempt(addrConnect))
         {
-            debug::log(1, NODE, "Connected to ", connectStr);
+            debug::log(3, NODE, "Connected to ", connectStr);
 
             fCONNECTED = true;
             fOUTGOING = true;
@@ -168,11 +165,8 @@ namespace LLP
     template <class PacketType>
     void BaseConnection<PacketType>::Disconnect()
     {
-        if(fCONNECTED.load())
-        {
-            Close();
-            fCONNECTED = false;
-        }
+        Close();
+        fCONNECTED = false;
     }
 
 

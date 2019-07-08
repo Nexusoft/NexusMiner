@@ -15,3 +15,4 @@
 #define OFFSETS_MAX 24
 #define WINDOW_BITS 5
 #define WINDOW_SIZE (1 << WINDOW_BITS)
+#define WINDOW_SIZE_DIV2 (1 << (WINDOW_BITS - 1))

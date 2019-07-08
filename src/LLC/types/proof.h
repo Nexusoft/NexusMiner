@@ -65,6 +65,10 @@ namespace LLC
         {
             std::unique_lock<std::mutex> lk(MUTEX);
             block = block_;
+
+            /* If the block is set to null, update the reset flag. */
+            if(block.IsNull())
+                Reset();
         }
 
 
@@ -78,8 +82,6 @@ namespace LLC
             std::unique_lock<std::mutex> lk(MUTEX);
             return block;
         }
-
-
 
 
         /** Work

@@ -115,7 +115,12 @@ namespace LLP
             if (!fStop.load() && !Connected())
             {
                 if (!Connect())
+                {
+                    /* Sleep an additional 4 seconds if reconnect attempt fails. */
+                    runtime::sleep(4000);
                     continue;
+                }
+
 
                 /* After connection has been reestablished, reset the miner. */
                 Reset();
@@ -168,9 +173,6 @@ namespace LLP
             /* Get blocks for workers if reset. */
             if(fReset.load() && !fStop.load())
             {
-                //if(!GetBlocks())
-                //  continue;
-
                 /* Tell the workers to restart it's work. */
                 for(const auto& worker : vWorkers)
                     worker->Reset();
@@ -362,6 +364,15 @@ namespace LLP
 
         /* Send LLP messages to obtain a new block. */
         TAO::Ledger::Block block = get_block(nChannel);
+
+        /* Check to see if the block was recieved properly. */
+        if(block.IsNull())
+        {
+            Pause();
+            debug::log(2, FUNCTION, "Null Block");
+            return block;
+        }
+
 
         /* Print a debug log message for this block. */
         uint1024_t hashProof = block.ProofHash();
@@ -589,7 +600,7 @@ namespace LLP
 
             debug::log(0, "[HASHES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), nMHPerSecond, " MH/s",
             " | Diff = ", std::setw(9), nHashDifficulty,
-            " | Block(s) A=", std::setw(2), nAccepted[1].load(), " R=", std::setw(2), nRejected[1].load(),
+            " | Blocks A=", std::setw(2), nAccepted[1].load(), " R=", std::setw(2), nRejected[1].load(),
             " | ", strTime);
         }
 
@@ -625,9 +636,9 @@ namespace LLP
             double WPS = 1.0 * std::accumulate(LLC::vWPSValues.begin(), LLC::vWPSValues.end(), 0.0) / LLC::vWPSValues.size();
 
 
-            debug::log(0, "[PRIMES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), WPS, " WP/s",
+            debug::log(0, "[PRIMES] Largest ", std::fixed, std::setprecision(7), (double)LLC::nLargest.load() / 1e7,
             " | Diff = ", std::setw(9), std::setprecision(7), nPrimeDifficulty,
-            " | Block(s) A=", std::setw(2), nAccepted[0].load(), " R=", std::setw(2), nRejected[0].load(),
+            " | Blocks A=", std::setw(2), nAccepted[0].load(), " R=", std::setw(2), nRejected[0].load(),
             " | ", strTime);
 
             std::string stats;
@@ -668,34 +679,33 @@ namespace LLP
             debug::log(1, stats);
             debug::log(1, "-----------------------------------------------------------------------------------------------");
 
-            debug::log(0, "[PRIMES] ", "Sieved ", std::fixed, std::setprecision(2), (double)gibps / (1 << 30), " GiB/s | Tested ",
-                tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), ratio, " %");
+            debug::log(0, "[PRIMES] ", std::setw(9), std::left, std::fixed, std::setprecision(3), WPS, " WP/s",
+            " | ", std::fixed, std::setprecision(2), (double)gibps / (1 << 30), " GiB/s",
+            " | ", tps_gpu, " T/s GPU, ", tps_cpu, " T/s CPU | Ratio: ", std::setprecision(3), ratio, " %");
             debug::log(0, "");
 
 
+
             /* Calculate and print the prime pattern offset ratios. */
-            debug::log(1, "[PRIMES] Offset Ratios: ");
-            for(uint16_t i = 0; i < vOffsets.size(); ++i)
-            {
-                found = LLC::PrimesFound[i].load();
-                checked = LLC::PrimesChecked[i].load();
+            //debug::log(1, "[PRIMES] Offset Ratios: ");
+            //for(uint16_t i = 0; i < vOffsets.size(); ++i)
+            //{
+            //    found = LLC::PrimesFound[i].load();
+            //    checked = LLC::PrimesChecked[i].load();
 
                 /* Check for divide by zero. */
-                if(checked)
-                {
-                    ratio = (double)(100 * found) / checked;
+            //    if(checked)
+            //    {
+            //        ratio = (double)(100 * found) / checked;
 
-                    LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
-                    LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
-                }
+            //        LLC::minRatios[i] = std::min(LLC::minRatios[i], ratio);
+            //        LLC::maxRatios[i] = std::max(LLC::maxRatios[i], ratio);
+            //    }
 
-                debug::log(1, std::setw(2), std::right, i, ": ",
-                              std::setw(2), std::right, vOffsets[i], " = ",
-                              std::setprecision(3), std::fixed, "[", LLC::minRatios[i], "-", LLC::maxRatios[i],  "]", "%  ");
-            }
-
-
-            /* TODO: stick this at the end: LLC::nLargest.load() / 10000000.0, */
+            //    debug::log(1, std::setw(2), std::right, i, ": ",
+            //                  std::setw(2), std::right, vOffsets[i], " = ",
+            //                  std::setprecision(3), std::fixed, "[", LLC::minRatios[i], "-", LLC::maxRatios[i],  "]", "%  ");
+            //}
 
         }
     }
@@ -718,6 +728,7 @@ namespace LLP
         if(RESPONSE.IsNull())
         {
             debug::error(FUNCTION, " invalid block response.");
+            block.SetNull();
             return block;
         }
 

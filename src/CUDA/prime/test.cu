@@ -58,8 +58,8 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
                                      uint32_t nOffsets)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
-    //if(c_quit)
-    //    return;
+    if(c_quit)
+        return;
 
     /* Compute the global index for this nonce offset. */
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -98,10 +98,9 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
                               uint32_t nTestOffsets,
                               uint32_t nOffsets)
 {
-    ///* If the quit flag was set, early return to avoid wasting time. */
-    //if(c_quit)
-    //    return;
-    extern __shared__ uint32_t A[];
+    /* If the quit flag was set, early return to avoid wasting time. */
+    if(c_quit)
+        return;
 
     /* Compute the global index for this nonce offset. */
     uint32_t position = blockIdx.x * blockDim.x + threadIdx.x;
@@ -111,9 +110,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
     if(idx < *nonce_count)
     {
         uint32_t p[WORD_MAX];
-
-        uint32_t o = position % nTestOffsets;
-        uint32_t test_index = c_iT[o];
+        uint32_t test_index = c_iT[position % nTestOffsets];
 
         /* Compute the primorial offset from the primorial and
          * offset pattern (i.e (293257 + 510510*n) + [0,4,6,10] ).
@@ -121,7 +118,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         add_ui(p, c_zBaseOrigin, nonce_offsets[idx] + (uint64_t)c_offsets[test_index]);
 
         /* Check if prime passes fermat test base 2. */
-        uint8_t prime = fermat_prime(p, &A[WORD_MAX * threadIdx.x], &window_data[position * WINDOW_SIZE * WORD_MAX]);
+        uint32_t prime = fermat_prime(p, &window_data[position * WINDOW_SIZE * WORD_MAX]);
 
         /* Increment primes found. */
         atomicAdd(&g_primes_found[test_index], prime);
@@ -204,7 +201,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     dim3 block(threadsPerBlock);
     dim3 grid((nThreads + (block.x * vOffsetsT.size()) - 1) / (block.x / vOffsetsT.size()));
 
-    uint32_t sharedSizeBytes = threadsPerBlock * WORD_MAX * sizeof(uint32_t);
+    uint32_t sharedSizeBytes = 0;//threadsPerBlock * WORD_MAX * sizeof(uint32_t);
 
     /* Launcth the fermat testing kernel. */
     fermat_kernel<<<grid, block, sharedSizeBytes, d_Streams[thr_id][STREAM::FERMAT]>>>(

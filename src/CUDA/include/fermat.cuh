@@ -29,15 +29,21 @@ void assign_zero(uint32_t *l)
 
 
 __device__ __forceinline__
-int inv2adic(uint32_t x)
+uint32_t inv2adic(uint32_t x)
 {
     uint32_t a;
     a = x;
-    x = (((x+2)&4)<<1)+x;
-    x *= 2 - a*x;
-    x *= 2 - a*x;
-    x *= 2 - a*x;
-    return -x;
+    //x = (((x+2)&4)<<1)+x;
+    //x *= 2 - a*x;
+    //x *= 2 - a*x;
+    //x *= 2 - a*x;
+    //return -x;
+
+    a=a*(a*x+14);
+    a=a*(a*x+2);
+    a=a*(a*x+2);
+    a=a*(a*x+2);
+    return a;
 }
 
 __device__ __forceinline__
@@ -212,6 +218,12 @@ uint16_t bit_count(uint32_t *x)
     return 1; //any number will have at least 1-bit
 }
 
+__device__ __forceinline__
+bool is_bit_set(uint32_t *x, uint32_t i)
+{
+    return (x[i >> 5] & (1 << (i & 31)));
+}
+
 
 __device__ __forceinline__
 void lshift1(uint32_t *r, uint32_t *a)
@@ -263,30 +275,50 @@ void load(uint32_t *a, uint32_t *table, uint32_t w)
 }
 
 
-
-/* Calculate ABar and BBar for Montgomery Modular Multiplication. */
+/* Calculate ABar for Montgomery Modular Multiplication.
+ * Calculate The window table used for fixed window exponentiation. */
 __device__ __forceinline__
-void calcBar(uint32_t *a, uint32_t *b, uint32_t *n, uint32_t *t)
+void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t d, uint32_t *t, uint32_t *table)
 {
     assign_zero(a);
+    //sub_n(a, a, n);
 
-    lshift1(t, n, __clz(n[WORD_MAX-1]));
+    uint32_t bits = __clz(n[WORD_MAX-1]);
+    lshift1(t, n, bits);
     sub_n(a, a, t);
 
-    while(cmp_ge_n(a, n))  //calculate R mod N;
+    for(uint32_t i = 0; i < bits; ++i)  //calculate R mod N;
     {
         rshift1(t, t);
         if(cmp_ge_n(a, t))
             sub_n(a, a, t);
     }
 
-    lshift1(b, a);     //calculate 2R mod N;
-    if(cmp_ge_n(b, n))
-        sub_n(b, b, n);
+
+    //mulredc(t, a, a, n, d, t);
+
+    lshift1(t, a);      //calculate 2R mod N;
+    if(cmp_ge_n(t, n))
+        sub_n(t, t, n);
+
+    store(t, table, 1);
+
+
+    for(uint16_t i = 2; i < WINDOW_SIZE; ++i) //calculate 2^i R mod N
+    {
+        lshift1(t, t);
+        if(cmp_ge_n(t, n))
+            sub_n(t, t, n);
+
+        store(t, table, i);
+    }
 }
 
+
+/* Calculate ABar for Montgomery Modular Multiplication.
+ * Calculate The window table used for fixed window exponentiation. */
 __device__ __forceinline__
-void calcBar(uint32_t *a, uint32_t *n, uint32_t *t)
+void calcWindowTableOdd(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
 {
     assign_zero(a);
 
@@ -301,18 +333,11 @@ void calcBar(uint32_t *a, uint32_t *n, uint32_t *t)
             sub_n(a, a, t);
     }
 
-}
-
-/* Calculate The window table used for fixed window exponentiation. */
-__device__ __forceinline__
-void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
-{
     lshift1(t, a);     //calculate 2R mod N;
     if(cmp_ge_n(t, n))
         sub_n(t, t, n);
 
-    //assign(&table[WORD_MAX], t);
-    store(t, table, 1);
+    store(t, table, 0); //store 2R mod N
 
 
     for(uint16_t i = 2; i < WINDOW_SIZE; ++i) //calculate 2^i R mod N
@@ -321,8 +346,8 @@ void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
         if(cmp_ge_n(t, n))
             sub_n(t, t, n);
 
-        //assign(&table[i * WORD_MAX], t);
-        store(t, table, i);
+        if(i & 1)
+            store(t, table, i >> 1); //store 2^i R mod N for odd numbers.
     }
 }
 
@@ -331,24 +356,24 @@ void calcWindowTable(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
 
 /* Calculate X = 2^Exp Mod N (Fermat test) */
 __device__ __forceinline__
-void pow2m(uint32_t *X, uint32_t *A, uint32_t *Exp, uint32_t *N, uint32_t *table)
+void pow2m_fwe(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
 {
+    uint32_t A[WORD_MAX];
     uint32_t t[WORD_MAX + 2];
     uint32_t wval = 1;
     uint32_t d = inv2adic(N[0]);
 
-    calcBar(X, N, t);
+    /* Precompute X and window table in Montgomery space. */
+    calcWindowTable(X, N, d, t, table);
 
-    calcWindowTable(X, N, t, table);
-
+    /* Get the starting bit index. */
     int32_t i = bit_count(Exp) - 1;
 
-    if(Exp[i>>5] & (1 << (i & 31)))
-        wval |= 1;
-
-    if(((i % WINDOW_BITS) == 0) && wval)
+    /* Check for fixed window alignment. */
+    if((i % WINDOW_BITS) == 0)
     {
-        mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
+        load(A, table, wval);
+        mulredc(X, X, A, N, d, t);
         wval ^= wval;
     }
 
@@ -359,70 +384,144 @@ void pow2m(uint32_t *X, uint32_t *A, uint32_t *Exp, uint32_t *N, uint32_t *table
 
         wval <<= 1;
 
-        if(Exp[i>>5] & (1 << (i & 31)))
+        if(is_bit_set(Exp, i))
             wval |= 1;
 
+        /* Check for fixed window alignment. */
         if(((i % WINDOW_BITS) == 0) && wval)
         {
-            //assign(A, &table[wval * WORD_MAX]);
             load(A, table, wval);
-            //mulredc(X, X, &table[wval * WORD_MAX], N, d, t);
             mulredc(X, X, A, N, d, t);
             wval ^= wval;
         }
     }
 
+    /* Final reduction into normalized space. */
     redc(X, X, N, d, t);
+
+    /* Final corrective step. */
+    if(cmp_ge_n(X, N))
+        sub_n(X, X, N);
+
 }
 
 
-/* Calculate X = 2^(N-1) Mod N (Fermat test, assume no overflow) */
+/* Calculate X = 2^Exp Mod N (Fermat test) */
 __device__ __forceinline__
-void pow2m(uint32_t *X, uint32_t *N)
+void pow2m_swe(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
 {
     uint32_t A[WORD_MAX];
     uint32_t t[WORD_MAX + 2];
-
+    uint32_t wval = 0;
     uint32_t d = inv2adic(N[0]);
+    int32_t wstart = bit_count(Exp) - 1;
+    int32_t wend = 0;
+    int32_t i, j;
 
-    uint64_t N0 = make_uint64_t(N[0], N[1]) - 1;
+    calcWindowTableOdd(X, N, t, table);
 
-    calcBar(X, A, N, t);
-
-    for(int16_t i = bit_count(N)-1; i >= 64; --i)
+    for(;;)
     {
-        mulredc(X, X, X, N, d, t);
+        if(wstart == 0)
+            break;
 
-        if(N[i>>5] & (1 << (i & 31)))
-            mulredc(X, X, A, N, d, t);
+        if(is_bit_set(Exp, wstart))
+            break;
+
+            --wstart;
     }
 
-    for(int16_t i = 63; i >= 0; --i)
-    {
-        mulredc(X, X, X, N, d, t);
 
-        if(N0 & ((uint64_t)1 << (i & 63)))
-            mulredc(X, X, A, N, d, t);
+    j = wstart;
+    wval = 1;
+    wend = 0;
+
+    for(i = 1; i < WINDOW_BITS; ++i)
+    {
+        if(is_bit_set(Exp, wstart - i))
+        {
+            wval <<= (i - wend);
+            wval |= 1;
+            wend = i;
+        }
+    }
+
+    j = wend + 1;
+
+
+    load(A, table, wval >> 1);
+    mulredc(X, X, A, N, d, t);
+
+
+    wstart -= wend + 1;
+    wval = 0;
+
+    for(;;)
+    {
+        if(is_bit_set(Exp, wstart) == 0)
+        {
+            mulredc(X, X, X, N, d, t);
+            //sqrredc(X, X, N, d, t);
+
+            if(wstart == 0)
+                break;
+            --wstart;
+            continue;
+        }
+
+        j = wstart;
+        wval = 1;
+        wend = 0;
+
+        for(i = 1; i < WINDOW_BITS; ++i)
+        {
+            if(wstart - i < 0)
+                break;
+
+            if(is_bit_set(Exp, wstart - i))
+            {
+                wval <<= (i - wend);
+                wval |= 1;
+                wend = i;
+            }
+        }
+
+        j = wend + 1;
+
+
+        for(i = 0; i < j; ++i)
+            mulredc(X, X, X, N, d, t);
+
+
+        load(A, table, wval >> 1);
+        mulredc(X, X, A, N, d, t);
+
+
+        wstart -= wend + 1;
+        wval = 0;
+        if(wstart < 0)
+            break;
+
     }
 
     redc(X, X, N, d, t);
-}
 
+    /* Final corrective step. */
+    if(cmp_ge_n(X, N))
+        sub_n(X, X, N);
+
+}
 
 
 /* Test if number p passes Fermat Primality Test base 2. */
 __device__ __forceinline__
-bool fermat_prime(uint32_t *p, uint32_t *a, uint32_t *table)
+uint32_t fermat_prime(uint32_t *p, uint32_t *table)
 {
     uint32_t e[WORD_MAX];
     uint32_t r[WORD_MAX];
 
     sub_ui(e, p, 1);
-    //pow2m(r, e, p);
-    pow2m(r, a, e, p, table);
-
-    if(cmp_ge_n(r, p))
-        sub_n(r, r, p);
+    pow2m_fwe(r, e, p, table);
 
     uint32_t result = r[0] - 1;
 
@@ -430,7 +529,9 @@ bool fermat_prime(uint32_t *p, uint32_t *a, uint32_t *table)
     for(uint8_t i = 1; i < WORD_MAX; ++i)
         result |= r[i];
 
-    return (result == 0);
+    result = (result == 0 ? 1 : 0);
+
+    return result;
 }
 
 /* Add a Result to the buffer. */

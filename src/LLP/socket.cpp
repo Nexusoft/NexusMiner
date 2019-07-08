@@ -215,7 +215,7 @@ namespace LLP
                 /* If the connection attempt timed out with select. */
                 if (nRet == 0)
                 {
-                    debug::log(2, FUNCTION, "Connection timeout ", addrDest.ToString());
+                    debug::log(3, FUNCTION, "Connection timeout ", addrDest.ToString());
                     closesocket(nFile);
 
                     return false;
@@ -314,7 +314,7 @@ namespace LLP
         if (nRead < 0)
         {
             nError = WSAGetLastError();
-            debug::log(2, FUNCTION, "read failed ", addr.ToString(), " (", nError, " ", strerror(nError), ")");
+            debug::log(3, FUNCTION, "read failed ", addr.ToString(), " (", nError, " ", strerror(nError), ")");
 
             return nError;
         }
@@ -338,7 +338,7 @@ namespace LLP
         if (nRead < 0)
         {
             nError = WSAGetLastError();
-            debug::log(2, FUNCTION, "read failed ",  addr.ToString(), " (", nError, " ", strerror(nError), ")");
+            debug::log(3, FUNCTION, "read failed ",  addr.ToString(), " (", nError, " ", strerror(nError), ")");
 
             return nError;
         }
@@ -382,7 +382,7 @@ namespace LLP
         if(nSent < 0)
         {
             nError = WSAGetLastError();
-            debug::log(2, FUNCTION, "write failed ",  addr.ToString(), " (", nError, " ", strerror(nError), ")");
+            debug::log(3, FUNCTION, "write failed ",  addr.ToString(), " (", nError, " ", strerror(nError), ")");
 
             return nError;
         }
@@ -474,6 +474,8 @@ namespace LLP
     /*  Checks for any flags in the Error Handle. */
     bool Socket::Errors() const
     {
+        LOCK(DATA_MUTEX);
+        
         return error_code() != 0;
     }
 

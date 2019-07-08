@@ -43,10 +43,7 @@ namespace LLP
     Worker::~Worker()
     {
         Stop();
-
-        //if(pProof)
-        //    delete pProof;
-
+        
         /* Join the worker thread. */
         if(workerThread.joinable())
             workerThread.join();
@@ -74,7 +71,7 @@ namespace LLP
         {
             /* Wait for the block to be ready. */
 
-            if(fSubscribe)
+            if(fSubscribe && !fPause.load())
                 pProof->SetBlock(pMiner->GetBlock(Channel()));
 
             if(!fPause.load())
