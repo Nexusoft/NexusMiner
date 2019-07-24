@@ -25,14 +25,6 @@ ________________________________________________________________________________
 #include <gmp.h>
 #endif
 
-/* Forward declared. */
-namespace TAO
-{
-    namespace Ledger
-    {
-        class Block;
-    }
-}
 
 namespace LLC
 {
@@ -49,6 +41,7 @@ namespace LLC
 
         HashCUDA(uint32_t id);
         virtual ~HashCUDA();
+
 
         /** Channel
          *

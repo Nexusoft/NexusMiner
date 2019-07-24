@@ -55,7 +55,8 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
                                      uint32_t *g_result_meta,
                                      uint32_t *g_result_count,
                                      uint32_t nThreshold,
-                                     uint32_t nOffsets)
+                                     uint32_t nOffsets,
+                                     uint32_t nMaxCandidates)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
     if(c_quit)
@@ -83,7 +84,7 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
             //printf("%d: compact_fermat: nonce_meta=%08X, test_combo=%08X, count=%d\n", idx, nonce_meta, test_combo, nCount);
 
             add_result(g_result_offsets, g_result_meta, g_result_count,
-                       in_nonce_offsets[idx], nonce_meta, CANDIDATES_MAX);
+                       in_nonce_offsets[idx], nonce_meta, nMaxCandidates);
         }
     }
 }
@@ -123,12 +124,11 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         /* Increment primes found. */
         atomicAdd(&g_primes_found[test_index], prime);
 
-        /* Update the nonce combo. */
-        atomicOr(&nonce_meta[idx], prime << test_index);
-
         /* Increment primes checked. */
         atomicAdd(&g_primes_checked[test_index], 1);
 
+        /* Update the nonce combo. */
+        atomicOr(&nonce_meta[idx], prime << test_index);
     }
 }
 
@@ -136,7 +136,8 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
 extern "C" __host__ void cuda_fermat(uint32_t thr_id,
                                      uint32_t sieve_index,
                                      uint32_t test_index,
-                                     uint32_t nTestLevels)
+                                     uint32_t nTestLevels,
+                                     uint32_t nMaxCandidates)
 {
     uint32_t curr_sieve = sieve_index % FRAME_COUNT;
     uint32_t curr_test = test_index % FRAME_COUNT;
@@ -183,16 +184,16 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     if(nThreads == 0)
         return;
 
-    if(nThreads >= CANDIDATES_MAX)
+    if(nThreads >= nMaxCandidates)
     {
-        debug::error(FUNCTION, "CANDIDATES_MAX limit reached.");
+        debug::error(FUNCTION, "Max Candidates limit reached: ", nThreads, "/", nMaxCandidates);
         return;
     }
 
 
     debug::log(3, FUNCTION, (uint32_t)thr_id,
         ": nonce_count = ", nThreads,
-        " queue filled = ", (nThreads * 100.0) / CANDIDATES_MAX, "%");
+        " queue filled = ", (nThreads * 100.0) / nMaxCandidates, "%");
 
 
     /* Loop unroll up to 8 offsets for testing. */
@@ -226,7 +227,8 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         frameResources[thr_id].d_result_meta[curr_test],
         frameResources[thr_id].d_result_count[curr_test],
         nTestLevels,
-        vOffsets.size());
+        vOffsets.size(),
+        nMaxCandidates);
 
     /* Copy the result count. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_count[curr_test],
@@ -236,12 +238,12 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
     /* Copy the result offsets. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_offsets[curr_test],
                           frameResources[thr_id].d_result_offsets[curr_test],
-                          CANDIDATES_MAX * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          nMaxCandidates * sizeof(uint64_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* copy the result meta. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_result_meta[curr_test],
                           frameResources[thr_id].d_result_meta[curr_test],
-                          CANDIDATES_MAX * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
+                          nMaxCandidates * sizeof(uint32_t), cudaMemcpyDeviceToHost, d_Streams[thr_id][STREAM::FERMAT]));
 
     /* Copy the amount of primes checked. */
     CHECK(cudaMemcpyAsync(frameResources[thr_id].h_primes_checked[curr_test],

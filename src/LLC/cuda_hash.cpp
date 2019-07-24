@@ -77,8 +77,8 @@ namespace LLC
             uint1024_t hashProof = block.ProofHash();
             uint32_t nBits = hashProof.BitCount();
             uint32_t nLeadingZeroes = 1024 - nBits;
-            debug::log(0, "[MASTER] Found Hash Block ", hashProof.SubString(), " with ",
-                nLeadingZeroes, " Leading Zero-Bits");
+            debug::log(0, "[MASTER] Found Hash Block ");
+            block.print();
 
             fReset = true;
             return true;

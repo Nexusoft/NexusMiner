@@ -100,10 +100,11 @@ namespace LLC
         debug::log(0, FUNCTION, "Bit Array Size  = ", nMaxSieveBits >> 13, " KB");
 
 
-        /* Make a really large first element (less than 200-bits) */
+        /* Make a really large first element */
+        uint32_t nBits = 192;
         mpz_set(zFirstElement, zPrimorialLarge);
         uint32_t nSize = mpz_sizeinbase(zFirstElement, 2);
-        mpz_mul_2exp(zFirstElement, zFirstElement, 192 - nSize);
+        mpz_mul_2exp(zFirstElement, zFirstElement, nBits - nSize);
         nSize = mpz_sizeinbase(zFirstElement, 2);
         debug::log(0, FUNCTION, "First Element Size: ", nSize, "-Bit");
 
@@ -178,14 +179,17 @@ namespace LLC
 
                 if(convert::popc(nMask) == nOffsets)
                 {
-                    /* Print info and add it to the list of origins. */
-                    debug::log(0, FUNCTION, std::setw(6), std::left, i, " : Found good origin: ",
-                        std::setw(12), std::left, nOrigin, " in ",
-                        std::setw(3), std::left, j, " tests");
+
 
                     omp_set_lock(&lk);
                     //vOrigins.push_back(nOrigin);
                     mapOrigins.insert(std::pair<uint32_t, uint64_t>(j, nOrigin));
+
+                    /* Print info and add it to the list of origins. */
+                    debug::log(0, FUNCTION, std::setw(6), std::left, i, " : Found good origin: ",
+                        std::setw(12), std::left, nOrigin, " in ",
+                        std::setw(3), std::left, j, " tests (", mapOrigins.size(), ")");
+
                     omp_unset_lock(&lk);
                     break;
                 }

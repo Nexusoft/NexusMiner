@@ -22,7 +22,8 @@ extern "C" void cuda_set_quit(uint32_t quit);
 extern "C" void cuda_fermat(uint32_t thr_id,
                             uint32_t sieve_index,
                             uint32_t test_index,
-                            uint32_t nTestLevels);
+                            uint32_t nTestLevels,
+                            uint32_t nMaxCandidates);
 
 extern "C" void cuda_results(uint32_t thr_id,
                              uint32_t test_index,

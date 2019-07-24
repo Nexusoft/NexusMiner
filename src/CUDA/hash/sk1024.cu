@@ -53,24 +53,10 @@ const int cpu_ROT1024[8][8] =
 	{ 47, 49, 27, 58, 37, 48, 53, 56 }
 };
 
-__forceinline__ __host__ void Round1024_host(
-	uint64_t &p0,
-	uint64_t &p1,
-	uint64_t &p2,
-	uint64_t &p3,
-	uint64_t &p4,
-	uint64_t &p5,
-	uint64_t &p6,
-	uint64_t &p7,
-	uint64_t &p8,
-	uint64_t &p9,
-	uint64_t &pA,
-	uint64_t &pB,
-	uint64_t &pC,
-	uint64_t &pD,
-	uint64_t &pE,
-	uint64_t &pF,
-	int ROT)
+__forceinline__ __host__
+void Round1024_host(uint64_t &p0, uint64_t &p1, uint64_t &p2, uint64_t &p3, uint64_t &p4, uint64_t &p5, uint64_t &p6, uint64_t &p7,
+	                uint64_t &p8, uint64_t &p9, uint64_t &pA, uint64_t &pB, uint64_t &pC, uint64_t &pD, uint64_t &pE, uint64_t &pF,
+	                int ROT)
 {
 	p0 += p1;
 	p1 = ROL64(p1, cpu_ROT1024[ROT][0]);
@@ -99,24 +85,9 @@ __forceinline__ __host__ void Round1024_host(
 }
 
 
-__forceinline__ __device__ void Round1024_0(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_0(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -127,34 +98,19 @@ __forceinline__ __device__ void Round1024_0(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 55) ^ p0;
-	p3 = ROL2(p3, 43) ^ p2;
-	p5 = ROL2(p5, 37) ^ p4;
-	p7 = ROL2(p7, 40) ^ p6;
-	p9 = ROL2(p9, 16) ^ p8;
-	pB = ROL2(pB, 22) ^ pA;
-	pD = ROL2(pD, 38) ^ pC;
-	pF = ROL2(pF, 12) ^ pE;
+	p1 = ROL2_1(p1, 55) ^ p0;
+	p3 = ROL2_1(p3, 43) ^ p2;
+	p5 = ROL2_1(p5, 37) ^ p4;
+	p7 = ROL2_1(p7, 40) ^ p6;
+	p9 = ROL2_0(p9, 16) ^ p8;
+	pB = ROL2_0(pB, 22) ^ pA;
+	pD = ROL2_1(pD, 38) ^ pC;
+	pF = ROL2_0(pF, 12) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_1(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_1(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -165,34 +121,19 @@ __forceinline__ __device__ void Round1024_1(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 25) ^ p0;
-	p3 = ROL2(p3, 25) ^ p2;
-	p5 = ROL2(p5, 46) ^ p4;
-	p7 = ROL2(p7, 13) ^ p6;
-	p9 = ROL2(p9, 14) ^ p8;
-	pB = ROL2(pB, 13) ^ pA;
-	pD = ROL2(pD, 52) ^ pC;
-	pF = ROL2(pF, 57) ^ pE;
+	p1 = ROL2_0(p1, 25) ^ p0;
+	p3 = ROL2_0(p3, 25) ^ p2;
+	p5 = ROL2_1(p5, 46) ^ p4;
+	p7 = ROL2_0(p7, 13) ^ p6;
+	p9 = ROL2_0(p9, 14) ^ p8;
+	pB = ROL2_0(pB, 13) ^ pA;
+	pD = ROL2_1(pD, 52) ^ pC;
+	pF = ROL2_1(pF, 57) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_2(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_2(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -203,34 +144,19 @@ __forceinline__ __device__ void Round1024_2(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 33) ^ p0;
-	p3 = ROL2(p3, 8) ^ p2;
-	p5 = ROL2(p5, 18) ^ p4;
-	p7 = ROL2(p7, 57) ^ p6;
-	p9 = ROL2(p9, 21) ^ p8;
-	pB = ROL2(pB, 12) ^ pA;
-	pD = ROL2(pD, 32) ^ pC;
-	pF = ROL2(pF, 54) ^ pE;
+	p1 = ROL2_1(p1, 33) ^ p0;
+	p3 = ROL2_0(p3, 8) ^ p2;
+	p5 = ROL2_0(p5, 18) ^ p4;
+	p7 = ROL2_1(p7, 57) ^ p6;
+	p9 = ROL2_0(p9, 21) ^ p8;
+	pB = ROL2_0(pB, 12) ^ pA;
+	pD = ROL2_1(pD, 32) ^ pC;
+	pF = ROL2_1(pF, 54) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_3(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_3(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -241,34 +167,19 @@ __forceinline__ __device__ void Round1024_3(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 34) ^ p0;
-	p3 = ROL2(p3, 43) ^ p2;
-	p5 = ROL2(p5, 25) ^ p4;
-	p7 = ROL2(p7, 60) ^ p6;
-	p9 = ROL2(p9, 44) ^ p8;
-	pB = ROL2(pB,  9) ^ pA;
-	pD = ROL2(pD, 59) ^ pC;
-	pF = ROL2(pF, 34) ^ pE;
+	p1 = ROL2_1(p1, 34) ^ p0;
+	p3 = ROL2_1(p3, 43) ^ p2;
+	p5 = ROL2_0(p5, 25) ^ p4;
+	p7 = ROL2_1(p7, 60) ^ p6;
+	p9 = ROL2_1(p9, 44) ^ p8;
+	pB = ROL2_0(pB,  9) ^ pA;
+	pD = ROL2_1(pD, 59) ^ pC;
+	pF = ROL2_1(pF, 34) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_4(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_4(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -279,34 +190,19 @@ __forceinline__ __device__ void Round1024_4(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 28) ^ p0;
-	p3 = ROL2(p3,  7) ^ p2;
-	p5 = ROL2(p5, 47) ^ p4;
-	p7 = ROL2(p7, 48) ^ p6;
-	p9 = ROL2(p9, 51) ^ p8;
-	pB = ROL2(pB,  9) ^ pA;
-	pD = ROL2(pD, 35) ^ pC;
-	pF = ROL2(pF, 41) ^ pE;
+	p1 = ROL2_0(p1, 28) ^ p0;
+	p3 = ROL2_0(p3,  7) ^ p2;
+	p5 = ROL2_1(p5, 47) ^ p4;
+	p7 = ROL2_1(p7, 48) ^ p6;
+	p9 = ROL2_1(p9, 51) ^ p8;
+	pB = ROL2_0(pB,  9) ^ pA;
+	pD = ROL2_1(pD, 35) ^ pC;
+	pF = ROL2_1(pF, 41) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_5(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_5(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -317,34 +213,19 @@ __forceinline__ __device__ void Round1024_5(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 17) ^ p0;
-	p3 = ROL2(p3,  6) ^ p2;
-	p5 = ROL2(p5, 18) ^ p4;
-	p7 = ROL2(p7, 25) ^ p6;
-	p9 = ROL2(p9, 43) ^ p8;
-	pB = ROL2(pB, 42) ^ pA;
-	pD = ROL2(pD, 40) ^ pC;
-	pF = ROL2(pF, 15) ^ pE;
+	p1 = ROL2_0(p1, 17) ^ p0;
+	p3 = ROL2_0(p3,  6) ^ p2;
+	p5 = ROL2_0(p5, 18) ^ p4;
+	p7 = ROL2_0(p7, 25) ^ p6;
+	p9 = ROL2_1(p9, 43) ^ p8;
+	pB = ROL2_1(pB, 42) ^ pA;
+	pD = ROL2_1(pD, 40) ^ pC;
+	pF = ROL2_0(pF, 15) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_6(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_6(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -355,34 +236,19 @@ __forceinline__ __device__ void Round1024_6(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 58) ^ p0;
-	p3 = ROL2(p3,  7) ^ p2;
-	p5 = ROL2(p5, 32) ^ p4;
-	p7 = ROL2(p7, 45) ^ p6;
-	p9 = ROL2(p9, 19) ^ p8;
-	pB = ROL2(pB, 18) ^ pA;
-	pD = ROL2(pD,  2) ^ pC;
-	pF = ROL2(pF, 56) ^ pE;
+	p1 = ROL2_1(p1, 58) ^ p0;
+	p3 = ROL2_0(p3,  7) ^ p2;
+	p5 = ROL2_1(p5, 32) ^ p4;
+	p7 = ROL2_1(p7, 45) ^ p6;
+	p9 = ROL2_0(p9, 19) ^ p8;
+	pB = ROL2_0(pB, 18) ^ pA;
+	pD = ROL2_0(pD,  2) ^ pC;
+	pF = ROL2_1(pF, 56) ^ pE;
 }
 
-__forceinline__ __device__ void Round1024_7(
-	uint2 &p0,
-	uint2 &p1,
-	uint2 &p2,
-	uint2 &p3,
-	uint2 &p4,
-	uint2 &p5,
-	uint2 &p6,
-	uint2 &p7,
-	uint2 &p8,
-	uint2 &p9,
-	uint2 &pA,
-	uint2 &pB,
-	uint2 &pC,
-	uint2 &pD,
-	uint2 &pE,
-	uint2 &pF,
-	int ROT)
+__forceinline__ __device__
+void Round1024_7(uint2 &p0, uint2 &p1, uint2 &p2, uint2 &p3, uint2 &p4, uint2 &p5, uint2 &p6, uint2 &p7, uint2 &p8, uint2 &p9,
+	             uint2 &pA, uint2 &pB, uint2 &pC, uint2 &pD, uint2 &pE, uint2 &pF)
 {
 	p0 += p1;
 	p2 += p3;
@@ -393,18 +259,18 @@ __forceinline__ __device__ void Round1024_7(
 	pC += pD;
 	pE += pF;
 
-	p1 = ROL2(p1, 47) ^ p0;
-	p3 = ROL2(p3, 49) ^ p2;
-	p5 = ROL2(p5, 27) ^ p4;
-	p7 = ROL2(p7, 58) ^ p6;
-	p9 = ROL2(p9, 37) ^ p8;
-	pB = ROL2(pB, 48) ^ pA;
-	pD = ROL2(pD, 53) ^ pC;
-	pF = ROL2(pF, 56) ^ pE;
+	p1 = ROL2_1(p1, 47) ^ p0;
+	p3 = ROL2_1(p3, 49) ^ p2;
+	p5 = ROL2_0(p5, 27) ^ p4;
+	p7 = ROL2_1(p7, 58) ^ p6;
+	p9 = ROL2_1(p9, 37) ^ p8;
+	pB = ROL2_1(pB, 48) ^ pA;
+	pD = ROL2_1(pD, 53) ^ pC;
+	pF = ROL2_1(pF, 56) ^ pE;
 }
 
 __device__ __forceinline__
-uint2 xor3(const uint2 a, const uint2 b, const uint2 c)
+uint2 xor3(const uint2& a, const uint2& b, const uint2& c)
 {
 	uint2 result;
 	asm("lop3.b32 %0, %1, %2, %3, 0x96;" : "=r"(result.x) : "r"(a.x), "r"(b.x), "r"(c.x)); //0x96 = 0xF0 ^ 0xCC ^ 0xAA
@@ -413,7 +279,7 @@ uint2 xor3(const uint2 a, const uint2 b, const uint2 c)
 }
 
 __device__ __forceinline__
-uint2 chi(const uint2 a, const uint2 b, const uint2 c)
+uint2 chi(const uint2& a, const uint2& b, const uint2& c)
 {
 	uint2 result;
 	asm("lop3.b32 %0, %1, %2, %3, 0xD2;" : "=r"(result.x) : "r"(a.x), "r"(b.x), "r"(c.x)); //0xD2 = 0xF0 ^ ((~0xCC) & 0xAA)
@@ -422,30 +288,14 @@ uint2 chi(const uint2 a, const uint2 b, const uint2 c)
 }
 
 __device__ __forceinline__
-uint2 xor5(const uint2 a, const uint2 b, const uint2 c, const uint2 d, const uint2 e)
+uint2 xor5(const uint2& a, const uint2& b, const uint2& c, const uint2& d, const uint2& e)
 {
 	return xor3(xor3(a, b, c), d, e);
 }
 
-__device__ __forceinline__
-uint2 ROL8(const uint2 a)
-{
-	uint2 result;
-	result.x = __byte_perm(a.x, a.y, 0x2107);
-	result.y = __byte_perm(a.y, a.x, 0x2107);
-	return result;
-}
 
 __device__ __forceinline__
-uint2 ROR8(const uint2 a)
-{
-	uint2 result;
-	result.x = __byte_perm(a.x, a.y, 0x4321);
-	result.y = __byte_perm(a.y, a.x, 0x4321);
-	return result;
-}
-
-__device__ __forceinline__ void Keccak1600(uint2 *s)
+void Keccak1600(uint2 *s)
 {
 	uint2 t[5], u, v;
 
@@ -458,28 +308,28 @@ __device__ __forceinline__ void Keccak1600(uint2 *s)
 		t[3] = xor5(s[3], s[8], s[13], s[18], s[23]);
 		t[4] = xor5(s[4], s[9], s[14], s[19], s[24]);
 
-		u = ROL2(t[1], 1);
+		u = ROL2_0(t[1], 1);
 		s[0] = xor3(s[0], t[4], u);
 		s[5] = xor3(s[5], t[4], u);
 		s[10] = xor3(s[10], t[4], u);
 		s[15] = xor3(s[15], t[4], u);
 		s[20] = xor3(s[20], t[4], u);
 
-		u = ROL2(t[2], 1);
+		u = ROL2_0(t[2], 1);
 		s[1] = xor3(s[1], t[0], u);
 		s[6] = xor3(s[6], t[0], u);
 		s[11] = xor3(s[11], t[0], u);
 		s[16] = xor3(s[16], t[0], u);
 		s[21] = xor3(s[21], t[0], u);
 
-		u = ROL2(t[3], 1);
+		u = ROL2_0(t[3], 1);
 		s[2] = xor3(s[2], t[1], u);
 		s[7] = xor3(s[7], t[1], u);
 		s[12] = xor3(s[12], t[1], u);
 		s[17] = xor3(s[17], t[1], u);
 		s[22] = xor3(s[22], t[1], u);
 
-		u = ROL2(t[4], 1);
+		u = ROL2_0(t[4], 1);
 		s[3] = xor3(s[3], t[2], u);
 		s[8] = xor3(s[8], t[2], u);
 		s[13] = xor3(s[13], t[2], u);
@@ -487,7 +337,7 @@ __device__ __forceinline__ void Keccak1600(uint2 *s)
 		s[23] = xor3(s[23], t[2], u);
 
 
-		u = ROL2(t[0], 1);
+		u = ROL2_0(t[0], 1);
 		s[4] = xor3(s[4], t[3], u);
 		s[9] = xor3(s[9], t[3], u);
 		s[14] = xor3(s[14], t[3], u);
@@ -496,60 +346,65 @@ __device__ __forceinline__ void Keccak1600(uint2 *s)
 
 		u = s[1];
 
-		s[1] = ROL2(s[6], 44);
-		s[6] = ROL2(s[9], 20);
-		s[9] = ROL2(s[22], 61);
-		s[22] = ROL2(s[14], 39);
-		s[14] = ROL2(s[20], 18);
-		s[20] = ROL2(s[2], 62);
-		s[2] = ROL2(s[12], 43);
-		s[12] = ROL2(s[13], 25);
-		s[13] = ROL2(s[19], 8);
-		s[19] = ROL2(s[23], 56);
-		s[23] = ROL2(s[15], 41);
-		s[15] = ROL2(s[4], 27);
-		s[4] = ROL2(s[24], 14);
-		s[24] = ROL2(s[21], 2);
-		s[21] = ROL2(s[8], 55);
-		s[8] = ROL2(s[16], 45);
-		s[16] = ROL2(s[5], 36);
-		s[5] = ROL2(s[3], 28);
-		s[3] = ROL2(s[18], 21);
-		s[18] = ROL2(s[17], 15);
-		s[17] = ROL2(s[11], 10);
-		s[11] = ROL2(s[7], 6);
-		s[7] = ROL2(s[10], 3);
-		s[10] = ROL2(u, 1);
+		s[1] = ROL2_1(s[6], 44);
+		s[6] = ROL2_0(s[9], 20);
+		s[9] = ROL2_1(s[22], 61);
+		s[22] = ROL2_1(s[14], 39);
+		s[14] = ROL2_0(s[20], 18);
+		s[20] = ROL2_1(s[2], 62);
+		s[2] = ROL2_1(s[12], 43);
+		s[12] = ROL2_0(s[13], 25);
+		s[13] = ROL2_0(s[19], 8);
+		s[19] = ROL2_1(s[23], 56);
+		s[23] = ROL2_1(s[15], 41);
+		s[15] = ROL2_0(s[4], 27);
+		s[4] = ROL2_0(s[24], 14);
+		s[24] = ROL2_0(s[21], 2);
+		s[21] = ROL2_1(s[8], 55);
+		s[8] = ROL2_1(s[16], 45);
+		s[16] = ROL2_1(s[5], 36);
+		s[5] = ROL2_0(s[3], 28);
+		s[3] = ROL2_0(s[18], 21);
+		s[18] = ROL2_0(s[17], 15);
+		s[17] = ROL2_0(s[11], 10);
+		s[11] = ROL2_0(s[7], 6);
+		s[7] = ROL2_0(s[10], 3);
+		s[10] = ROL2_0(u, 1);
 
-		u = s[0]; v = s[1];
+		u = s[0];
+        v = s[1];
 		s[0] = chi(s[0], s[1], s[2]);
 		s[1] = chi(s[1], s[2], s[3]);
 		s[2] = chi(s[2], s[3], s[4]);
 		s[3] = chi(s[3], s[4], u);
 		s[4] = chi(s[4], u, v);
 
-		u = s[5]; v = s[6];
+		u = s[5];
+        v = s[6];
 		s[5] = chi(s[5], s[6], s[7]);
 		s[6] = chi(s[6], s[7], s[8]);
 		s[7] = chi(s[7], s[8], s[9]);
 		s[8] = chi(s[8], s[9], u);
 		s[9] = chi(s[9], u, v);
 
-		u = s[10]; v = s[11];
+		u = s[10];
+        v = s[11];
 		s[10] = chi(s[10], s[11], s[12]);
 		s[11] = chi(s[11], s[12], s[13]);
 		s[12] = chi(s[12], s[13], s[14]);
 		s[13] = chi(s[13], s[14], u);
 		s[14] = chi(s[14], u, v);
 
-		u = s[15]; v = s[16];
+		u = s[15];
+        v = s[16];
 		s[15] = chi(s[15], s[16], s[17]);
 		s[16] = chi(s[16], s[17], s[18]);
 		s[17] = chi(s[17], s[18], s[19]);
 		s[18] = chi(s[18], s[19], u);
 		s[19] = chi(s[19], u, v);
 
-		u = s[20]; v = s[21];
+		u = s[20];
+        v = s[21];
 		s[20] = chi(s[20], s[21], s[22]);
 		s[21] = chi(s[21], s[22], s[23]);
 		s[22] = chi(s[22], s[23], s[24]);
@@ -560,16 +415,17 @@ __device__ __forceinline__ void Keccak1600(uint2 *s)
 	}
 }
 
-__forceinline__ __device__ void Skein1024(uint2 *p, uint2 *t, uint2 *b)
+__forceinline__ __device__
+void Skein1024(uint2 *p, uint2 *t, uint2 *b)
 {
 
 	#pragma unroll
 	for (int i = 1; i < 21; i += 2)
 	{
-		Round1024_0(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], 0);
-		Round1024_1(p[0], p[9], p[2], p[13], p[6], p[11], p[4], p[15], p[10], p[7], p[12], p[3], p[14], p[5], p[8], p[1], 1);
-		Round1024_2(p[0], p[7], p[2], p[5], p[4], p[3], p[6], p[1], p[12], p[15], p[14], p[13], p[8], p[11], p[10], p[9], 2);
-		Round1024_3(p[0], p[15], p[2], p[11], p[6], p[13], p[4], p[9], p[14], p[1], p[8], p[5], p[10], p[3], p[12], p[7], 3);
+		Round1024_0(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+		Round1024_1(p[0], p[9], p[2], p[13], p[6], p[11], p[4], p[15], p[10], p[7], p[12], p[3], p[14], p[5], p[8], p[1]);
+		Round1024_2(p[0], p[7], p[2], p[5], p[4], p[3], p[6], p[1], p[12], p[15], p[14], p[13], p[8], p[11], p[10], p[9]);
+		Round1024_3(p[0], p[15], p[2], p[11], p[6], p[13], p[4], p[9], p[14], p[1], p[8], p[5], p[10], p[3], p[12], p[7]);
 
 		#pragma unroll
 		for (int j = 0; j < 13; ++j)
@@ -579,10 +435,10 @@ __forceinline__ __device__ void Skein1024(uint2 *p, uint2 *t, uint2 *b)
 		p[14] += b[(i + 14) % 17] + t[(i + 1) % 3];
 		p[15] += b[(i + 15) % 17] + make_uint2(i, 0);
 
-		Round1024_4(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15], 4);
-		Round1024_5(p[0], p[9], p[2], p[13], p[6], p[11], p[4], p[15], p[10], p[7], p[12], p[3], p[14], p[5], p[8], p[1], 5);
-		Round1024_6(p[0], p[7], p[2], p[5], p[4], p[3], p[6], p[1], p[12], p[15], p[14], p[13], p[8], p[11], p[10], p[9], 6);
-		Round1024_7(p[0], p[15], p[2], p[11], p[6], p[13], p[4], p[9], p[14], p[1], p[8], p[5], p[10], p[3], p[12], p[7], 7);
+		Round1024_4(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]);
+		Round1024_5(p[0], p[9], p[2], p[13], p[6], p[11], p[4], p[15], p[10], p[7], p[12], p[3], p[14], p[5], p[8], p[1]);
+		Round1024_6(p[0], p[7], p[2], p[5], p[4], p[3], p[6], p[1], p[12], p[15], p[14], p[13], p[8], p[11], p[10], p[9]);
+		Round1024_7(p[0], p[15], p[2], p[11], p[6], p[13], p[4], p[9], p[14], p[1], p[8], p[5], p[10], p[3], p[12], p[7]);
 
 		#pragma unroll
 		for (int j = 0; j < 13; ++j)
@@ -601,15 +457,9 @@ __forceinline__ __device__ void Skein1024(uint2 *p, uint2 *t, uint2 *b)
  **/
 
  __launch_bounds__(896, 1)
-__global__ void  sk1024_gpu_hash(
-	int threads,
-	uint64_t startNonce,
-	uint64_t *resNonce,
-	uint64_t *resLowerHash)
+__global__ void  sk1024_gpu_hash(int threads, uint64_t startNonce, uint64_t *resNonce, uint64_t *resLowerHash)
 {
-
-
-	int thread = (blockDim.x * blockIdx.x + threadIdx.x);
+	int thread = blockDim.x * blockIdx.x + threadIdx.x;
 
 	if (thread < threads)
 	{
@@ -620,7 +470,8 @@ __global__ void  sk1024_gpu_hash(
 		uint64_t nonce = startNonce + (uint64_t)thread;
 		uint64_t LowerHash = 0xFFFFFFFFFFFFFFFF;
 
-		for (int i = 0; i<10; i++)
+        #pragma unroll
+		for(int i = 0; i < 10; ++i)
 			p[i] = uMessage[i + 16] + c_hv[i];
 
 		uint2 tempnonce = vectorize(nonce);
@@ -638,14 +489,15 @@ __global__ void  sk1024_gpu_hash(
 
 		Skein1024(p, t, c_hv);
 
-		for (int i = 0; i < 10; ++i)
+        #pragma unroll
+		for(int i = 0; i < 10; ++i)
 			p[i] ^= uMessage[i + 16];
 
 		p[10] ^= tempnonce;
 		h[16] = skein_ks_parity;
 
 		#pragma unroll
-		for (int i = 0; i < 16; i += 2)
+		for(int i = 0; i < 16; i += 2)
 		{
 			h[i] = p[i];
 			h[i + 1] = p[i + 1];
@@ -674,7 +526,7 @@ __global__ void  sk1024_gpu_hash(
 		state[8] = p[8];
 
 		#pragma unroll
-		for (int i = 9; i<25; ++i)
+		for(int i = 9; i < 25; ++i)
 			state[i] = make_uint2(0, 0);
 
 		Keccak1600(state);
@@ -693,10 +545,10 @@ __global__ void  sk1024_gpu_hash(
 		Keccak1600(state);
 
 		//if (devectorize(state[6]) <= 0x3FFFC000) {
-		if (devectorize(state[6]) <= pTarget[15])
+		if(devectorize(state[6]) <= pTarget[15])
 		{
 			LowerHash = *resLowerHash;
-			if (devectorize(state[6]) < LowerHash)
+			if(devectorize(state[6]) < LowerHash)
 			{
 				*resLowerHash = devectorize(state[6]);
 				*resNonce = nonce;
@@ -705,11 +557,7 @@ __global__ void  sk1024_gpu_hash(
 	}
 }
 
-__host__ uint64_t sk1024_cpu_hash(
-	uint32_t thr_id,
-	uint32_t threads,
-	uint64_t startNonce,
-	uint32_t threadsperblock)
+__host__ uint64_t sk1024_cpu_hash(uint32_t thr_id, uint32_t threads, uint64_t startNonce, uint32_t threadsperblock)
 {
 	uint64_t result = 0xFFFFFFFFFFFFFFFF;
 	CHECK(cudaMemset(d_SKNonce[thr_id], 0xFF, sizeof(uint64_t)));

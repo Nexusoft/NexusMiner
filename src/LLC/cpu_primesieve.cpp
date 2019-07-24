@@ -39,9 +39,11 @@ namespace LLC
     {
     }
 
+
     PrimeSieveCPU::~PrimeSieveCPU()
     {
     }
+
 
     bool PrimeSieveCPU::Work()
     {
@@ -103,6 +105,7 @@ namespace LLC
         return false;
     }
 
+
     void PrimeSieveCPU::Load()
     {
         debug::log(3, FUNCTION, "PrimeSieveCPU", static_cast<uint32_t>(nID));
@@ -119,6 +122,7 @@ namespace LLC
         /* Create empty initial base remainders. */
         vBaseRemainders.assign(nSievePrimeLimit, 0);
     }
+
 
     void PrimeSieveCPU::Init()
     {

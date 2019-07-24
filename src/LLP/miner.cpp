@@ -22,12 +22,21 @@ ________________________________________________________________________________
 #include <iomanip>
 #include <cmath>
 
-const char *ChannelName[3] =
+namespace
 {
-    "Stake",
-    "Prime",
-    "Hash"
-};
+    const char *ChannelName[3] =
+    {
+        "Stake",
+        "Prime",
+        "Hash"
+    };
+
+
+    uint32_t nPrevChannel = 0;
+
+}
+
+
 
 namespace LLP
 {
@@ -102,10 +111,12 @@ namespace LLP
         minerTimer.Start();
         wpsTimer.Start();
 
+        uint32_t nCounter = 0;
+
         while(!fStop.load())
         {
-            /* Run this thread at 1 cycle per second. */
-            runtime::sleep(1000);
+            /* Run this thread at 10 cycles per second. */
+            runtime::sleep(100);
 
             /* Check if shutdown occurred after sleep cycle. */
             if(fStop.load())
@@ -116,8 +127,8 @@ namespace LLP
             {
                 if (!Connect())
                 {
-                    /* Sleep an additional 4 seconds if reconnect attempt fails. */
-                    runtime::sleep(4000);
+                    /* Sleep an additional 5 seconds if reconnect attempt fails. */
+                    runtime::sleep(5000);
                     continue;
                 }
 
@@ -126,27 +137,32 @@ namespace LLP
                 Reset();
             }
 
-
-            /** Check the Block Height. **/
-            uint32_t nHeight = GetHeight();
-            if (nHeight == 0)
+            if(++nCounter >= 5)
             {
-                debug::error("Failed to Update Height...");
-                Pause();
-                continue;
+                /** Check the Block Height. **/
+                uint32_t nHeight = GetHeight();
+                if (nHeight == 0)
+                {
+                    debug::error("Failed to Update Height...");
+                    Pause();
+                    continue;
+                }
+
+                /** If there is a new block, Flag the Threads to Stop Mining. **/
+                if (nHeight != nBestHeight.load())
+                {
+                    nBestHeight = nHeight;
+                    debug::log(0, "[MASTER] Nexus Network: New Block ", nHeight);
+
+                    /* Reset the workers so they can recieve new blocks. */
+                    Reset();
+                }
+
+                nCounter = 0;
             }
 
-            /** If there is a new block, Flag the Threads to Stop Mining. **/
-            if (nHeight != nBestHeight.load())
-            {
-                nBestHeight = nHeight;
-                debug::log(0, "[MASTER] Nexus Network: New Block ", nHeight);
 
-                /* Reset the workers so they can recieve new blocks. */
-                Reset();
-            }
-
-            /* WPS Meter for Prime Minining. */
+            /* WPS Meter for Prime Mining. */
             if (wpsTimer.Elapsed() >= 1)
             {
                 uint32_t nElapsed = wpsTimer.Elapsed();
@@ -170,6 +186,7 @@ namespace LLP
                 minerTimer.Reset();
             }
 
+
             /* Get blocks for workers if reset. */
             if(fReset.load() && !fStop.load())
             {
@@ -187,13 +204,18 @@ namespace LLP
 
     void Miner::SetChannel(uint32_t nChannel)
     {
-        Packet REQUEST;
+        if(nPrevChannel != nChannel)
+        {
+            nPrevChannel = nChannel;
 
-        REQUEST.HEADER = SET_CHANNEL;
-        REQUEST.LENGTH = 4;
-        REQUEST.DATA   = convert::uint2bytes(nChannel);
+            Packet REQUEST;
 
-        WritePacket(REQUEST);
+            REQUEST.HEADER = SET_CHANNEL;
+            REQUEST.LENGTH = 4;
+            REQUEST.DATA   = convert::uint2bytes(nChannel);
+
+            WritePacket(REQUEST);
+        }
     }
 
 

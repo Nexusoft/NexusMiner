@@ -33,18 +33,24 @@ std::vector<uint32_t> vOffsetsT;
 
 
 /* GPU Specific Configurations */
-uint32_t nSievePrimeLimit = 1 << 23;
+uint32_t nSievePrimeLimit = 1 << 24;
 uint32_t nSievePrimesLog2[GPU_MAX] = { 0 };
 uint32_t nSieveBitsLog2[GPU_MAX] = { 0 };
 uint32_t nSieveIterationsLog2[GPU_MAX] = { 0 };
+uint32_t nMaxCandidatesLog2[GPU_MAX] = { 0 };
 uint32_t nTestLevels[GPU_MAX] = { 0 };
 uint32_t nSievesPerOrigin[GPU_MAX] = { 0 };
 
 namespace prime
 {
     /* Load the prime mining configuration for each GPU (Hash mining auto-computed.) */
-    void load_config(uint32_t nThreadsGPU)
+    void load_config(const std::vector<uint32_t>& indices)
     {
+        uint32_t nThreadsGPU = indices.size();
+
+        if(nThreadsGPU == 0)
+            return;
+
         debug::log(0, "Loading configuration...");
         debug::log(0, "");
 
@@ -62,34 +68,39 @@ namespace prime
 
         for (uint32_t i = 0; i < nThreadsGPU; ++i)
         {
-            /* Acquire the device name so we can parse the parameters for it. */
-            std::string devicename = cuda_devicename(device_map[i]);
+            uint32_t nDevice = indices[i];
 
-            #define PARSE(X) if (!parser.GetValueAsInteger(devicename.c_str(), #X, (int*)&X[i])) \
-            parser.GetValueAsInteger("GENERAL", #X, (int*)&X[i]);
+            /* Acquire the device name so we can parse the parameters for it. */
+            std::string devicename = cuda_devicename(nDevice);
+
+            #define PARSE(X) if (!parser.GetValueAsInteger(devicename.c_str(), #X, (int*)&X[nDevice])) \
+            parser.GetValueAsInteger("GENERAL", #X, (int*)&X[nDevice]);
 
             /* Parse parameters in config.ini */
             PARSE(nSievePrimesLog2);
             PARSE(nSieveBitsLog2);
             PARSE(nSieveIterationsLog2);
+            PARSE(nMaxCandidatesLog2);
             PARSE(nTestLevels);
 
-            uint32_t sieve_primes = 1 << nSievePrimesLog2[i];
-            uint32_t sieve_bits = 1 << nSieveBitsLog2[i];
-            uint32_t sieve_iterations = 1 << nSieveIterationsLog2[i];
+            uint32_t sieve_primes = 1 << nSievePrimesLog2[nDevice];
+            uint32_t sieve_bits = 1 << nSieveBitsLog2[nDevice];
+            uint32_t sieve_iterations = 1 << nSieveIterationsLog2[nDevice];
+            uint32_t max_candidates = 1 << nMaxCandidatesLog2[nDevice];
 
 
-            nSievesPerOrigin[i] = (uint32_t)(std::numeric_limits<uint64_t>::max() / LLC::nPrimorial) / sieve_bits;
+            nSievesPerOrigin[nDevice] = (uint32_t)(std::numeric_limits<uint64_t>::max() / LLC::nPrimorial) / sieve_bits;
 
             if (nSievePrimeLimit < sieve_primes)
                 nSievePrimeLimit = sieve_primes;
 
-            debug::log(0, "GPU thread ", i, ", device ", device_map[i], " [", devicename, "]");
+            debug::log(0, "Device ", nDevice, " [", devicename, "]");
             debug::log(0, "nSievePrimes = ", sieve_primes);
             debug::log(0, "nBitArray_Size = ", sieve_bits);
             debug::log(0, "nSieveIterations = ", sieve_iterations);
-            debug::log(0, "nTestLevels = ", nTestLevels[i]);
-            debug::log(0, "nSievesPerOrigin = ", nSievesPerOrigin[i]);
+            debug::log(0, "nMaxCandidates = ", max_candidates);
+            debug::log(0, "nTestLevels = ", nTestLevels[nDevice]);
+            debug::log(0, "nSievesPerOrigin = ", nSievesPerOrigin[nDevice]);
             debug::log(0, "");
         }
     }

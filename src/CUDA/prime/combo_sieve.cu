@@ -221,13 +221,17 @@ __global__ void compact_combo(uint64_t *d_origins,
                               uint32_t *d_bit_array_sieve_B,
                               uint32_t nBitArray_Size,
                               uint32_t origin_index,
+                              uint32_t nMaxCandidates,
                               uint8_t nThreshold,
                               uint8_t nOffsetsB,
                               uint8_t nOffsets)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
-    //if(c_quit)
-    //    return;
+    if(c_quit)
+    {
+        *d_nonce_count = 0;
+        return;
+    }
 
 
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -286,20 +290,18 @@ __global__ void compact_combo(uint64_t *d_origins,
                         break;
                 }
 
-                /* Determine if combo will break prime gap or not. */
+                /* Determine if combo count will break threshold. */
                 if(nCount >= nThreshold)
                 {
                     uint32_t i = atomicAdd(d_nonce_count, 1);
 
-                    if(i < CANDIDATES_MAX)
+                    if(i < nMaxCandidates)
                     {
                         /* Assign the global nonce offset and meta data. */
                         d_nonce_offsets[i] = nonce_offset;
                         d_nonce_meta[i] = ~combo;
                     }
                 }
-                //else
-                //    printf("%d: combo=%08X, n=%d, t=%d, count=%d\n", idx, combo, n, t, nCount);
             }
         }
     }
@@ -405,6 +407,7 @@ void comboB_launch(uint8_t thr_id,
     &frameResources[thr_id].d_bit_array_sieve[curr_sieve][nBitArray_Size >> 5], \
     nBitArray_Size, \
     origin_index, \
+    nMaxCandidates, \
     threshold, \
     X, \
     vOffsets.size())
@@ -413,6 +416,7 @@ void comboB_launch(uint8_t thr_id,
 void kernel_ccompact_launch(uint8_t thr_id,
                             uint8_t str_id,
                             uint32_t origin_index,
+                            uint32_t nMaxCandidates,
                             uint8_t curr_sieve,
                             uint8_t curr_test,
                             uint8_t next_test,

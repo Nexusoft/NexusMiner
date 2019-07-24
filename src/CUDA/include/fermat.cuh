@@ -262,7 +262,7 @@ void store(uint32_t *a, uint32_t *table, uint32_t w)
 {
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
-        table[i * WORD_MAX + w] = a[i];
+        table[WORD_MAX * w + i] = a[i];
 }
 
 
@@ -271,7 +271,7 @@ void load(uint32_t *a, uint32_t *table, uint32_t w)
 {
     #pragma unroll
     for(uint8_t i = 0; i < WORD_MAX; ++i)
-        a[i] = table[i * WORD_MAX + w];
+        a[i] = table[WORD_MAX * w + i];
 }
 
 
@@ -339,7 +339,6 @@ void calcWindowTableOdd(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
 
     store(t, table, 0); //store 2R mod N
 
-
     for(uint16_t i = 2; i < WINDOW_SIZE; ++i) //calculate 2^i R mod N
     {
         lshift1(t, t);
@@ -350,8 +349,6 @@ void calcWindowTableOdd(uint32_t *a, uint32_t *n, uint32_t *t, uint32_t *table)
             store(t, table, i >> 1); //store 2^i R mod N for odd numbers.
     }
 }
-
-
 
 
 /* Calculate X = 2^Exp Mod N (Fermat test) */
@@ -504,6 +501,7 @@ void pow2m_swe(uint32_t *X, uint32_t *Exp, uint32_t *N, uint32_t *table)
 
     }
 
+    // transform back from Montgomery space
     redc(X, X, N, d, t);
 
     /* Final corrective step. */

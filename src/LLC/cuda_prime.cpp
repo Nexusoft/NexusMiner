@@ -51,15 +51,18 @@ namespace LLC
 
     PrimeCUDA::PrimeCUDA(uint32_t id)
     : Proof(id)
+    , vWorkOrigins()
     , zPrimeOrigin()
     , zPrimorialMod()
     , zTempVar()
     , nCount(0)
     , nSieveIndex(0)
     , nTestIndex(0)
+    , nBitArrayIndex(0)
     , nIterations(0)
     , nSievePrimes(0)
     , nSieveBits(0)
+    , nMaxCandidates(0)
     , nTestLevel(0)
     {
         for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
@@ -85,87 +88,72 @@ namespace LLC
 
         /* Get difficulty. */
         uint32_t nDifficulty = block.nBits;
-        uint32_t nOrigins = vOrigins.size();
+        uint32_t nOrigins = vWorkOrigins.size();
 
 
         /* Check for early out. */
         if(fReset.load())
-        {
-            cuda_set_quit(1);
             return false;
-        }
+
+
+        bool fSynchronize = false;
+
 
         /* Sieve bit array and compact test candidate nonces */
-        if(cuda_primesieve(nID,
-                           nPrimorial,
-                           nPrimorialEndPrime,
-                           primeLimitA,
-                           primeLimitB,
-                           nSievePrimes,
-                           nSieveBits,
-                           nDifficulty,
-                           nSieveIndex,
-                           nTestIndex,
-                           nOrigins))
+        if(cuda_primesieve(nID, nPrimorial, nPrimorialEndPrime, primeLimitA, primeLimitB, nSievePrimes, nSieveBits, nDifficulty,
+                           nSieveIndex, nTestIndex, nOrigins, nMaxCandidates))
         {
-            /* Check for early out. */
-            if(fReset.load())
-            {
-                cuda_set_quit(1);
-                return false;
-            }
+            uint32_t nOriginIndex = nSieveIndex % nOrigins;
 
-            /* After the number of iterations have been satisfied,
-             * start filling next queue */
-            if ((nSieveIndex == (nOrigins - 1) || nSieveIndex % nIterations == 0)
-            && nSieveIndex > 0)
+            bool fNewSieve = nOriginIndex == 0;
+            bool fLastSieve = nBitArrayIndex == nSievesPerOrigin[nID] - 1;
+
+            /* Determine if we should synchronize early due to running out of work. */
+            fSynchronize = fNewSieve && fLastSieve;
+
+
+            /* Determine if there should be a new test round. */
+            bool fTestRound = nSieveIndex && nSieveIndex % nIterations == 0;
+
+            /* After the number of iterations have been satisfied, start filling next queue */
+            if (fTestRound || fSynchronize)
             {
                 /* Test results. */
-                cuda_fermat(nID, nSieveIndex, nTestIndex, nTestLevel);
+                cuda_fermat(nID, nSieveIndex, nTestIndex, nTestLevel, nMaxCandidates);
                 ++nTestIndex;
             }
 
+            /* Shift the working origin over by an entire sieve range. */
+            vWorkOrigins[nOriginIndex] += nPrimorial * nSieveBits;
+
             ++nSieveIndex;
             SievedBits += nSieveBits;
+
+            if(nSieveIndex % nOrigins == 0)
+            {
+                ++nBitArrayIndex;
+
+                /* Compute prime remainders for each origin. */
+                cuda_set_origins(nID, primeLimitA, vWorkOrigins.data(), vWorkOrigins.size());
+
+                //debug::log(0, "cuda_set_origins ", nID, " ", nBitArrayIndex, " ", nSieveIndex);
+            }
         }
 
-        /* Check for early out. */
-        if(fReset.load())
-        {
-            cuda_set_quit(1);
-            return false;
-        }
 
         /* Obtain the final results and push them onto the queue */
         if(nTestIndex)
-        {
-            bool fSynchronize = false;
-
-            if(nSieveIndex == nOrigins)
-                fSynchronize = true;
-
-            cuda_results(nID, nTestIndex-1, nonce_offsets, nonce_meta,
-                &nCount, nPrimesChecked, nPrimesFound, fSynchronize);
-        }
-
-        /* Check for early out. */
-        if(fReset.load())
-        {
-            cuda_set_quit(1);
-            return false;
-        }
-
+            cuda_results(nID, nTestIndex - 1, nonce_offsets, nonce_meta, &nCount, nPrimesChecked, nPrimesFound, fSynchronize);
 
         /* Add GPU sieve results to work queue */
         SendResults(nCount);
-
 
         /* Change frequency of looping for better GPU utilization, can lead to
         lower latency than from a calling thread waking a blocking-sync thread */
         runtime::sleep(1);
 
         /* Tell worker we want to request a new block, the prime origins have been exhausted. */
-        if(nSieveIndex == nOrigins)
+        if(fSynchronize)
         {
             debug::log(0, FUNCTION, (uint32_t)nID, " - Requesting more work");
             fReset = true;
@@ -187,6 +175,10 @@ namespace LLC
             g_work_queue.clear();
         }
 
+        /* Set GPU quit flag to true and ensure GPU is synchronized. */
+        cuda_set_quit(1);
+        cuda_device_synchronize();
+
         /* Initialize the stats counts for this GPU. */
         cuda_init_counts(nID);
 
@@ -197,6 +189,9 @@ namespace LLC
         nCount = 0;
         nSieveIndex = 0;
         nTestIndex = 0;
+        nBitArrayIndex = 0;
+        vWorkOrigins = vOrigins;
+
         for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
         {
             nPrimesChecked[i] = 0;
@@ -205,7 +200,6 @@ namespace LLC
 
         /* Set the prime origin from the block hash. */
         mpz_import(zPrimeOrigin, 32, -1, sizeof(uint32_t), 0, 0, block.ProofHash().begin());
-
 
         /* Compute the primorial mod from the origin. */
         mpz_mod(zPrimorialMod, zPrimeOrigin, zPrimorial);
@@ -219,11 +213,7 @@ namespace LLC
         cuda_base_remainders(nID, nSievePrimes);
 
         /* Compute prime remainders for each origin. */
-        cuda_set_origins(nID, primeLimitA, vOrigins.size());
-
-
-
-
+        cuda_set_origins(nID, primeLimitA, vWorkOrigins.data(), vWorkOrigins.size());
     }
 
     void PrimeCUDA::Load()
@@ -237,24 +227,20 @@ namespace LLC
         nIterations = 1 << nSieveIterationsLog2[nID];
         nSievePrimes = 1 << nSievePrimesLog2[nID];
         nSieveBits =  1 << nSieveBitsLog2[nID];
+        nMaxCandidates = 1 << nMaxCandidatesLog2[nID];
         nTestLevel = nTestLevels[nID];
 
+
+        debug::log(0, FUNCTION, "nIterations ", nIterations, " nSievePrimes ", nSievePrimes, " nSieveBits ", nSieveBits, " nMaxCandidates ", nMaxCandidates);
+
         /* Load the primes lists on the GPU device. */
-        cuda_init_primes(nID,
-                         vOrigins.data(),
-                         primes,
-                         primesInverseInvk,
-                         nSievePrimes,
-                         nSieveBits,
-                         32,
-                         nPrimorialEndPrime,
-                         primeLimitA,
-                         vOrigins.size());
+        cuda_init_primes(nID, vOrigins.data(), primes, primesInverseInvk, nSievePrimes, nSieveBits, 32, nPrimorialEndPrime,
+                         primeLimitA, vOrigins.size(), nMaxCandidates);
 
 
-        /* Find prime limit B which is the first prime larger than bit array size. */
-        primeLimitB = 564164;
-        for(int i = 0; i < nSievePrimes; ++i)
+        /* Find prime limit B which is the first prime larger than bit array size (index 0 reserved for size). */
+        primeLimitB = 0;
+        for(int i = 1; i < nSievePrimes; ++i)
         {
             if(primes[i] > nSieveBits)
             {
@@ -271,23 +257,24 @@ namespace LLC
         cuda_set_offset_patterns(nID, vOffsets, vOffsetsA, vOffsetsB, vOffsetsT);
 
         /* Allocate memory for offsets testing meta and bit array sieve. */
-        g_nonce_offsets[nID] =   (uint64_t*)malloc(CANDIDATES_MAX * sizeof(uint64_t));
-        g_nonce_meta[nID] =      (uint32_t*)malloc(CANDIDATES_MAX * sizeof(uint32_t));
-        g_bit_array_sieve[nID] = (uint32_t *)malloc(16 * (nSieveBits >> 5) * sizeof(uint32_t));
+        g_nonce_offsets[nID] =   (uint64_t*)malloc(nMaxCandidates * sizeof(uint64_t));
+        g_nonce_meta[nID] =      (uint32_t*)malloc(nMaxCandidates * sizeof(uint32_t));
+        //g_bit_array_sieve[nID] = (uint32_t *)malloc(16 * (nSieveBits >> 5) * sizeof(uint32_t));
+
 
         /* Initialize the GMP objects. */
         mpz_init(zPrimeOrigin);
         mpz_init(zPrimorialMod);
         mpz_init(zTempVar);
-
     }
 
     void PrimeCUDA::Shutdown()
     {
         debug::log(3, FUNCTION, "PrimeCUDA", static_cast<uint32_t>(nID));
 
-        /* Set the GPU quit flag to true. */
+        /* Set GPU quit flag to true and ensure GPU is synchronized. */
         cuda_set_quit(1);
+        cuda_device_synchronize();
 
         /* Atomic set reset flag to false. */
         fReset = true;
@@ -301,7 +288,7 @@ namespace LLC
         /* Free the global nonce and sieve memory. */
         free(g_nonce_offsets[nID]);
         free(g_nonce_meta[nID]);
-        free(g_bit_array_sieve[nID]);
+        //free(g_bit_array_sieve[nID]);
 
         /* Free the GPU device memory and reset them. */
         cuda_free_primes(nID);

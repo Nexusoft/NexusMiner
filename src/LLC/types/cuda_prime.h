@@ -104,6 +104,8 @@ namespace LLC
 
     private:
 
+        std::vector<uint64_t> vWorkOrigins;
+
         mpz_t zPrimeOrigin;
         mpz_t zPrimorialMod;
         mpz_t zTempVar;
@@ -113,10 +115,13 @@ namespace LLC
         uint32_t nPrimesFound[OFFSETS_MAX];
         uint32_t nSieveIndex;
         uint32_t nTestIndex;
+        uint32_t nBitArrayIndex;
+
 
         uint32_t nIterations;
         uint32_t nSievePrimes;
         uint32_t nSieveBits;
+        uint32_t nMaxCandidates;
         uint8_t nTestLevel;
 
 

@@ -8,7 +8,6 @@
 
 #include <stdio.h>
 
-uint32_t device_map[GPU_MAX] = {0,1,2,3,4,5,6,7};
 
 extern "C" void cuda_reset_device()
 {
@@ -100,19 +99,16 @@ extern "C" std::string cuda_devicename(uint8_t index)
 
 extern "C" void cuda_init(uint8_t thr_id)
 {
-  debug::log(0, "thread ", (uint32_t)thr_id, " maps to CUDA device #", static_cast<uint32_t>(device_map[thr_id]));
-
-  cudaSetDevice(device_map[thr_id]);
-
-  cudaDeviceSetCacheConfig(cudaFuncCachePreferEqual);
+  cudaSetDevice(thr_id);
+  cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 }
 
 
 extern "C" void cuda_free(uint8_t thr_id)
 {
-    debug::log(0, "Device ", static_cast<uint32_t>(device_map[thr_id]), " shutting down...");
+    debug::log(0, "Device ", (uint32_t)thr_id, " shutting down...");
 
-    cudaSetDevice(device_map[thr_id]);
+    cudaSetDevice(thr_id);
     cudaDeviceSynchronize();
     cudaDeviceReset();
 }

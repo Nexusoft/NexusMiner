@@ -34,14 +34,16 @@ extern uint32_t nSievePrimeLimit;
 extern uint32_t nSievePrimesLog2[GPU_MAX];
 extern uint32_t nSieveBitsLog2[GPU_MAX];
 extern uint32_t nSieveIterationsLog2[GPU_MAX];
+extern uint32_t nMaxCandidatesLog2[GPU_MAX];
 extern uint32_t  nTestLevels[GPU_MAX];
 extern uint32_t nSievesPerOrigin[GPU_MAX];
+
 
 namespace prime
 {
     bool load_offsets();
     bool load_origins();
-    void load_config(uint32_t nThreadsGPU);
+    void load_config(const std::vector<uint32_t>& indices);
 }
 
 #endif
