@@ -43,7 +43,7 @@ namespace LLP
     Worker::~Worker()
     {
         Stop();
-        
+
         /* Join the worker thread. */
         if(workerThread.joinable())
             workerThread.join();
@@ -70,13 +70,12 @@ namespace LLP
         while (!fStop.load())
         {
             /* Wait for the block to be ready. */
-
             if(fSubscribe && !fPause.load())
                 pProof->SetBlock(pMiner->GetBlock(Channel()));
 
+            /* If not paused, disable reset flag. */
             if(!fPause.load())
                 fReset = false;
-
 
             /* Initialize the proof of work. */
             if(!fReset.load())

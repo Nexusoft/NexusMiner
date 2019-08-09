@@ -131,10 +131,6 @@ namespace LLP
                     runtime::sleep(5000);
                     continue;
                 }
-
-
-                /* After connection has been reestablished, reset the miner. */
-                Reset();
             }
 
             if(++nCounter >= 5)
@@ -182,7 +178,9 @@ namespace LLP
             /* Rudimentary meter. */
             if(minerTimer.Elapsed() >= 10)
             {
-                PrintStats();
+                if(!fStop.load() && !fPause.load())
+                    PrintStats();
+
                 minerTimer.Reset();
             }
 
@@ -204,9 +202,17 @@ namespace LLP
 
     void Miner::SetChannel(uint32_t nChannel)
     {
-        if(nPrevChannel != nChannel)
+
+        /* Make sure we don't attempt to set an invalid channel. */
+        if(nChannel == 0 || nChannel > 2)
         {
-            nPrevChannel = nChannel;
+            debug::error(FUNCTION, "Invalid Channel ", nChannel);
+            return;
+        }
+
+        //if(nPrevChannel != nChannel)
+        //{
+        //    nPrevChannel = nChannel;
 
             Packet REQUEST;
 
@@ -215,7 +221,7 @@ namespace LLP
             REQUEST.DATA   = convert::uint2bytes(nChannel);
 
             WritePacket(REQUEST);
-        }
+        //}
     }
 
 
@@ -331,6 +337,7 @@ namespace LLP
                 debug::log(0, "[MASTER] ", KLGRN, "ACCEPTED", KNRM);
                 if(nChannel == 1 || nChannel == 2)
                     ++nAccepted[nChannel - 1];
+
                 Reset();
             }
             else if(RESPONSE.HEADER == ORPHAN_BLOCK)
@@ -384,17 +391,19 @@ namespace LLP
     {
         std::unique_lock<std::mutex> lk(mut);
 
+        TAO::Ledger::Block block;
+        block.SetNull();
+
         /* Send LLP messages to obtain a new block. */
-        TAO::Ledger::Block block = get_block(nChannel);
+        if(Connected())
+            block = get_block(nChannel);
 
         /* Check to see if the block was recieved properly. */
         if(block.IsNull())
         {
             Pause();
-            debug::log(2, FUNCTION, "Null Block");
             return block;
         }
-
 
         /* Print a debug log message for this block. */
         uint1024_t hashProof = block.ProofHash();
@@ -552,6 +561,8 @@ namespace LLP
 
             /* Set the miner pause flag. */
             fPause = true;
+
+            nBestHeight = 0;
 
             /* Pause the workers. */
             for(const auto& worker : vWorkers)

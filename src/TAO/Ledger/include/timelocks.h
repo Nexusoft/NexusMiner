@@ -15,7 +15,7 @@ ________________________________________________________________________________
 #ifndef NEXUS_TAO_LEDGER_INCLUDE_TIMELOCKS_H
 #define NEXUS_TAO_LEDGER_INCLUDE_TIMELOCKS_H
 
-#include <inttypes.h>
+#include <cstdint>
 
 /* Global TAO namespace. */
 namespace TAO

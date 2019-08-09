@@ -188,8 +188,9 @@ namespace config
 
         for(const auto& entry : vIPPortFilters)
         {
-            /* ensure it has a port*/
+            /* ensure it has a port */
             std::size_t nPortPos = entry.find(":");
+            
             if( nPortPos == std::string::npos)
                 continue;
 

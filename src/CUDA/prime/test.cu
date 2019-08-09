@@ -130,6 +130,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         /* Update the nonce combo. */
         atomicOr(&nonce_meta[idx], prime << test_index);
     }
+    
 }
 
 

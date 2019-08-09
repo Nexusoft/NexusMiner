@@ -33,11 +33,6 @@ uint32_t inv2adic(uint32_t x)
 {
     uint32_t a;
     a = x;
-    //x = (((x+2)&4)<<1)+x;
-    //x *= 2 - a*x;
-    //x *= 2 - a*x;
-    //x *= 2 - a*x;
-    //return -x;
 
     a=a*(a*x+14);
     a=a*(a*x+2);
