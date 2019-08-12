@@ -61,12 +61,64 @@ extern "C" void cuda_driver_version(int &major, int &minor)
 }
 
 
-extern "C" uint32_t cuda_device_multiprocessors(uint8_t index)
+extern "C" uint32_t cuda_device_multiprocessors(uint32_t index)
 {
     cudaDeviceProp props;
 
 	if (cudaGetDeviceProperties(&props, index) == cudaSuccess)
 		return props.multiProcessorCount;
+
+    return 0;
+}
+
+
+extern "C" uint32_t cuda_device_threads(uint32_t index)
+{
+    cudaDeviceProp props;
+
+	if(cudaGetDeviceProperties(&props, index) == cudaSuccess)
+    {
+
+        uint32_t threadsPerSM = 0;
+
+        switch (props.major)
+        {
+            case 3:
+            {
+                threadsPerSM = 192;
+                break;
+            }
+            case 5:
+            {
+                threadsPerSM  = 128;
+                break;
+            }
+            case 6:
+            {
+                if(props.minor == 0)
+                    threadsPerSM = 64;
+                else
+                    threadsPerSM = 128;
+
+                break;
+            }
+            case 7:
+            {
+                threadsPerSM = 64;
+                break;
+            }
+            default:
+            {
+                debug::error(FUNCTION, "GPU #", index,
+                    " unsupported compute capability: ", props.major, ".", props.minor);
+
+                return 0;
+            }
+        }
+
+        return threadsPerSM * props.multiProcessorCount;
+    }
+
 
     return 0;
 }
@@ -86,7 +138,7 @@ extern "C" uint32_t cuda_num_devices()
 }
 
 
-extern "C" std::string cuda_devicename(uint8_t index)
+extern "C" std::string cuda_devicename(uint32_t index)
 {
 	cudaDeviceProp props;
 
@@ -97,16 +149,16 @@ extern "C" std::string cuda_devicename(uint8_t index)
 }
 
 
-extern "C" void cuda_init(uint8_t thr_id)
+extern "C" void cuda_init(uint32_t thr_id)
 {
   cudaSetDevice(thr_id);
   cudaDeviceSetCacheConfig(cudaFuncCachePreferL1);
 }
 
 
-extern "C" void cuda_free(uint8_t thr_id)
+extern "C" void cuda_free(uint32_t thr_id)
 {
-    debug::log(0, "Device ", (uint32_t)thr_id, " shutting down...");
+    debug::log(0, "Device ", thr_id, " shutting down...");
 
     cudaSetDevice(thr_id);
     cudaDeviceSynchronize();

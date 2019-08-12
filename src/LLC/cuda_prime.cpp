@@ -63,6 +63,7 @@ namespace LLC
     , nSievePrimes(0)
     , nSieveBits(0)
     , nMaxCandidates(0)
+    , nDeviceThreads(0)
     , nTestLevel(0)
     {
         for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
@@ -230,7 +231,9 @@ namespace LLC
         nMaxCandidates = 1 << nMaxCandidatesLog2[nID];
         nTestLevel = nTestLevels[nID];
 
+        nDeviceThreads = cuda_device_threads(nID);
 
+        debug::log(0, FUNCTION, nDeviceThreads, " CUDA Cores");
         debug::log(0, FUNCTION, "nIterations ", nIterations, " nSievePrimes ", nSievePrimes, " nSieveBits ", nSieveBits, " nMaxCandidates ", nMaxCandidates);
 
         /* Load the primes lists on the GPU device. */

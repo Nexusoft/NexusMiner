@@ -252,6 +252,7 @@ void rshift1(uint32_t *r, uint32_t *a)
 }
 
 
+/* Store a value on the window table at index w. */
 __device__ __forceinline__
 void store(uint32_t *a, uint32_t *table, uint32_t w)
 {
@@ -261,6 +262,7 @@ void store(uint32_t *a, uint32_t *table, uint32_t w)
 }
 
 
+/* Load a value from the window table at index w. */
 __device__ __forceinline__
 void load(uint32_t *a, uint32_t *table, uint32_t w)
 {

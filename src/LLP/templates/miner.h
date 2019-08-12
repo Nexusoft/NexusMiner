@@ -326,6 +326,14 @@ namespace LLP
          **/
         TAO::Ledger::Block get_block(uint32_t nChannel);
 
+
+        /** set_coinbase
+         *
+         *
+         **/
+        void set_coinbase();
+
+
         std::vector<Worker *> vWorkers;
         std::vector<Worker *> vSubscribed;
         std::queue<TAO::Ledger::Block> qSubmit;

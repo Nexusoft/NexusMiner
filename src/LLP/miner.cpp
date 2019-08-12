@@ -150,6 +150,13 @@ namespace LLP
                     nBestHeight = nHeight;
                     debug::log(0, "[MASTER] Nexus Network: New Block ", nHeight);
 
+                    /* Set the coinbase reward for this round. */
+                    {
+                        std::unique_lock<std::mutex> lk(mut);
+                        set_coinbase();
+                    }
+
+
                     /* Reset the workers so they can recieve new blocks. */
                     Reset();
                 }
@@ -250,7 +257,6 @@ namespace LLP
     /* Check if there are any blocks to submit. */
     void Miner::CheckSubmit()
     {
-        //uint8_t blockID = 0;
         TAO::Ledger::Block block;
         bool have_submit = false;
 
@@ -285,15 +291,6 @@ namespace LLP
 
         Packet REQUEST;
         Packet RESPONSE;
-
-
-
-        /* Make sure that the block to submit didn't come from a previous round. */
-        //if(block.nHeight != best_height && best_height != 1)
-        //{
-        //    debug::log(0, "[MASTER] ", KLYEL, "ORPHANED (Stale)", KNRM, block.nHeight, " ", best_height);
-        //    return;
-        //}
 
         /* Build a Submit block packet request. */
         REQUEST.HEADER = SUBMIT_BLOCK;
@@ -801,6 +798,82 @@ namespace LLP
 
         /* Return the newly created block. */
         return block;
+    }
+
+    void Miner::set_coinbase()
+    {
+        Packet REQUEST;
+        Packet RESPONSE;
+
+        /* Setup a reward request and wait for its arrival. */
+        REQUEST.HEADER = GET_REWARD;
+        WritePacket(REQUEST);
+        ReadNextPacket(RESPONSE);
+
+        /* Check if the reward was recieved. */
+        if(RESPONSE.IsNull() || RESPONSE.HEADER != BLOCK_REWARD)
+        {
+            debug::error(FUNCTION, "invalid reward response.");
+            return;
+        }
+
+        /* Get the maximum reward. */
+        const uint64_t nMaxReward = convert::bytes2uint64(RESPONSE.DATA);
+
+        /* Get the dev fee. */
+        uint64_t nFee = static_cast<uint64_t>(static_cast<double>(nMaxReward) * 0.01);
+
+        /* Get the reward minus fees. */
+        uint64_t nReward = nMaxReward - nFee;
+
+        std::vector<uint8_t> FEE = convert::uint2bytes64(nFee);
+        std::vector<uint8_t> REWARD = convert::uint2bytes64(nReward);
+
+        /* Setup a set coinbase request. */
+        REQUEST.HEADER = SET_COINBASE;
+
+        /* Add number of coinbase recipients. */
+        uint8_t nSize = 1;
+        REQUEST.DATA.push_back(nSize);
+
+        /* Add the wallet reward. */
+        REQUEST.DATA.insert(REQUEST.DATA.end(), REWARD.begin(), REWARD.end());
+
+        /* Set the dev address. */
+        std::string strAddress = "2SXUYZMAThtEz1aeVmGtJBLLgnmxrendSTj5A4qej771K2WZd9T";
+        std::vector<uint8_t> ADDRESS = convert::string2bytes(strAddress);
+
+        /* Set the length. */
+        uint8_t nLength = ADDRESS.size();
+        REQUEST.DATA.push_back(nLength);
+
+        /* Set the string address. */
+        REQUEST.DATA.insert(REQUEST.DATA.end(), ADDRESS.begin(), ADDRESS.end());
+
+        /* Set the value for the coinbase output. */
+        REQUEST.DATA.insert(REQUEST.DATA.end(), FEE.begin(), FEE.end());
+
+        /* Set the length to the size of the packet. */
+        REQUEST.LENGTH = REQUEST.DATA.size();
+
+        WritePacket(REQUEST);
+        ReadNextPacket(RESPONSE);
+
+        /* Check if the set coinbase responded properly. */
+        if(RESPONSE.IsNull())
+        {
+            debug::error(FUNCTION, "invalid set coinbase response.");
+            return;
+        }
+
+        /* Print a coinbase fail message. */
+        if(RESPONSE.HEADER == COINBASE_FAIL)
+            debug::error(FUNCTION, "failed to set the coinbase.");
+
+        /* Print a coinbase set message. */
+        //if(RESPONSE.HEADER == COINBASE_SET)
+        //    debug::log(0, FUNCTION, "coinbase set");
+
     }
 
 }
