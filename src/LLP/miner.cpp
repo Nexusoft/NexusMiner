@@ -150,12 +150,6 @@ namespace LLP
                     nBestHeight = nHeight;
                     debug::log(0, "[MASTER] Nexus Network: New Block ", nHeight);
 
-                    /* Set the coinbase reward for this round. */
-                    {
-                        std::unique_lock<std::mutex> lk(mut);
-                        set_coinbase();
-                    }
-
 
                     /* Reset the workers so they can recieve new blocks. */
                     Reset();
@@ -390,6 +384,10 @@ namespace LLP
 
         TAO::Ledger::Block block;
         block.SetNull();
+
+        /* Make sure we don't get wrong block. */
+        if(nBestHeight == 0)
+            return block;
 
         /* Send LLP messages to obtain a new block. */
         if(Connected())
@@ -751,6 +749,10 @@ namespace LLP
 
         /* Set the channel of the worker channel. */
         SetChannel(nChannel);
+
+        /* Set the coinbase reward for this block. */
+        set_coinbase();
+
         WritePacket(REQUEST);
         ReadNextPacket(RESPONSE);
 
@@ -799,6 +801,7 @@ namespace LLP
         /* Return the newly created block. */
         return block;
     }
+
 
     void Miner::set_coinbase()
     {
@@ -871,8 +874,8 @@ namespace LLP
             debug::error(FUNCTION, "failed to set the coinbase.");
 
         /* Print a coinbase set message. */
-        //if(RESPONSE.HEADER == COINBASE_SET)
-        //    debug::log(0, FUNCTION, "coinbase set");
+        if(RESPONSE.HEADER == COINBASE_SET)
+            debug::log(3, FUNCTION, "coinbase set");
 
     }
 
