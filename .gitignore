@@ -3,6 +3,7 @@ log
 *.ini
 *.prof
 *.gz
+*.zip
 nexusminer
 miner_profile
 
