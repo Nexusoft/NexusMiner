@@ -130,7 +130,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
         /* Update the nonce combo. */
         atomicOr(&nonce_meta[idx], prime << test_index);
     }
-    
+
 }
 
 
@@ -205,7 +205,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
 
     uint32_t sharedSizeBytes = 0;//threadsPerBlock * WORD_MAX * sizeof(uint32_t);
 
-    /* Launcth the fermat testing kernel. */
+    /* Launch the fermat testing kernel. */
     fermat_kernel<<<grid, block, sharedSizeBytes, d_Streams[thr_id][STREAM::FERMAT]>>>(
         frameResources[thr_id].d_nonce_offsets[curr_test],
         frameResources[thr_id].d_nonce_meta[curr_test],

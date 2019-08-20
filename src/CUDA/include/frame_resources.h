@@ -11,7 +11,7 @@
 #include <CUDA/include/macro.h>
 #include <cstdint>
 
-#define FRAME_COUNT 3
+#define FRAME_COUNT 2
 
 struct FrameResource
 {
