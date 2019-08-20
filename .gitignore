@@ -1,6 +1,5 @@
 log
 *.o
-*.ini
 *.prof
 *.gz
 *.zip
