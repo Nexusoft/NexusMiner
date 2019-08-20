@@ -63,7 +63,7 @@ Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet h
     -prime=<indices>    ex: 0,1,2,3,4,5
     -hash=<indices>     ex: 0,1,2,3,4,5
     -testnet            Specifies or overrides -port=8325
-    -primeorigins       Standalone CPU mode to compute prime origins based on primorial end prime and base offset.
+    -primeorigins       Standalone CPU mode to compute prime origins based on primorial end prime, base offset, and prime offsets.
 ```
 
   ./nexusminer -ip=192.168.0.100 -port=9325 -timeout=10 -prime=0,1,2,3,4,5
@@ -76,7 +76,7 @@ Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet h
 
 * CUDA Toolkit: follow installation guide: https://docs.nvidia.com/cuda/index.html
 
-### Windows
+### Windows (Not yet supported)
 
 * MPIR: Windows GMP equivalent
 
