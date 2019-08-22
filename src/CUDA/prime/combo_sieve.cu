@@ -16,6 +16,66 @@
 #include <CUDA/include/constants.h>
 #include <Util/include/prime_config.h>
 
+
+template<uint8_t o>
+__global__ void combosieve_kernelD_512(uint32_t *g_sieve_hierarchy,
+                                       uint32_t *g_bit_array_sieve,
+                                       uint32_t *prime_remainders,
+                                       uint16_t *blockoffset_mod_p,
+                                       uint32_t base_index,
+                                       uint16_t nPrimorialEndPrime,
+                                       uint16_t nPrimeLimitA)
+{
+    extern __shared__ uint32_t shared_array_sieve[];
+    uint32_t index;
+    uint32_t mask;
+    uint32_t id;
+    uint16_t i, j;
+    uint16_t pr, pre2;
+
+    #pragma unroll 16
+    for (uint8_t i= 0; i <  16; ++i)
+        shared_array_sieve[threadIdx.x + (i << 9)] = 0;
+
+    __syncthreads();
+
+    base_index = base_index << 12;
+
+    for (i = nPrimorialEndPrime + threadIdx.x; i < nPrimeLimitA; i += blockDim.x)
+    {
+        pr = c_primes[i];
+        pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
+
+
+        index = prime_remainders[((base_index + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
+        if(index >= pr)
+            index = index - pr;
+
+        for(; index < 262144; index += pr)
+        {
+            mask = 1 << (index & 31);
+            id = index >> 5;
+
+            if((g_sieve_hierarchy[id] & mask) == 0)
+                atomicOr(&shared_array_sieve[id], mask);
+        }
+
+    }
+
+    __syncthreads();
+    g_bit_array_sieve += (blockIdx.x << 13);
+
+    #pragma unroll 16
+    for (uint8_t i = 0; i < 16; ++i) // fixed value
+    {
+        j = threadIdx.x + (i << 9);
+        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
+        g_bit_array_sieve[j] = shared_array_sieve[j];
+    }
+}
+
+
+
 template<uint8_t o>
 __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
                                        uint32_t *g_bit_array_sieve,
@@ -307,10 +367,10 @@ __global__ void compact_combo(uint64_t *d_origins,
     }
 }
 
-#define COMBO_A_LAUNCH(X) combosieve_kernelA_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
+#define COMBO_A_LAUNCH(X) combosieve_kernelD_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
 frameResources[thr_id].d_bit_array_sieve[frame_index], \
 &frameResources[thr_id].d_bit_array_sieve[frame_index][X * nBitArray_Size >> 5], \
-&d_prime_remainders[thr_id][nPrimeLimitA * nOrigins << 3], \
+&d_prime_remainders[thr_id][4096 * nOrigins << 3], \
 d_blockoffset_mod_p[thr_id], \
 origin_index, \
 nPrimorialEndPrime, \

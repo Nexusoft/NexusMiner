@@ -131,7 +131,7 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
     uint32_t sharedSizeBits = sharedSizeKB * 1024 * 8;
     uint32_t allocSize = ((nBitArray_Size * 16  + sharedSizeBits - 1) / sharedSizeBits) * sharedSizeBits;
     uint32_t bitarray_size = (allocSize+31)/32 * sizeof(uint32_t);
-    uint32_t remainder_size = 2 * 8 * nPrimeLimitA * nOrigins * sizeof(uint32_t);
+    uint32_t remainder_size = 2 * 8 * 4096 * nOrigins * sizeof(uint32_t);
 
     /* Allocate memory for the primes, inverses, and reciprocals that are used
        as the basis for prime sieve computation */
@@ -315,18 +315,22 @@ __global__ void primesieve_kernelA0(uint64_t *origins,
                                     uint4 *primes,
                                     uint32_t *prime_remainders,
                                     uint32_t *base_remainders,
-                                    uint16_t nPrimeLimit,
-                                    uint8_t nOffsets)
+                                    uint8_t nOffsets,
+                                    uint16_t nOrigins)
 {
-    uint32_t i = (blockIdx.x << 9) + threadIdx.x;
-    uint32_t j = i << 3;
+    uint32_t g_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint4 tmp = primes[threadIdx.x];
+    uint32_t p_idx = g_idx / nOrigins;
+    uint32_t o_idx = g_idx % nOrigins;
+
+    uint32_t j = ((o_idx << 12) + p_idx) << 3;
+
+    uint4 tmp = primes[p_idx];
     uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
     for(uint8_t o = 0; o < nOffsets; ++o)
     {
-        tmp.z = mod_p_small(origins[blockIdx.x] + base_remainders[threadIdx.x] + c_offsets[c_iA[o]], tmp.x, recip);
+        tmp.z = mod_p_small(origins[o_idx] + base_remainders[p_idx] + c_offsets[c_iA[o]], tmp.x, recip);
         prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
     }
 }
@@ -335,86 +339,27 @@ __global__ void primesieve_kernelB0(uint64_t *origins,
                                     uint4 *primes,
                                     uint32_t *prime_remainders,
                                     uint32_t *base_remainders,
-                                    uint16_t nPrimeLimit,
-                                    uint8_t nOffsets)
+                                    uint8_t nOffsets,
+                                    uint16_t nOrigins)
 {
-    uint32_t i = (blockIdx.x << 9) + threadIdx.x;
-    uint32_t j = i << 3;
+    uint32_t g_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint4 tmp = primes[threadIdx.x];
+    uint32_t p_idx = g_idx / nOrigins;
+    uint32_t o_idx = g_idx % nOrigins;
+
+    uint32_t j = ((o_idx << 12) + p_idx) << 3;
+
+    uint4 tmp = primes[p_idx];
     uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
     for(uint8_t o = 0; o < nOffsets; ++o)
     {
-        tmp.z = mod_p_small(origins[blockIdx.x] + base_remainders[threadIdx.x] + c_offsets[c_iB[o]], tmp.x, recip);
+        tmp.z = mod_p_small(origins[o_idx] + base_remainders[p_idx] + c_offsets[c_iB[o]], tmp.x, recip);
         prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
     }
 }
 
 
-template<uint8_t offsetsA>
-__global__ void primesieve_kernelA_1024(uint32_t *g_bit_array_sieve,
-                                        uint32_t *prime_remainders,
-                                        uint16_t *blockoffset_mod_p,
-                                        uint32_t base_index,
-                                        uint16_t nPrimorialEndPrime,
-                                        uint16_t nPrimeLimitA)
-{
-    extern __shared__ uint32_t shared_array_sieve[];
-
-    uint16_t i, j;
-
-    #pragma unroll 8
-    for (int i= 0; i <  8; ++i)
-        shared_array_sieve[threadIdx.x + (i << 10)] = 0;
-
-    __syncthreads();
-
-    for (i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
-    {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
-
-        // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 10;
-
-        uint32_t pre1[offsetsA];
-        auto pre = [&pre1, &prime_remainders, &base_index, &i](uint32_t o)
-        {
-            pre1[o] = prime_remainders[(((base_index << 9) + i) << 3) + o]; // << 3 because we have space for 8 offsets
-        };
-
-        Unroller<0, offsetsA>::step(pre);
-
-        uint32_t index;
-        auto loop = [&pIdx, &nAdd, &pre1, &pre2, &pr, &index](uint32_t o)
-        {
-            index = pre1[o] + pre2;
-            if(index >= pr)
-                index = index - pr;
-
-            for(index = index + pIdx; index < 262144; index += nAdd)
-            {
-                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
-            }
-
-        };
-
-        Unroller<0, offsetsA>::step(loop);
-    }
-
-    __syncthreads();
-    g_bit_array_sieve += (blockIdx.x << 13);
-
-    #pragma unroll 8
-    for (int i = 0; i < 8; ++i) // fixed value
-    {
-        j = threadIdx.x + (i << 10);
-        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
-        g_bit_array_sieve[j] = shared_array_sieve[j];
-    }
-}
 template<uint8_t offsetsA>
 __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
@@ -437,7 +382,7 @@ __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
 
     __syncthreads();
 
-    base_index = base_index << 9;
+    base_index = base_index << 12;
 
     for (i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
     {
@@ -485,8 +430,9 @@ __global__ void primesieve_kernelA_512(uint32_t *g_bit_array_sieve,
     }
 }
 
+
 template<uint8_t offsetsA>
-__global__ void primesieve_kernelA_256(uint32_t *g_bit_array_sieve,
+__global__ void primesieve_kernelD_512(uint32_t *g_bit_array_sieve,
                                        uint32_t *prime_remainders,
                                        uint16_t *blockoffset_mod_p,
                                        uint32_t base_index,
@@ -494,39 +440,44 @@ __global__ void primesieve_kernelA_256(uint32_t *g_bit_array_sieve,
                                        uint16_t nPrimeLimitA)
 {
     extern __shared__ uint32_t shared_array_sieve[];
+    uint32_t pre1[offsetsA];
+    uint32_t index;
+    uint16_t i, j;
+    uint16_t pr, pre2;
 
-    #pragma unroll 32
-    for (uint8_t i= 0; i <  32; ++i)
-        shared_array_sieve[threadIdx.x + (i << 8)] = 0;
+    #pragma unroll 16
+    for (int i= 0; i <  16; ++i)
+        shared_array_sieve[threadIdx.x + (i << 9)] = 0;
 
     __syncthreads();
 
-    for (uint16_t i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
+    base_index = base_index << 12;
+
+    for (i = nPrimorialEndPrime + threadIdx.x; i < nPrimeLimitA; i += blockDim.x)
     {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
+        pr = c_primes[i];
+        pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
 
         // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 8;
+        index = (base_index + i) << 3;
 
-        uint32_t pre1[offsetsA];
-        auto pre = [&pre1, &prime_remainders, &base_index, &i](uint32_t o)
+        auto pre = [&pre1, &prime_remainders, &index](uint32_t o)
         {
-            pre1[o] = prime_remainders[(((base_index << 9) + i) << 3) + o]; // << 3 because we have space for 8 offsets
+            pre1[o] = prime_remainders[index + o]; // << 3 because we have space for 8 offsets
         };
 
         Unroller<0, offsetsA>::step(pre);
 
-        uint32_t index;
-        auto loop = [&pIdx, &nAdd, &pre1, &pre2, &pr, &index](uint32_t o)
+        auto loop = [&pre1, &pre2, &pr, &index](uint32_t o)
         {
             index = pre1[o] + pre2;
             if(index >= pr)
                 index = index - pr;
 
-            for(index = index + pIdx; index < 262144; index += nAdd)
+            for(; index < 262144; index += pr)
+            {
                 atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+            }
         };
 
         Unroller<0, offsetsA>::step(loop);
@@ -535,69 +486,10 @@ __global__ void primesieve_kernelA_256(uint32_t *g_bit_array_sieve,
     __syncthreads();
     g_bit_array_sieve += (blockIdx.x << 13);
 
-    #pragma unroll 32
-    for (uint8_t i = 0; i < 32; ++i) // fixed value
+    #pragma unroll 16
+    for (int i = 0; i < 16; ++i) // fixed value
     {
-        uint16_t j = threadIdx.x + (i << 8);
-        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
-        g_bit_array_sieve[j] = shared_array_sieve[j];
-    }
-}
-
-template<uint8_t offsetsA>
-__global__ void primesieve_kernelA_128(uint32_t *g_bit_array_sieve,
-                                       uint32_t *prime_remainders,
-                                       uint16_t *blockoffset_mod_p,
-                                       uint32_t base_index,
-                                       uint16_t nPrimorialEndPrime,
-                                       uint16_t nPrimeLimitA)
-{
-    extern __shared__ uint32_t shared_array_sieve[];
-
-    #pragma unroll 64
-    for (uint8_t i= 0; i <  64; ++i)
-        shared_array_sieve[threadIdx.x + (i << 7)] = 0;
-
-    __syncthreads();
-
-    for (uint16_t i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
-    {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
-
-        // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 7;
-
-        uint32_t pre1[offsetsA];
-        auto pre = [&pre1, &prime_remainders, &base_index, &i](uint32_t o)
-        {
-            pre1[o] = prime_remainders[(((base_index << 9) + i) << 3) + o]; // << 3 because we have space for 8 offsets
-        };
-
-        Unroller<0, offsetsA>::step(pre);
-
-        uint32_t index;
-        auto loop = [&pIdx, &nAdd, &pre1, &pre2, &pr, &index](uint32_t o)
-        {
-            index = pre1[o] + pre2;
-            if(index >= pr)
-                index = index - pr;
-
-            for(index = index + pIdx; index < 262144; index += nAdd)
-                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
-        };
-
-        Unroller<0, offsetsA>::step(loop);
-    }
-
-    __syncthreads();
-    g_bit_array_sieve += (blockIdx.x << 13);
-
-    #pragma unroll 64
-    for (uint8_t i = 0; i < 64; ++i) // fixed value
-    {
-        uint16_t j = threadIdx.x + (i << 7);
+        j = threadIdx.x + (i << 9);
         //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
         g_bit_array_sieve[j] = shared_array_sieve[j];
     }
@@ -693,16 +585,18 @@ void kernelA0_launch(uint8_t thr_id,
                      uint16_t nPrimeLimitA,
                      uint16_t nOrigins)
 {
-    dim3 block(nPrimeLimitA);
-    dim3 grid(nOrigins);
+    uint32_t nThreads = nPrimeLimitA * nOrigins;
+
+    dim3 block(512);
+    dim3 grid((nThreads + block.x - 1) / block.x);
 
     primesieve_kernelA0<<<grid, block, 0, d_Streams[thr_id][str_id]>>>(
         d_origins[thr_id],
         d_primesInverseInvk[thr_id],
         d_prime_remainders[thr_id],
         d_base_remainders[thr_id],
-        nPrimeLimitA,
-        nOffsetsA );
+        nOffsetsA,
+        nOrigins);
 }
 
 void kernelB0_launch(uint8_t thr_id,
@@ -710,16 +604,18 @@ void kernelB0_launch(uint8_t thr_id,
                      uint16_t nPrimeLimitA,
                      uint16_t nOrigins)
 {
-    dim3 block(nPrimeLimitA);
-    dim3 grid(nOrigins);
+    uint32_t nThreads = nPrimeLimitA * nOrigins;
+
+    dim3 block(512);
+    dim3 grid((nThreads + block.x - 1) / block.x);
 
     primesieve_kernelB0<<<grid, block, 0, d_Streams[thr_id][str_id]>>>(
         d_origins[thr_id],
         d_primesInverseInvk[thr_id],
-        &d_prime_remainders[thr_id][nPrimeLimitA * nOrigins << 3],
+        &d_prime_remainders[thr_id][4096 * nOrigins << 3],
         d_base_remainders[thr_id],
-        nPrimeLimitA,
-        nOffsetsB );
+        nOffsetsB,
+        nOrigins);
 }
 
 extern "C" void cuda_set_origins(uint8_t thr_id, uint32_t nPrimeLimitA, uint64_t *origins, uint32_t nOrigins)
@@ -741,7 +637,7 @@ extern "C" void cuda_set_origins(uint8_t thr_id, uint32_t nPrimeLimitA, uint64_t
     CHECK(stream_signal_event(thr_id, 0, STREAM::SIEVE_B, EVENT::SIEVE_B));
 }
 
-#define KERNEL_A_LAUNCH(X) primesieve_kernelA_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
+#define KERNEL_A_LAUNCH(X) primesieve_kernelD_512<X><<<grid, block, sharedSizeBits/8, d_Streams[thr_id][str_id]>>>(\
 frameResources[thr_id].d_bit_array_sieve[frame_index], \
 d_prime_remainders[thr_id], \
 d_blockoffset_mod_p[thr_id], \
