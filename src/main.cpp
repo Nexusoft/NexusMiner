@@ -85,6 +85,10 @@ int main(int argc, char **argv)
     uint32_t nPrimeCPU = config::GetArg(std::string("-cpuprime"), 0);
     uint32_t nHashCPU = config::GetArg(std::string("-cpuhash"), 0);
 
+
+    /* Get the percent of developer fee to donate. (Thank you !!!). */
+    double nDevFee = config::GetArg(std::string("-donate"), 0.0);
+
     /* If prime origins is specified, generate a prime origin list. */
     if(config::GetBoolArg(std::string("-primeorigins")))
     {
@@ -118,7 +122,7 @@ int main(int argc, char **argv)
     }
 
     /* Initialize the miner. */
-    LLP::Miner Miner(ip, port, nTimeout);
+    LLP::Miner Miner(ip, port, nTimeout, nDevFee);
 
     /* Add GPU prime sieve/test workers to the miner. */
     for(uint32_t tid = 0; tid < nPrimeGPU; ++tid)

@@ -124,7 +124,7 @@ namespace LLP
     public:
 
         /** Default constructor. **/
-        Miner(const std::string &ip, uint16_t port, uint16_t timeout);
+        Miner(const std::string &ip, uint16_t port, uint16_t timeout, double devfee = 0.0f);
 
 
         /** Default destructor. **/
@@ -352,6 +352,7 @@ namespace LLP
 
         double nHashDifficulty;
         double nPrimeDifficulty;
+        double nDevFee;
 
         std::atomic<uint8_t> nReady;
         std::atomic<bool> fReset;
@@ -359,6 +360,8 @@ namespace LLP
         std::atomic<bool> fPause;
 
         uint32_t nChannels;
+
+
 
     };
 }

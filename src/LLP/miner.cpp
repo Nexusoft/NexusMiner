@@ -41,7 +41,7 @@ namespace
 namespace LLP
 {
 
-    Miner::Miner(const std::string &ip, uint16_t port, uint16_t timeout)
+    Miner::Miner(const std::string &ip, uint16_t port, uint16_t timeout, double devfee)
     : Outbound(ip, port, timeout)
     , vWorkers()
     , vSubscribed()
@@ -55,6 +55,7 @@ namespace LLP
     , nBestHeight(0)
     , nHashDifficulty(0.0)
     , nPrimeDifficulty(0.0)
+    , nDevFee(devfee)
     , nReady(0)
     , fReset(true)
     , fStop(true)
@@ -65,6 +66,12 @@ namespace LLP
         nAccepted[1] = 0;
         nRejected[0] = 0;
         nRejected[1] = 0;
+
+        /* Clamp dev fee to 0 - 100% */
+        if(nDevFee > 100.0)
+            nDevFee = 100.0;
+        if(nDevFee < 0.0)
+            nDevFee = 0.0;
     }
 
 
@@ -805,6 +812,14 @@ namespace LLP
 
     void Miner::set_coinbase()
     {
+
+        /* Get percent fee from 0 - 100% mapped between 0.0 and 1.0 */
+        double nNormalizedFee = nDevFee / 100.0;
+
+        /* If fee is small enough, don't bother setting coinbase. */
+        if(nNormalizedFee >= 0.0 && nNormalizedFee < 0.0001)
+            return;
+
         Packet REQUEST;
         Packet RESPONSE;
 
@@ -823,8 +838,13 @@ namespace LLP
         /* Get the maximum reward. */
         const uint64_t nMaxReward = convert::bytes2uint64(RESPONSE.DATA);
 
+
         /* Get the dev fee. */
-        uint64_t nFee = static_cast<uint64_t>(static_cast<double>(nMaxReward) * 0.01);
+        uint64_t nFee = static_cast<uint64_t>(static_cast<double>(nMaxReward) * nNormalizedFee);
+
+        /* Clamp fee to max. */
+        if(nFee > nMaxReward)
+            nFee = nMaxReward;
 
         /* Get the reward minus fees. */
         uint64_t nReward = nMaxReward - nFee;
@@ -875,7 +895,7 @@ namespace LLP
 
         /* Print a coinbase set message. */
         if(RESPONSE.HEADER == COINBASE_SET)
-            debug::log(3, FUNCTION, "coinbase set");
+            debug::log(3, FUNCTION, "coinbase set with ", nDevFee, "% fee");
 
     }
 
