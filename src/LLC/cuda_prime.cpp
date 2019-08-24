@@ -64,6 +64,8 @@ namespace LLC
     , nSieveBits(0)
     , nMaxCandidates(0)
     , nDeviceThreads(0)
+    , nPrimeLimitA(4096)
+    , nPrimeLimitB(564164)
     , nTestLevel(0)
     {
         for(uint8_t i = 0; i < OFFSETS_MAX; ++i)
@@ -101,7 +103,7 @@ namespace LLC
 
 
         /* Sieve bit array and compact test candidate nonces */
-        if(cuda_primesieve(nID, nPrimorial, nPrimorialEndPrime, primeLimitA, primeLimitB, nSievePrimes, nSieveBits, nDifficulty,
+        if(cuda_primesieve(nID, nPrimorial, nPrimorialEndPrime, nPrimeLimitA, nPrimeLimitB, nSievePrimes, nSieveBits, nDifficulty,
                            nSieveIndex, nTestIndex, nOrigins, nMaxCandidates))
         {
             uint32_t nOriginIndex = nSieveIndex % nOrigins;
@@ -135,7 +137,7 @@ namespace LLC
                 ++nBitArrayIndex;
 
                 /* Compute prime remainders for each origin. */
-                cuda_set_origins(nID, primeLimitA, vWorkOrigins.data(), vWorkOrigins.size());
+                cuda_set_origins(nID, nPrimeLimitA, vWorkOrigins.data(), vWorkOrigins.size());
 
                 //debug::log(0, "cuda_set_origins ", nID, " ", nBitArrayIndex, " ", nSieveIndex);
             }
@@ -214,7 +216,7 @@ namespace LLC
         cuda_base_remainders(nID, nSievePrimes);
 
         /* Compute prime remainders for each origin. */
-        cuda_set_origins(nID, primeLimitA, vWorkOrigins.data(), vWorkOrigins.size());
+        cuda_set_origins(nID, nPrimeLimitA, vWorkOrigins.data(), vWorkOrigins.size());
     }
 
     void PrimeCUDA::Load()
@@ -238,17 +240,16 @@ namespace LLC
 
         /* Load the primes lists on the GPU device. */
         cuda_init_primes(nID, vOrigins.data(), primes, primesInverseInvk, nSievePrimes, nSieveBits, 32, nPrimorialEndPrime,
-                         primeLimitA, vOrigins.size(), nMaxCandidates);
+                         nPrimeLimitA, vOrigins.size(), nMaxCandidates);
 
 
         /* Find prime limit B which is the first prime larger than bit array size (index 0 reserved for size). */
-        primeLimitB = 0;
         for(int i = 1; i < nSievePrimes; ++i)
         {
             if(primes[i] > nSieveBits)
             {
                 debug::log(0, i, ": First prime found larger than ", nSieveBits, " = ", primes[i]);
-                primeLimitB = i;
+                nPrimeLimitB = i;
                 break;
             }
         }

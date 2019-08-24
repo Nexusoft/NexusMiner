@@ -123,6 +123,8 @@ namespace LLC
         uint32_t nSieveBits;
         uint32_t nMaxCandidates;
         uint32_t nDeviceThreads;
+        uint32_t nPrimeLimitA;
+        uint32_t nPrimeLimitB;
         uint8_t nTestLevel;
 
 

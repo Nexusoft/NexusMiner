@@ -141,106 +141,6 @@ __global__ void combosieve_kernelA_512(uint32_t *g_sieve_hierarchy,
     }
 }
 
-template<uint8_t o>
-__global__ void combosieve_kernelA_256(uint32_t *g_sieve_hierarchy,
-                                       uint32_t *g_bit_array_sieve,
-                                       uint32_t *prime_remainders,
-                                       uint16_t *blockoffset_mod_p,
-                                       uint32_t base_index,
-                                       uint16_t nPrimorialEndPrime,
-                                       uint16_t nPrimeLimitA)
-{
-    extern __shared__ uint32_t shared_array_sieve[];
-
-    #pragma unroll 32
-    for (uint8_t i= 0; i <  32; ++i)
-        shared_array_sieve[threadIdx.x + (i << 8)] = 0;
-
-    __syncthreads();
-
-    for (uint16_t i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
-    {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
-
-        // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 8;
-
-        uint32_t index = prime_remainders[(((base_index << 9) + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
-        if(index >= pr)
-            index = index - pr;
-
-        for(index = index + pIdx; index < 262144; index += nAdd)
-        {
-            if( (g_sieve_hierarchy[index >> 5] & (1 << (index & 31)) ) == 0)
-                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
-        }
-
-    }
-
-    __syncthreads();
-    g_bit_array_sieve += (blockIdx.x << 13);
-
-    #pragma unroll 32
-    for (uint8_t i = 0; i < 32; ++i) // fixed value
-    {
-        uint16_t j = threadIdx.x + (i << 8);
-        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
-        g_bit_array_sieve[j] = shared_array_sieve[j];
-    }
-}
-
-template<uint8_t o>
-__global__ void combosieve_kernelA_128(uint32_t *g_sieve_hierarchy,
-                                       uint32_t *g_bit_array_sieve,
-                                       uint32_t *prime_remainders,
-                                       uint16_t *blockoffset_mod_p,
-                                       uint32_t base_index,
-                                       uint16_t nPrimorialEndPrime,
-                                       uint16_t nPrimeLimitA)
-{
-    extern __shared__ uint32_t shared_array_sieve[];
-
-    #pragma unroll 64
-    for (uint8_t i= 0; i <  64; ++i)
-        shared_array_sieve[threadIdx.x + (i << 7)] = 0;
-
-    __syncthreads();
-
-    for (uint16_t i = nPrimorialEndPrime; i < nPrimeLimitA; ++i)
-    {
-        uint16_t pr = c_primes[i];
-        uint16_t pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
-
-        // precompute
-        uint32_t pIdx = threadIdx.x * pr;
-        uint32_t nAdd = pr << 7;
-
-        uint32_t index = prime_remainders[(((base_index << 9) + i) << 3) + o] + pre2; // << 3 because we have space for 8 offsets
-
-        if(index >= pr)
-            index = index - pr;
-
-        for(index = index + pIdx; index < 262144; index += nAdd)
-        {
-            if( (g_sieve_hierarchy[index >> 5] & (1 << (index & 31)) ) == 0)
-                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
-        }
-    }
-
-    __syncthreads();
-    g_bit_array_sieve += (blockIdx.x << 13);
-
-    #pragma unroll 64
-    for (uint8_t i = 0; i < 64; ++i) // fixed value
-    {
-        uint16_t j = threadIdx.x + (i << 7);
-        //atomicOr(&g_bit_array_sieve[j], shared_array_sieve[j]);
-        g_bit_array_sieve[j] = shared_array_sieve[j];
-    }
-}
-
 
 template<uint8_t o>
 __global__ void combosieve_kernelB(uint64_t *origins,
@@ -337,12 +237,11 @@ __global__ void compact_combo(uint64_t *d_origins,
                 //printf("%d: compact_sieve: combo=%08X, count=%d\n", idx, combo, nRemaining);
 
                 /* Compute the end, tail, and next indices. */
-                uint32_t e = 32 - __clz(combo);
+                //uint32_t e = 32 - __clz(combo);
                 uint32_t t = 0;
                 uint32_t n = __ffs(combo);
 
-                /* Iterate through sieved bits and determine if there is
-                 * a rule-breaking prime gap. */
+                /* Iterate through sieved bits and determine if there is a rule-breaking prime gap. */
                 uint32_t nCount = 1;
                 for(; nCount < nRemaining; ++nCount)
                 {

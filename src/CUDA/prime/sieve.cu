@@ -126,8 +126,8 @@ extern "C" void cuda_init_primes(uint8_t thr_id,
                                  uint32_t nMaxCandidates)
 {
     uint32_t primeinverseinvk_size = sizeof(uint32_t) * 4 * nPrimeLimit;
-    uint32_t nonce64_size = nMaxCandidates * sizeof(uint64_t);
-    uint32_t nonce32_size = nMaxCandidates * sizeof(uint32_t);
+    uint64_t nonce64_size = nMaxCandidates * sizeof(uint64_t);
+    uint64_t nonce32_size = nMaxCandidates * sizeof(uint32_t);
     uint32_t sharedSizeBits = sharedSizeKB * 1024 * 8;
     uint32_t allocSize = ((nBitArray_Size * 16  + sharedSizeBits - 1) / sharedSizeBits) * sharedSizeBits;
     uint32_t bitarray_size = (allocSize+31)/32 * sizeof(uint32_t);
@@ -316,25 +316,29 @@ __global__ void primesieve_kernelA0(uint64_t *origins,
                                     uint32_t *prime_remainders,
                                     uint32_t *base_remainders,
                                     uint8_t nOffsets,
-                                    uint16_t nOrigins)
+                                    uint16_t nOrigins,
+                                    uint32_t nThreads)
 {
     uint32_t g_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint32_t p_idx = g_idx / nOrigins;
-    uint64_t o_idx = g_idx % nOrigins;
-
-    uint32_t j = ((o_idx << 12) + p_idx) << 3;
-
-
-    o_idx = origins[o_idx] + base_remainders[p_idx];
-
-    uint4 tmp = primes[p_idx];
-    uint64_t recip = make_uint64_t(tmp.z, tmp.w);
-
-    for(uint8_t o = 0; o < nOffsets; ++o)
+    if(g_idx < nThreads)
     {
-        tmp.z = mod_p_small(o_idx + c_offsets[c_iA[o]], tmp.x, recip);
-        prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+        uint32_t p_idx = g_idx / nOrigins;
+        uint64_t o_idx = g_idx % nOrigins;
+
+        uint32_t j = ((o_idx << 12) + p_idx) << 3;
+
+
+        o_idx = origins[o_idx] + base_remainders[p_idx];
+
+        uint4 tmp = primes[p_idx];
+        uint64_t recip = make_uint64_t(tmp.z, tmp.w);
+
+        for(uint8_t o = 0; o < nOffsets; ++o)
+        {
+            tmp.z = mod_p_small(o_idx + c_offsets[c_iA[o]], tmp.x, recip);
+            prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+        }
     }
 }
 
@@ -343,25 +347,30 @@ __global__ void primesieve_kernelB0(uint64_t *origins,
                                     uint32_t *prime_remainders,
                                     uint32_t *base_remainders,
                                     uint8_t nOffsets,
-                                    uint16_t nOrigins)
+                                    uint16_t nOrigins,
+                                    uint32_t nThreads)
 {
     uint32_t g_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    uint32_t p_idx = g_idx / nOrigins;
-    uint64_t o_idx = g_idx % nOrigins;
 
-    uint32_t j = ((o_idx << 12) + p_idx) << 3;
-
-
-    o_idx = origins[o_idx] + base_remainders[p_idx];
-
-    uint4 tmp = primes[p_idx];
-    uint64_t recip = make_uint64_t(tmp.z, tmp.w);
-
-    for(uint8_t o = 0; o < nOffsets; ++o)
+    if(g_idx < nThreads)
     {
-        tmp.z = mod_p_small(o_idx + c_offsets[c_iB[o]], tmp.x, recip);
-        prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+        uint32_t p_idx = g_idx / nOrigins;
+        uint64_t o_idx = g_idx % nOrigins;
+
+        uint32_t j = ((o_idx << 12) + p_idx) << 3;
+
+
+        o_idx = origins[o_idx] + base_remainders[p_idx];
+
+        uint4 tmp = primes[p_idx];
+        uint64_t recip = make_uint64_t(tmp.z, tmp.w);
+
+        for(uint8_t o = 0; o < nOffsets; ++o)
+        {
+            tmp.z = mod_p_small(o_idx + c_offsets[c_iB[o]], tmp.x, recip);
+            prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
+        }
     }
 }
 
@@ -462,6 +471,23 @@ __global__ void primesieve_kernelD_512(uint32_t *g_bit_array_sieve,
     //precompute
     uint32_t b_idx = blockIdx.x << 12;
 
+    auto pre = [&pre1, &prime_remainders, &index](uint32_t o)
+    {
+        pre1[o] = prime_remainders[index + o]; // << 3 because we have space for 8 offsets
+    };
+
+    auto loop = [&pre1, &pre2, &pr, &index](uint32_t o)
+    {
+        index = pre1[o] + pre2;
+        if(index >= pr)
+            index = index - pr;
+
+        for(; index < 262144; index += pr)
+        {
+            atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
+        }
+    };
+
     for (i = nPrimorialEndPrime + threadIdx.x; i < nPrimeLimitA; i += blockDim.x)
     {
         pr = c_primes[i];
@@ -470,25 +496,7 @@ __global__ void primesieve_kernelD_512(uint32_t *g_bit_array_sieve,
         // precompute
         index = (base_index + i) << 3;
 
-        auto pre = [&pre1, &prime_remainders, &index](uint32_t o)
-        {
-            pre1[o] = prime_remainders[index + o]; // << 3 because we have space for 8 offsets
-        };
-
         Unroller<0, offsetsA>::step(pre);
-
-        auto loop = [&pre1, &pre2, &pr, &index](uint32_t o)
-        {
-            index = pre1[o] + pre2;
-            if(index >= pr)
-                index = index - pr;
-
-            for(; index < 262144; index += pr)
-            {
-                atomicOr(&shared_array_sieve[index >> 5], 1 << (index & 31));
-            }
-        };
-
         Unroller<0, offsetsA>::step(loop);
     }
 
@@ -606,7 +614,8 @@ void kernelA0_launch(uint8_t thr_id,
         d_prime_remainders[thr_id],
         d_base_remainders[thr_id],
         nOffsetsA,
-        nOrigins);
+        nOrigins,
+        nThreads);
 }
 
 void kernelB0_launch(uint8_t thr_id,
@@ -625,7 +634,8 @@ void kernelB0_launch(uint8_t thr_id,
         &d_prime_remainders[thr_id][4096 * nOrigins << 3],
         d_base_remainders[thr_id],
         nOffsetsB,
-        nOrigins);
+        nOrigins,
+        nThreads);
 }
 
 extern "C" void cuda_set_origins(uint8_t thr_id, uint32_t nPrimeLimitA, uint64_t *origins, uint32_t nOrigins)

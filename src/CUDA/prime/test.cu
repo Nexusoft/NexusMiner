@@ -55,7 +55,6 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
                                      uint32_t *g_result_meta,
                                      uint32_t *g_result_count,
                                      uint32_t nThreshold,
-                                     uint32_t nOffsets,
                                      uint32_t nMaxCandidates)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
@@ -67,6 +66,7 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
 
     if(idx < *in_nonce_count)
     {
+        uint64_t nonce_offset = in_nonce_offsets[idx];
         uint32_t nonce_meta = in_nonce_meta[idx];
 
         /* Mask out the tested bits. */
@@ -84,7 +84,7 @@ __global__ void compact_test_offsets(uint64_t *in_nonce_offsets,
             //printf("%d: compact_fermat: nonce_meta=%08X, test_combo=%08X, count=%d\n", idx, nonce_meta, test_combo, nCount);
 
             add_result(g_result_offsets, g_result_meta, g_result_count,
-                       in_nonce_offsets[idx], nonce_meta, nMaxCandidates);
+                       nonce_offset, nonce_meta, nMaxCandidates);
         }
     }
 }
@@ -96,8 +96,7 @@ __global__ void fermat_kernel(uint64_t *nonce_offsets,
                               uint32_t *window_data,
                               uint32_t *g_primes_checked,
                               uint32_t *g_primes_found,
-                              uint32_t nTestOffsets,
-                              uint32_t nOffsets)
+                              uint32_t nTestOffsets)
 {
     /* If the quit flag was set, early return to avoid wasting time. */
     if(c_quit)
@@ -213,8 +212,7 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         frameResources[thr_id].d_window_data[curr_test],
         frameResources[thr_id].d_primes_checked[curr_test],
         frameResources[thr_id].d_primes_found[curr_test],
-        vOffsetsT.size(),
-        vOffsets.size());
+        vOffsetsT.size());
 
     dim3 block2(128);
     dim3 grid2((nThreads + block2.x - 1) / block2.x);
@@ -228,7 +226,6 @@ extern "C" __host__ void cuda_fermat(uint32_t thr_id,
         frameResources[thr_id].d_result_meta[curr_test],
         frameResources[thr_id].d_result_count[curr_test],
         nTestLevels,
-        vOffsets.size(),
         nMaxCandidates);
 
     /* Copy the result count. */
