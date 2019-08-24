@@ -108,10 +108,10 @@ build/Util_%.o:	src/Util/%.cpp
 	$(CXX) -o $@ -c $(CXXFLAGS) $< $(INCLUDES)
 
 build/CUDA_prime_sieve.o:	src/CUDA/prime/sieve.cu
-	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
+	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=72 -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_prime_combo_sieve.o:	src/CUDA/prime/combo_sieve.cu
-	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=40 -o $@ -c $< $(CUDA_INC)
+	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=72 -o $@ -c $< $(CUDA_INC)
 
 build/CUDA_prime_test.o:	src/CUDA/prime/test.cu
 	$(NVCC) $(GPU_CARD) $(NVCC_FLAGS) --maxrregcount=128 -o $@ -c $< $(CUDA_INC)

@@ -321,16 +321,19 @@ __global__ void primesieve_kernelA0(uint64_t *origins,
     uint32_t g_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     uint32_t p_idx = g_idx / nOrigins;
-    uint32_t o_idx = g_idx % nOrigins;
+    uint64_t o_idx = g_idx % nOrigins;
 
     uint32_t j = ((o_idx << 12) + p_idx) << 3;
+
+
+    o_idx = origins[o_idx] + base_remainders[p_idx];
 
     uint4 tmp = primes[p_idx];
     uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
     for(uint8_t o = 0; o < nOffsets; ++o)
     {
-        tmp.z = mod_p_small(origins[o_idx] + base_remainders[p_idx] + c_offsets[c_iA[o]], tmp.x, recip);
+        tmp.z = mod_p_small(o_idx + c_offsets[c_iA[o]], tmp.x, recip);
         prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
     }
 }
@@ -345,16 +348,19 @@ __global__ void primesieve_kernelB0(uint64_t *origins,
     uint32_t g_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     uint32_t p_idx = g_idx / nOrigins;
-    uint32_t o_idx = g_idx % nOrigins;
+    uint64_t o_idx = g_idx % nOrigins;
 
     uint32_t j = ((o_idx << 12) + p_idx) << 3;
+
+
+    o_idx = origins[o_idx] + base_remainders[p_idx];
 
     uint4 tmp = primes[p_idx];
     uint64_t recip = make_uint64_t(tmp.z, tmp.w);
 
     for(uint8_t o = 0; o < nOffsets; ++o)
     {
-        tmp.z = mod_p_small(origins[o_idx] + base_remainders[p_idx] + c_offsets[c_iB[o]], tmp.x, recip);
+        tmp.z = mod_p_small(o_idx + c_offsets[c_iB[o]], tmp.x, recip);
         prime_remainders[j + o] = mod_p_small((uint64_t)(tmp.x - tmp.z)*tmp.y, tmp.x, recip);
     }
 }
@@ -453,10 +459,13 @@ __global__ void primesieve_kernelD_512(uint32_t *g_bit_array_sieve,
 
     base_index = base_index << 12;
 
+    //precompute
+    uint32_t b_idx = blockIdx.x << 12;
+
     for (i = nPrimorialEndPrime + threadIdx.x; i < nPrimeLimitA; i += blockDim.x)
     {
         pr = c_primes[i];
-        pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
+        pre2 = blockoffset_mod_p[b_idx + i];
 
         // precompute
         index = (base_index + i) << 3;
@@ -586,6 +595,7 @@ void kernelA0_launch(uint8_t thr_id,
                      uint16_t nOrigins)
 {
     uint32_t nThreads = nPrimeLimitA * nOrigins;
+
 
     dim3 block(512);
     dim3 grid((nThreads + block.x - 1) / block.x);

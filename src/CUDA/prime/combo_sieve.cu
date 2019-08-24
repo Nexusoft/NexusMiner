@@ -41,10 +41,13 @@ __global__ void combosieve_kernelD_512(uint32_t *g_sieve_hierarchy,
 
     base_index = base_index << 12;
 
+    //precompute
+    uint32_t b_idx = blockIdx.x << 12;
+
     for (i = nPrimorialEndPrime + threadIdx.x; i < nPrimeLimitA; i += blockDim.x)
     {
         pr = c_primes[i];
-        pre2 = blockoffset_mod_p[(blockIdx.x << 12) + i];
+        pre2 = blockoffset_mod_p[b_idx + i];
 
 
         index = prime_remainders[((base_index + i) << 3) + o] + pre2;  // << 3 because we have space for 8 offsets
