@@ -1,0 +1,16 @@
+The FPGA accepts work packets from software via USB UART and returns 64 bit nonce candidates.
+UART settings: 230400 8-N-1
+When there is a new block, the software sends the FPGA a 224 byte work packet in raw (not ascii) format over the UART.
+The first 136 bytes is the hash midstate which is used as the Key for the next part of the hash.  
+The key is followed by the final 88 bytes of the block header.
+
+Upon receipt of a new header the FPGA will immediately search the space for a nonce that results in a hash with 32 leading zeros.  
+The starting nonce is specified by the last 8 bytes of the work packet. 
+The FPGA search proceeds by incrementing the nonce by 1
+When it finds a nonce it sends it over the UART to the software (8 bytes).
+The actual difficulty is likely greater than 32 bits, so the software must check if the nonce actually solves the block and should filter out bad blocks.
+The number of nonces received over time can be used as a performance gage.  The hash rate in Megahashes per second can be calculated as nonces_received * (2^32)/1e6/eleapsed_seconds.
+
+After sending a work packet over the uart, the software shall wait at least 20ms before sending a new work packet to the same port.
+The entire work packet must be transmitted to the FPGA within 20ms of receiving the first byte. 
+Although unlikely, the FPGA may transmit multiple nonces in succession without a gap. 
