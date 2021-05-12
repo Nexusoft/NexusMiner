@@ -7,4 +7,6 @@ nexusminer
 miner_profile
 *.cache
 *.make
+*.vscode
+Makefile
 build/
