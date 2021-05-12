@@ -8,8 +8,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(${CMAKE_SOURCE_DIR}/include/)
 
+find_package(Threads REQUIRED)
+
+# OpenSSL
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
+
+#ASIO
+add_definitions(-DASIO_STANDALONE)
+include_directories(${CMAKE_SOURCE_DIR}/include/asio-1.18.1/include)
 
 if(UNIX)
     add_definitions(-DUNIX)
