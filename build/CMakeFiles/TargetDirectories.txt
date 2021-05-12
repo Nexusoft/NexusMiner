@@ -1,5 +1,0 @@
-/home/developer/work/NexusMiner/build/CMakeFiles/rebuild_cache.dir
-/home/developer/work/NexusMiner/build/CMakeFiles/edit_cache.dir
-/home/developer/work/NexusMiner/build/src/CMakeFiles/rebuild_cache.dir
-/home/developer/work/NexusMiner/build/src/CMakeFiles/miner.dir
-/home/developer/work/NexusMiner/build/src/CMakeFiles/edit_cache.dir
