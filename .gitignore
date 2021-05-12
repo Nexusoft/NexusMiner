@@ -7,4 +7,4 @@ nexusminer
 miner_profile
 *.cache
 *.make
-
+build/

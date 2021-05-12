@@ -38,7 +38,6 @@ Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet h
 
 ### General
 
-* CUDA Toolkit: follow installation guide: https://docs.nvidia.com/cuda/index.html
 
 ### Windows (Not yet supported)
 
