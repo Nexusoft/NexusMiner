@@ -1,0 +1,44 @@
+#ifndef NEXUSMINER_MINER_HPP
+#define NEXUSMINER_MINER_HPP
+
+#include "config.hpp"
+#include <spdlog/spdlog.h>
+
+#include <thread>
+#include <vector>
+#include <memory>
+#include <mutex>
+
+namespace asio {
+	class io_context;
+}
+namespace nexusminer
+{
+namespace network { class Component; }
+
+class Wallet_connection;
+
+class Miner
+{
+public:
+
+	Miner();
+	~Miner();
+
+	bool init();
+	void run();
+
+private:
+
+	std::shared_ptr<::asio::io_context> m_io_context;
+	std::unique_ptr<network::Component> m_network_component;
+	std::unique_ptr<Wallet_connection> m_wallet_connection;
+	std::shared_ptr<spdlog::logger> m_logger;
+
+	Config m_config;
+};
+
+}
+
+
+#endif
