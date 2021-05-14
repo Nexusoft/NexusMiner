@@ -2,7 +2,8 @@
 
 #include "network/create_component.hpp"
 #include "network/component.hpp"
-#include "wallet_connection.hpp"
+#include "worker_manager.hpp"
+#include "worker.hpp"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -39,7 +40,7 @@ bool Miner::init()
 	m_network_component = network::create_component(m_io_context);
 
 	network::Endpoint local_endpoint{network::Transport_protocol::tcp, "127.0.0.1", 0}; 
-	m_wallet_connection = std::make_unique<Wallet_connection>(m_network_component->get_socket_factory()->create_socket(local_endpoint));
+	m_worker_manager = std::make_unique<Worker_manager>(m_config, m_network_component->get_socket_factory()->create_socket(local_endpoint));
 
 	return true;
 }
@@ -47,7 +48,7 @@ bool Miner::init()
 void Miner::run()
 {
 	network::Endpoint wallet_endpoint{network::Transport_protocol::tcp, m_config.get_wallet_ip(), m_config.get_port()};
-	auto result = m_wallet_connection->connect(wallet_endpoint);
+	auto result = m_worker_manager->connect(wallet_endpoint);
 	if(result != network::Result::ok)
 	{
 		m_logger->error("Failed to initialise socket. Result: {}", result);
