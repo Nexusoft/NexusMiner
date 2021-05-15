@@ -4,8 +4,8 @@
 #include <vector>
 #include <cstdint>
 #include <memory>
-#include "network/types.hpp"
-#include "LLP/block.hpp"
+#include "types.hpp"
+#include "block.hpp"
 #include "utils.hpp"
 
 namespace nexusminer

@@ -12,11 +12,9 @@ namespace nexusminer
 	Config::Config()
 		: m_wallet_ip{ "127.0.0.1" }
 		, m_port{ 9323 }
-		, m_mining_mode{ Mining_mode::PRIME}
+		, m_mining_mode{ Mining_mode::HASH}
 		, m_connection_threads{ 20 }
-		, m_use_ddos{true}
-		, m_r_score{20}
-		, m_c_score{2}
+		, m_use_pool{false}
 		, m_min_share{ 40000000 }
 		, m_logfile{""}		// no logfile usage, default
 	{
@@ -32,9 +30,7 @@ namespace nexusminer
 		std::cout << "Mining Mode: " << m_mining_mode << std::endl;
 		std::cout << "Connection Threads: " << m_connection_threads << std::endl;
 
-		std::cout << "bDDOS: " << m_use_ddos << std::endl;;
-		std::cout << "rScore: " << m_r_score << std::endl;
-		std::cout << "cScore: " << m_c_score << std::endl;
+		std::cout << "Pool: " << m_use_pool << std::endl;;
 		std::cout << "Min Share Diff: " << m_min_share << std::endl;
 
 		std::cout << "Logfile: " << m_logfile << std::endl;
@@ -60,9 +56,7 @@ namespace nexusminer
 		j.at("mining_mode").get_to(m_mining_mode);
 		
 		j.at("connection_threads").get_to(m_connection_threads);
-		j.at("enable_ddos").get_to(m_use_ddos);
-		j.at("ddos_rscore").get_to(m_r_score);
-		j.at("ddos_cscore").get_to(m_c_score);
+		j.at("enable_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
 
 		j.at("logfile").get_to(m_logfile);

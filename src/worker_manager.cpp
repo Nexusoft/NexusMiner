@@ -1,6 +1,7 @@
 #include "worker_manager.hpp"
 #include "packet.hpp"
 #include "config.hpp"
+#include "fpga/worker_fpga.hpp"
 
 namespace nexusminer
 {
@@ -63,6 +64,11 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 {
 
+
+if( response == Packet::ACCEPT)
+{
+
+}
 }
 
 }
