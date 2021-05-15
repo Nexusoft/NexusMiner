@@ -2,6 +2,7 @@
 #include "packet.hpp"
 #include "config.hpp"
 #include "fpga/worker_fpga.hpp"
+#include "block.hpp"
 
 namespace nexusminer
 {
@@ -9,6 +10,7 @@ Worker_manager::Worker_manager(Config& config, network::Socket::Sptr socket)
 : m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
+, m_current_height{0}
 {
 }
 
@@ -63,12 +65,73 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 {
+		Packet packet{ std::move(receive_buffer) };
+		if (!packet.is_valid())
+		{
+			// log invalid packet
+			m_logger->error("Received packet is invalid. Header: {0}", packet.m_header);
+			return;
+		}
 
+        if (packet.m_header == Packet::PING)
+        {
+            Packet response;
+            response = response.get_packet(Packet::PING);
+            m_connection->transmit(response.get_bytes());
+        }
+        else if (packet.m_header == Packet::BLOCK_HEIGHT)
+		{
+			auto const height = bytes2uint(*packet.m_data);
+			m_logger->debug("Height Received {}", height);
 
-if( response == Packet::ACCEPT)
-{
+			if (height > m_current_height)
+			{
+				m_logger->info("Nexus Network: New Block [Height] {}", height);
+				m_current_height = height;
 
+                // get new block from wallet
+                Packet packet_get_block;
+		        packet_get_block.m_header = Packet::GET_BLOCK;
+
+                m_connection->transmit(packet.get_bytes());                
+			}			
+		}
+        // Block from wallet received
+        else if(packet.m_header == Packet::BLOCK_DATA)
+        {
+            auto block = deserialize_block(packet.m_data);
+			if (block->nHeight == m_current_height)
+			{
+	            for(auto& worker : m_workers)
+                {
+                    worker->set_block(std::move(block), [self = shared_from_this()](auto block_data)
+                    {
+                        // create block and submit
+                    });
+                }
+			}
+			else
+			{
+				m_logger->info("Block Obsolete Height = {}, Skipping over.", block->nHeight);
+			}
+        }
 }
-}
+
+	/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
+	std::unique_ptr<LLP::CBlock> Worker_manager::deserialize_block(network::Shared_payload data)
+	{
+		std::unique_ptr<LLP::CBlock> block;
+		block->nVersion = bytes2uint(std::vector<uint8_t>(data->begin(), data->begin() + 4));
+
+		block->hashPrevBlock.SetBytes(std::vector<uint8_t>(data->begin() + 4, data->begin() + 132));
+		block->hashMerkleRoot.SetBytes(std::vector<uint8_t>(data->begin() + 132, data->end() - 20));
+
+		block->nChannel = bytes2uint(std::vector<uint8_t>(data->end() - 20, data->end() - 16));
+		block->nHeight = bytes2uint(std::vector<uint8_t>(data->end() - 16, data->end() - 12));
+		block->nBits = bytes2uint(std::vector<uint8_t>(data->end() - 12, data->end() - 8));
+		block->nNonce = bytes2uint64(std::vector<uint8_t>(data->end() - 8, data->end()));
+
+		return block;
+	}
 
 }

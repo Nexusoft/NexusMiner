@@ -3,9 +3,12 @@
 
 #include "network/connection.hpp"
 #include "network/socket.hpp"
+#include "network/types.hpp"
 #include <spdlog/spdlog.h>
 
 #include <memory>
+
+namespace LLP { class CBlock; }
 
 namespace nexusminer 
 {
@@ -27,12 +30,16 @@ private:
     void parse_config();
 	void process_data(network::Shared_payload&& receive_buffer);	// handle network messages
 
+    std::unique_ptr<LLP::CBlock> deserialize_block(network::Shared_payload data);
+
     Config& m_config;
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
 
     std::vector<std::unique_ptr<Worker>> m_workers;
+
+    std::uint32_t m_current_height;
 };
 }
 
