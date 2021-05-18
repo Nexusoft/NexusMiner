@@ -49,11 +49,12 @@ void Miner::run()
 {
 	network::Endpoint wallet_endpoint{network::Transport_protocol::tcp, m_config.get_wallet_ip(), m_config.get_port()};
 	auto result = m_worker_manager->connect(wallet_endpoint);
-	if(result != network::Result::ok)
+	if(!result)
 	{
 		m_logger->error("Failed to initialise socket. Result: {}", result);
 		return;
 	}
-}
+	
+	m_io_context->run();
 
 }

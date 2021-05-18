@@ -56,7 +56,7 @@ namespace nexusminer
 		j.at("mining_mode").get_to(m_mining_mode);
 		
 		j.at("connection_threads").get_to(m_connection_threads);
-		j.at("enable_pool").get_to(m_use_pool);
+		j.at("use_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
 
 		j.at("logfile").get_to(m_logfile);
