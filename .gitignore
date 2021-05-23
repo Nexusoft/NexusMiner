@@ -10,3 +10,4 @@ miner_profile
 *.vscode
 Makefile
 build/
+.vs/

@@ -4,6 +4,7 @@
 #include <memory>
 #include <functional>
 #include "uint1024.h"
+#include "../LLP/block.hpp"
 
 namespace LLP { class CBlock; }
 

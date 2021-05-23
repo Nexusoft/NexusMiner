@@ -40,7 +40,7 @@ public:
 		nNonce = 0;
 	}
 
-//	inline uint1024 GetHash() const { return SK1024(BEGIN(nVersion), END(nBits)); }
+	//inline uint1024 GetHash() const { return SK1024(BEGIN(nVersion), END(nBits)); }
 	//inline uint1024 GetPrime() const { return GetHash() + nNonce; }
 };
 }
