@@ -63,7 +63,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
     return true;
 }
 
-void Worker_manager::add_worker(std::unique_ptr<Worker> worker)
+void Worker_manager::add_worker(std::shared_ptr<Worker> worker)
 {
     m_workers.push_back(std::move(worker));
 }

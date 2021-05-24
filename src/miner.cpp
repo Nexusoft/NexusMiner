@@ -44,7 +44,7 @@ namespace nexusminer
 		m_worker_manager = std::make_unique<Worker_manager>(m_config, m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
 
-		m_worker_manager->add_worker(std::move(std::make_unique<Worker_software_hash>()));
+		m_worker_manager->add_worker(std::make_shared<Worker_software_hash>(m_io_context));
 		return true;
 	}
 

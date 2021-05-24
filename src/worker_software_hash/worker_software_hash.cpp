@@ -1,20 +1,30 @@
 #include "worker_software_hash.hpp"
 #include "statistics.hpp"
+#include "../LLP/block.hpp"
 
 namespace nexusminer
 {
 
-Worker_software_hash::Worker_software_hash(): stop(false)
+Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context) 
+: stop{false}
+, mine{false}  //set this to true to mine without waiting for a block header.
+, m_io_context{std::move(io_context)}
+, m_logger{spdlog::get("logger")}
 {
-	mine = false;  //set this to true to mine without waiting for a block header.
 	runThread = std::thread(&Worker_software_hash::run,this);
+}
+
+Worker_software_hash::~Worker_software_hash() 
+{ 
+	stop = true;  
+	runThread.join(); 
 }
 
 void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_found_handler result)
 {
 	std::unique_lock<std::mutex> lck(mtx);
 	mine = false;
-	std::cout << "New Block" << std::endl;
+	m_logger->debug("New Block");
 	foundNonceCallback = result;
 	block_.merkle_root = block.hashMerkleRoot;
 	block_.previous_hash = block.hashPrevBlock;
@@ -52,7 +62,6 @@ void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_fou
 
 void Worker_software_hash::run()
 {
-	
 	while (!stop)
 	{
 		//block until the header is ready
@@ -68,18 +77,22 @@ void Worker_software_hash::run()
 		//check the result for leading zeros
 		if ((keccakHash & leadingZeroMask) == 0)
 		{
-			std::cout << "found a nonce candidate " << nonce << "... ";
+			m_logger->debug("found a nonce candidate {}", nonce);
 			//verify the difficulty
 			if (difficultyCheck())
 			{
-				std::cout << "PASSES difficulty check. " << nonce << std::endl;
+				m_logger->debug("PASSES difficulty check. {}", nonce);
 				//update the block with the nonce and call the callback function;
 				block_.nonce = nonce;
-				//m_io_context_->post(foundNonceCallback(std::make_shared<Block_data>(block_)));  //i don't think this is correct
+				m_io_context->post([self = shared_from_this()]()
+				{
+					auto block_data = self->get_block_data(); 
+					self->foundNonceCallback(std::make_unique<Block_data>(block_data));
+				});					
 			}
 			else
 			{
-				std::cout << "FAILS difficulty check. " << nonce << std::endl;
+				m_logger->debug("FAILS difficulty check {}", nonce);
 			}
 		}
 		skein.setNonce(++nonce);
@@ -91,12 +104,15 @@ void Worker_software_hash::print_statistics()
     m_statistics->print();
 }
 
-
-
 bool Worker_software_hash::difficultyCheck()
 {
 	//perform a more precise difficulty check prior to submitting the nonce 
 	return true;
+}
+
+Block_data Worker_software_hash::get_block_data() const
+{
+	return block_;
 }
 
 }
