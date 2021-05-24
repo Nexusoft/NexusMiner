@@ -6,8 +6,8 @@ namespace nexusminer
 
 Worker_software_hash::Worker_software_hash(): stop(false)
 {
+	mine = false;  //set this to true to mine without waiting for a block header.
 	runThread = std::thread(&Worker_software_hash::run,this);
-	mine = true;  //todo: set this to false when headers come in correctly
 }
 
 void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_found_handler result)
