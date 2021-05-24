@@ -11,3 +11,4 @@ miner_profile
 Makefile
 build/
 .vs/
+CMakeSettings.json

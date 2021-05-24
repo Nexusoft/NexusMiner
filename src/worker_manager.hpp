@@ -23,14 +23,14 @@ public:
     Worker_manager(Config& config, network::Socket::Sptr socket);
 
     bool connect(network::Endpoint const& wallet_endpoint);
-
+    void add_worker(std::unique_ptr<Worker> worker);
 
 private:
 
     void parse_config();
 	void process_data(network::Shared_payload&& receive_buffer);	// handle network messages
 
-    std::unique_ptr<LLP::CBlock> deserialize_block(network::Shared_payload data);
+    LLP::CBlock deserialize_block(network::Shared_payload data);
 
     Config& m_config;
 	network::Socket::Sptr m_socket;

@@ -4,6 +4,7 @@
 #include "network/component.hpp"
 #include "worker_manager.hpp"
 #include "worker.hpp"
+#include "worker_software_hash/worker_software_hash.hpp"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -42,6 +43,8 @@ namespace nexusminer
 		network::Endpoint local_endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
 		m_worker_manager = std::make_unique<Worker_manager>(m_config, m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
+
+		m_worker_manager->add_worker(std::move(std::make_unique<Worker_software_hash>()));
 		return true;
 	}
 

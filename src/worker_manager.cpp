@@ -63,6 +63,11 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
     return true;
 }
 
+void Worker_manager::add_worker(std::unique_ptr<Worker> worker)
+{
+    m_workers.push_back(std::move(worker));
+}
+
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 {
 		Packet packet{ std::move(receive_buffer) };
@@ -100,11 +105,11 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         else if(packet.m_header == Packet::BLOCK_DATA)
         {
             auto block = deserialize_block(packet.m_data);
-			if (block->nHeight == m_current_height)
+			if (block.nHeight == m_current_height)
 			{
 	            for(auto& worker : m_workers)
                 {
-                    worker->set_block(std::move(block), [self = shared_from_this()](auto block_data)
+                    worker->set_block(block, [self = shared_from_this()](auto block_data)
                     {
                         // create block and submit
                     });
@@ -112,24 +117,24 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 			}
 			else
 			{
-				m_logger->info("Block Obsolete Height = {}, Skipping over.", block->nHeight);
+				m_logger->info("Block Obsolete Height = {}, Skipping over.", block.nHeight);
 			}
         }
 }
 
 	/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
-	std::unique_ptr<LLP::CBlock> Worker_manager::deserialize_block(network::Shared_payload data)
+	LLP::CBlock Worker_manager::deserialize_block(network::Shared_payload data)
 	{
-		std::unique_ptr<LLP::CBlock> block;
-		block->nVersion = bytes2uint(std::vector<uint8_t>(data->begin(), data->begin() + 4));
+		LLP::CBlock block;
+		block.nVersion = bytes2uint(std::vector<uint8_t>(data->begin(), data->begin() + 4));
 
-		block->hashPrevBlock.SetBytes(std::vector<uint8_t>(data->begin() + 4, data->begin() + 132));
-		block->hashMerkleRoot.SetBytes(std::vector<uint8_t>(data->begin() + 132, data->end() - 20));
+		block.hashPrevBlock.SetBytes(std::vector<uint8_t>(data->begin() + 4, data->begin() + 132));
+		block.hashMerkleRoot.SetBytes(std::vector<uint8_t>(data->begin() + 132, data->end() - 20));
 
-		block->nChannel = bytes2uint(std::vector<uint8_t>(data->end() - 20, data->end() - 16));
-		block->nHeight = bytes2uint(std::vector<uint8_t>(data->end() - 16, data->end() - 12));
-		block->nBits = bytes2uint(std::vector<uint8_t>(data->end() - 12, data->end() - 8));
-		block->nNonce = bytes2uint64(std::vector<uint8_t>(data->end() - 8, data->end()));
+		block.nChannel = bytes2uint(std::vector<uint8_t>(data->end() - 20, data->end() - 16));
+		block.nHeight = bytes2uint(std::vector<uint8_t>(data->end() - 16, data->end() - 12));
+		block.nBits = bytes2uint(std::vector<uint8_t>(data->end() - 12, data->end() - 8));
+		block.nNonce = bytes2uint64(std::vector<uint8_t>(data->end() - 8, data->end()));
 
 		return block;
 	}

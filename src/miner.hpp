@@ -3,6 +3,7 @@
 
 #include "config.hpp"
 #include <spdlog/spdlog.h>
+#include <asio.hpp>
 
 #include <thread>
 #include <vector>
