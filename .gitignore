@@ -10,3 +10,5 @@ miner_profile
 *.vscode
 Makefile
 build/
+.vs/
+CMakeSettings.json
