@@ -36,14 +36,15 @@ private:
 
     void run();
     bool difficultyCheck();
+    uint64_t leadingZeroMask();  
 
     std::atomic<bool> stop;
     std::thread runThread;
     Worker::Block_found_handler foundNonceCallback;
     std::unique_ptr<Statistics> m_statistics;
 
-    static constexpr int leadingZeros = 20;  //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
-    static constexpr uint64_t leadingZeroMask = ((1ull << leadingZeros) - 1) << (64 - leadingZeros);
+    int leadingZeros;  //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
+    
     NexusSkein skein;
     Block_data block_;
     std::mutex mtx;

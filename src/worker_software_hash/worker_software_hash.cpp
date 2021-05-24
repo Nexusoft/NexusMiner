@@ -7,16 +7,22 @@ namespace nexusminer
 
 Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context) 
 : stop{false}
-, mine{false}  //set this to true to mine without waiting for a block header.
+, mine{true}  //set this to true to mine without waiting for a block header.
+, leadingZeros{18}  //set this lower to find more nonce candidates.
 , m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
 {
+	
 	runThread = std::thread(&Worker_software_hash::run,this);
+	cv.notify_one();
 }
 
 Worker_software_hash::~Worker_software_hash() 
 { 
+	//make sure the run thread exits the loop
 	stop = true;  
+	mine = true;
+	cv.notify_one();
 	runThread.join(); 
 }
 
@@ -75,7 +81,7 @@ void Worker_software_hash::run()
 		uint64_t keccakHash = keccak.getResult();
 		uint64_t nonce = skein.getNonce();
 		//check the result for leading zeros
-		if ((keccakHash & leadingZeroMask) == 0)
+		if ((keccakHash & leadingZeroMask()) == 0)
 		{
 			m_logger->debug("found a nonce candidate {}", nonce);
 			//verify the difficulty
@@ -84,11 +90,19 @@ void Worker_software_hash::run()
 				m_logger->debug("PASSES difficulty check. {}", nonce);
 				//update the block with the nonce and call the callback function;
 				block_.nonce = nonce;
-				m_io_context->post([self = shared_from_this()]()
+				if (foundNonceCallback)
 				{
-					auto block_data = self->get_block_data(); 
-					self->foundNonceCallback(std::make_unique<Block_data>(block_data));
-				});					
+					m_io_context->post([self = shared_from_this()]()
+					{
+						auto block_data = self->get_block_data();
+						self->foundNonceCallback(std::make_unique<Block_data>(block_data));
+					});
+				}
+				else
+				{
+					m_logger->debug("Miner callback function not set.");
+				}
+				
 			}
 			else
 			{
@@ -109,6 +123,12 @@ bool Worker_software_hash::difficultyCheck()
 	//perform a more precise difficulty check prior to submitting the nonce 
 	return true;
 }
+
+uint64_t Worker_software_hash::leadingZeroMask()
+{
+	return ((1ull << leadingZeros) - 1) << (64 - leadingZeros);
+}
+
 
 Block_data Worker_software_hash::get_block_data() const
 {
