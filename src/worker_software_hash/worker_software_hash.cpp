@@ -92,17 +92,21 @@ void Worker_software_hash::run()
 				block_.nonce = nonce;
 				if (foundNonceCallback)
 				{
-					m_io_context->post([self = shared_from_this()]()
+					std::weak_ptr<Worker_software_hash> weak_self = shared_from_this();
+					m_io_context->post([weak_self]()
 					{
-						auto block_data = self->get_block_data();
-						self->foundNonceCallback(std::make_unique<Block_data>(block_data));
+						auto self = weak_self.lock();
+						if(self)
+						{
+							auto block_data = self->get_block_data();
+							self->foundNonceCallback(std::make_unique<Block_data>(block_data));
+					 	}
 					});
 				}
 				else
 				{
 					m_logger->debug("Miner callback function not set.");
-				}
-				
+				}				
 			}
 			else
 			{
