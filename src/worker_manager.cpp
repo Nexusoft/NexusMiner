@@ -6,18 +6,20 @@
 
 namespace nexusminer
 {
-Worker_manager::Worker_manager(Config& config, network::Socket::Sptr socket)
+Worker_manager::Worker_manager(Config& config, chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket)
 : m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
+, m_timer_factory{std::move(timer_factory)}
 , m_current_height{0}
 {
+    m_connection_retry_timer = m_timer_factory->create_timer();
 }
 
 bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 {
     std::weak_ptr<Worker_manager> weak_self = shared_from_this();
-    auto connection = m_socket->connect(wallet_endpoint, [weak_self](auto result, auto receive_buffer)
+    auto connection = m_socket->connect(wallet_endpoint, [weak_self, wallet_endpoint](auto result, auto receive_buffer)
     {
         auto self = weak_self.lock();
         if(self)
@@ -29,7 +31,12 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
             {
                 self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
                 self->m_connection = nullptr;		// close connection (socket etc)
+
                 // retry connect
+                auto const connection_retry_interval = self->m_config.get_connection_retry_interval();
+                self->m_logger->info("Connection retry {} seconds", connection_retry_interval);
+                self->m_connection_retry_timer->start(chrono::Seconds(connection_retry_interval), 
+                    self->connection_retry_handler(wallet_endpoint));
             }
             else if (result == network::Result::connection_ok)
             {
@@ -63,6 +70,24 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
     m_connection = std::move(connection);
     return true;
+}
+
+chrono::Timer::Handler Worker_manager::connection_retry_handler(network::Endpoint const& wallet_endpoint)
+{
+    std::weak_ptr<Worker_manager> weak_self = shared_from_this();
+    return[weak_self, wallet_endpoint](bool canceled)
+    {
+        if (canceled)	// don't do anything if the timer has been canceled
+        {
+            return;
+        }
+
+        auto self = weak_self.lock();
+        if(self)
+        {
+            self->connect(wallet_endpoint);
+        }
+    }; 
 }
 
 void Worker_manager::add_worker(std::shared_ptr<Worker> worker)

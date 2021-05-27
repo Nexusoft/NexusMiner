@@ -2,10 +2,10 @@
 #include "config.hpp"
 #include "json/json.hpp"
 
-using json = nlohmann::json;
-
 #include <fstream>
 #include <iostream>
+
+using json = nlohmann::json;
 
 namespace nexusminer
 {
@@ -17,6 +17,7 @@ namespace nexusminer
 		, m_use_pool{false}
 		, m_min_share{ 40000000 }
 		, m_logfile{""}		// no logfile usage, default
+		, m_connection_retry_interval{5}
 	{
 	}
 
@@ -29,6 +30,7 @@ namespace nexusminer
 
 		std::cout << "Mining Mode: " << m_mining_mode << std::endl;
 		std::cout << "Connection Threads: " << m_connection_threads << std::endl;
+		std::cout << "Connection Retry Interval: " << m_connection_retry_interval << std::endl;
 
 		std::cout << "Pool: " << m_use_pool << std::endl;;
 		std::cout << "Min Share Diff: " << m_min_share << std::endl;
@@ -56,13 +58,14 @@ namespace nexusminer
 		j.at("mining_mode").get_to(m_mining_mode);
 		
 		j.at("connection_threads").get_to(m_connection_threads);
+		j.at("connection_retry_interval").get_to(m_connection_retry_interval);
 		j.at("use_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
 
 		j.at("logfile").get_to(m_logfile);
 
 		print_config();
-		// TODO Need to add exception handling here and set bSuccess appropriately
+		// TODO Need to add exception handling here and set return value appropriately
 		return true;
 	}
 

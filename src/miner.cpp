@@ -2,6 +2,7 @@
 
 #include "network/create_component.hpp"
 #include "network/component.hpp"
+#include "chrono/timer_factory.hpp"
 #include "worker_manager.hpp"
 #include "worker.hpp"
 #include "worker_software_hash/worker_software_hash.hpp"
@@ -55,11 +56,15 @@ namespace nexusminer
 		// std::err logger
 		auto console_err = spdlog::stderr_color_mt("console_err");
 
+		// timer initialisation
+		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);
+
 		// network initialisation
 		m_network_component = network::create_component(m_io_context);
 
 		network::Endpoint local_endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
-		m_worker_manager = std::make_unique<Worker_manager>(m_config, m_network_component->get_socket_factory()->create_socket(local_endpoint));
+		m_worker_manager = std::make_unique<Worker_manager>(m_config, timer_factory, 
+			m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
 
 		m_worker_manager->add_worker(std::make_shared<Worker_software_hash>(m_io_context));

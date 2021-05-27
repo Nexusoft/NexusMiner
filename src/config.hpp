@@ -1,5 +1,6 @@
 #ifndef NEXUSMINER_CONFIG_HPP
 #define NEXUSMINER_CONFIG_HPP
+
 #include <string>
 
 namespace nexusminer
@@ -24,11 +25,9 @@ public:
 	Mining_mode get_mining_mode() const { return m_mining_mode; }
 	std::uint32_t get_connection_threads() const { return m_connection_threads; }
 	bool get_use_bool() const { return m_use_pool; }
-
 	std::uint32_t get_min_share() const { return m_min_share; }
-
 	std::string const& get_logfile() const { return m_logfile; }
-
+	std::uint16_t get_connection_retry_interval() const { return m_connection_retry_interval; }
 
 private:
 
@@ -37,12 +36,11 @@ private:
 	Mining_mode	 m_mining_mode;
 	bool		 m_use_pool;
 	std::uint32_t m_connection_threads;
-	std::uint32_t     m_min_share;
+	std::uint32_t m_min_share;
 	std::string  m_logfile;
+	std::uint16_t m_connection_retry_interval;
 
 };
 
 }
-
-
 #endif 

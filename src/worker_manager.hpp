@@ -5,6 +5,8 @@
 #include "network/socket.hpp"
 #include "network/types.hpp"
 #include <spdlog/spdlog.h>
+#include "chrono/timer_factory.hpp"
+#include "chrono/timer.hpp"
 
 #include <memory>
 
@@ -20,7 +22,7 @@ class Worker_manager : public std::enable_shared_from_this<Worker_manager>
 {
 public:
 
-    Worker_manager(Config& config, network::Socket::Sptr socket);
+    Worker_manager(Config& config, chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket);
 
     bool connect(network::Endpoint const& wallet_endpoint);
     void add_worker(std::shared_ptr<Worker> worker);
@@ -32,10 +34,14 @@ private:
 
     LLP::CBlock deserialize_block(network::Shared_payload data);
 
+    chrono::Timer::Handler connection_retry_handler(network::Endpoint const& wallet_endpoint);
+
     Config& m_config;
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
+    chrono::Timer_factory::Sptr m_timer_factory;
+    chrono::Timer::Uptr m_connection_retry_timer;
 
     std::vector<std::shared_ptr<Worker>> m_workers;
 
