@@ -10,13 +10,34 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 
+#include <asio/io_context.hpp>
 #include <chrono>
 
 namespace nexusminer
 {
 
-	Miner::Miner() : m_io_context{ std::make_shared<::asio::io_context>() }
+	Miner::Miner() 
+	: m_io_context{std::make_shared<::asio::io_context>()}
+	, m_signals{std::make_shared<::asio::signal_set>(*m_io_context)}
 	{
+		m_logger = spdlog::stdout_color_mt("logger");
+		m_logger->set_level(spdlog::level::debug);
+
+		// Register to handle the signals that indicate when the server should exit.
+		// It is safe to register for the same signal multiple times in a program,
+		// provided all registration for the specified signal is made through Asio.
+		m_signals->add(SIGINT);
+		m_signals->add(SIGTERM);
+#if defined(SIGQUIT)
+		m_signals->add(SIGQUIT);
+#endif 
+
+		m_signals->async_wait([this](auto, auto)
+		{
+			m_logger->error("Shutting down NexusMiner");
+			m_io_context->stop();
+			exit(1);
+		});
 	}
 
 	Miner::~Miner()
@@ -30,9 +51,6 @@ namespace nexusminer
 		{
 			return false;
 		}
-
-		m_logger = spdlog::stdout_color_mt("logger");
-		m_logger->set_level(spdlog::level::debug);
 
 		// std::err logger
 		auto console_err = spdlog::stderr_color_mt("console_err");
