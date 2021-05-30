@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.10)
 
 project(NexusMiner CXX)
@@ -33,5 +32,23 @@ if(MSVC)
     add_definitions(/permissive-)
 endif()
 
+include_directories(${CMAKE_SOURCE_DIR}/src/include/)
+include_directories(${CMAKE_SOURCE_DIR}/src/worker_software_hash/)
 
-add_subdirectory(src)
+# add submodules
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/chrono)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/network)
+add_subdirectory(${CMAKE_SOURCE_DIR}/src/hash)
+
+add_executable(NexusMiner 
+                ${CMAKE_SOURCE_DIR}/src/config.cpp 
+                ${CMAKE_SOURCE_DIR}/src/main.cpp 
+                ${CMAKE_SOURCE_DIR}/src/miner.cpp 
+                ${CMAKE_SOURCE_DIR}/src/worker_manager.cpp 
+                ${CMAKE_SOURCE_DIR}/src/worker_software_hash/worker_software_hash.cpp)
+
+target_link_libraries(NexusMiner chrono)
+target_link_libraries(NexusMiner network)
+target_link_libraries(NexusMiner hash)
+target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
+target_link_libraries(NexusMiner Threads::Threads)
