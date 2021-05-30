@@ -1,6 +1,6 @@
 #include "worker_software_hash.hpp"
 #include "statistics.hpp"
-#include "../LLP/block.hpp"
+#include "LLP/block.hpp"
 
 namespace nexusminer
 {

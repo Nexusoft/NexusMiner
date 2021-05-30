@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include "types.hpp"
-#include "block.hpp"
+#include "LLP/block.hpp"
 #include "utils.hpp"
 
 namespace nexusminer

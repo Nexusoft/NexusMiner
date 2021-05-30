@@ -1,8 +1,8 @@
 #include "worker_manager.hpp"
+#include "worker_software_hash.hpp"
 #include "packet.hpp"
 #include "config.hpp"
-#include "fpga/worker_fpga.hpp"
-#include "block.hpp"
+#include "LLP/block.hpp"
 
 namespace nexusminer
 {
