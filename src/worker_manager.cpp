@@ -14,6 +14,7 @@ Worker_manager::Worker_manager(Config& config, chrono::Timer_factory::Sptr timer
 , m_current_height{0}
 {
     m_connection_retry_timer = m_timer_factory->create_timer();
+    m_statistics_timer = m_timer_factory->create_timer();
 }
 
 bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
@@ -41,10 +42,10 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
             else if (result == network::Result::connection_ok)
             {
                 self->m_logger->info("Connection to wallet established");
-            //	self->m_maintenance_timer->start(chrono::Seconds(60), self->maintenance_timer_handler());
-            //  self->m_block_timer->start(chrono::Milliseconds(50), self->block_timer_handler());
-            //   self->m_orphan_check_timer->start(chrono::Seconds(20), self->orphan_check_timer_handler());			
-            // self->m_get_height_timer->start(chrono::Seconds(2), self->get_height_timer_handler());
+
+                auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
+                self->m_statistics_timer->start(chrono::Seconds(print_statistics_interval), self->statistics_handler(print_statistics_interval));
+
 
                 // set channel
                 std::uint32_t channel = (self->m_config.get_mining_mode() == Config::PRIME) ? 1U : 2U;
@@ -86,6 +87,32 @@ chrono::Timer::Handler Worker_manager::connection_retry_handler(network::Endpoin
         if(self)
         {
             self->connect(wallet_endpoint);
+        }
+    }; 
+}
+
+chrono::Timer::Handler Worker_manager::statistics_handler(std::uint16_t print_statistics_interval)
+{
+    std::weak_ptr<Worker_manager> weak_self = shared_from_this();
+    return[weak_self, print_statistics_interval](bool canceled)
+    {
+        if (canceled)	// don't do anything if the timer has been canceled
+        {
+            return;
+        }
+
+        auto self = weak_self.lock();
+        if(self)
+        {
+            // print statistics
+             for(auto& worker : self->m_workers)
+             {
+                 worker->print_statistics();
+             }
+
+            // restart timer
+            self->m_statistics_timer->start(chrono::Seconds(print_statistics_interval), 
+                self->statistics_handler(print_statistics_interval));
         }
     }; 
 }

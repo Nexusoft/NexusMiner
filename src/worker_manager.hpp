@@ -25,6 +25,7 @@ public:
     Worker_manager(Config& config, chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket);
 
     bool connect(network::Endpoint const& wallet_endpoint);
+    // TODO: remove and read workers from config
     void add_worker(std::shared_ptr<Worker> worker);
 
 private:
@@ -35,6 +36,7 @@ private:
     LLP::CBlock deserialize_block(network::Shared_payload data);
 
     chrono::Timer::Handler connection_retry_handler(network::Endpoint const& wallet_endpoint);
+    chrono::Timer::Handler statistics_handler(std::uint16_t print_statistics_interval);
 
     Config& m_config;
 	network::Socket::Sptr m_socket;
@@ -42,6 +44,7 @@ private:
     std::shared_ptr<spdlog::logger> m_logger;
     chrono::Timer_factory::Sptr m_timer_factory;
     chrono::Timer::Uptr m_connection_retry_timer;
+    chrono::Timer::Uptr m_statistics_timer;
 
     std::vector<std::shared_ptr<Worker>> m_workers;
 

@@ -32,20 +32,20 @@ if(MSVC)
     add_definitions(/permissive-)
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/src/include/)
-include_directories(${CMAKE_SOURCE_DIR}/src/worker_software_hash/)
+include_directories(src/include/)
+include_directories(src/worker_software_hash/)
 
 # add submodules
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/chrono)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/network)
-add_subdirectory(${CMAKE_SOURCE_DIR}/src/hash)
+add_subdirectory(src/chrono)
+add_subdirectory(src/network)
+add_subdirectory(src/hash)
 
 add_executable(NexusMiner 
-                ${CMAKE_SOURCE_DIR}/src/config.cpp 
-                ${CMAKE_SOURCE_DIR}/src/main.cpp 
-                ${CMAKE_SOURCE_DIR}/src/miner.cpp 
-                ${CMAKE_SOURCE_DIR}/src/worker_manager.cpp 
-                ${CMAKE_SOURCE_DIR}/src/worker_software_hash/worker_software_hash.cpp)
+                src/config.cpp 
+                src/main.cpp 
+                src/miner.cpp 
+                src/worker_manager.cpp 
+                src/worker_software_hash/worker_software_hash.cpp)
 
 target_link_libraries(NexusMiner chrono)
 target_link_libraries(NexusMiner network)

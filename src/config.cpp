@@ -13,7 +13,6 @@ namespace nexusminer
 		: m_wallet_ip{ "127.0.0.1" }
 		, m_port{ 9323 }
 		, m_mining_mode{ Mining_mode::HASH}
-		, m_connection_threads{ 20 }
 		, m_use_pool{false}
 		, m_min_share{ 40000000 }
 		, m_logfile{""}		// no logfile usage, default
@@ -29,8 +28,9 @@ namespace nexusminer
 		std::cout << "Port: " << m_port << std::endl;
 
 		std::cout << "Mining Mode: " << m_mining_mode << std::endl;
-		std::cout << "Connection Threads: " << m_connection_threads << std::endl;
+
 		std::cout << "Connection Retry Interval: " << m_connection_retry_interval << std::endl;
+		std::cout << "Print Statistics Interval: " << m_print_statistics_interval << std::endl;		
 
 		std::cout << "Pool: " << m_use_pool << std::endl;;
 		std::cout << "Min Share Diff: " << m_min_share << std::endl;
@@ -57,8 +57,8 @@ namespace nexusminer
 		j.at("port").get_to(m_port);
 		j.at("mining_mode").get_to(m_mining_mode);
 		
-		j.at("connection_threads").get_to(m_connection_threads);
 		j.at("connection_retry_interval").get_to(m_connection_retry_interval);
+		j.at("print_statistics_interval").get_to(m_print_statistics_interval);
 		j.at("use_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
 
