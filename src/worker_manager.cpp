@@ -17,6 +17,21 @@ Worker_manager::Worker_manager(Config& config, chrono::Timer_factory::Sptr timer
     m_statistics_timer = m_timer_factory->create_timer();
 }
 
+void Worker_manager::stop()
+{
+    m_connection_retry_timer->cancel();
+    m_statistics_timer->cancel();
+
+    // close connection
+    m_connection.reset();
+
+    // destroy workers
+    for(auto& worker : m_workers)
+    {
+        worker.reset();
+    }
+}
+
 bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 {
     std::weak_ptr<Worker_manager> weak_self = shared_from_this();
@@ -166,6 +181,21 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
                     worker->set_block(block, [self = shared_from_this()](auto block_data)
                     {
                         // create block and submit
+                        self->m_logger->info("Submitting Block...");
+
+                        Packet PACKET;
+                        Packet submit_block;
+		                submit_block.m_header = Packet::SUBMIT_BLOCK;
+			
+			            submit_block.m_data = std::make_shared<std::vector<uint8_t>>(block_data->merkle_root.GetBytes());
+			            std::vector<std::uint8_t> nonce  = uint2bytes64(block_data->nonce);
+
+                        submit_block.m_data->insert(submit_block.m_data->end(), nonce.begin(), nonce.end());
+			            submit_block.m_length = 72;
+
+                        self->m_connection->transmit(submit_block.get_bytes());   
+
+                        // get new block
                     });
                 }
 			}
@@ -174,23 +204,37 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 				m_logger->info("Block Obsolete Height = {}, Skipping over.", block.nHeight);
 			}
         }
+        else if(packet.m_header == Packet::ACCEPT)
+        {
+            m_logger->info("Block Accepted By Nexus Network.");
+            // TODO add to statistics
+        }
+        else if(packet.m_header == Packet::REJECT)
+        {
+            m_logger->info("Block Rejected by Nexus Network.");
+            // TODO add to statistics
+        }
+        else
+        {
+            m_logger->error("Invalid header received.");
+        }
 }
 
-	/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
-	LLP::CBlock Worker_manager::deserialize_block(network::Shared_payload data)
-	{
-		LLP::CBlock block;
-		block.nVersion = bytes2uint(std::vector<uint8_t>(data->begin(), data->begin() + 4));
+/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
+LLP::CBlock Worker_manager::deserialize_block(network::Shared_payload data)
+{
+    LLP::CBlock block;
+    block.nVersion = bytes2uint(std::vector<uint8_t>(data->begin(), data->begin() + 4));
 
-		block.hashPrevBlock.SetBytes(std::vector<uint8_t>(data->begin() + 4, data->begin() + 132));
-		block.hashMerkleRoot.SetBytes(std::vector<uint8_t>(data->begin() + 132, data->end() - 20));
+    block.hashPrevBlock.SetBytes(std::vector<uint8_t>(data->begin() + 4, data->begin() + 132));
+    block.hashMerkleRoot.SetBytes(std::vector<uint8_t>(data->begin() + 132, data->end() - 20));
 
-		block.nChannel = bytes2uint(std::vector<uint8_t>(data->end() - 20, data->end() - 16));
-		block.nHeight = bytes2uint(std::vector<uint8_t>(data->end() - 16, data->end() - 12));
-		block.nBits = bytes2uint(std::vector<uint8_t>(data->end() - 12, data->end() - 8));
-		block.nNonce = bytes2uint64(std::vector<uint8_t>(data->end() - 8, data->end()));
+    block.nChannel = bytes2uint(std::vector<uint8_t>(data->end() - 20, data->end() - 16));
+    block.nHeight = bytes2uint(std::vector<uint8_t>(data->end() - 16, data->end() - 12));
+    block.nBits = bytes2uint(std::vector<uint8_t>(data->end() - 12, data->end() - 8));
+    block.nNonce = bytes2uint64(std::vector<uint8_t>(data->end() - 8, data->end()));
 
-		return block;
-	}
+    return block;
+}
 
 }

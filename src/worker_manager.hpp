@@ -28,6 +28,9 @@ public:
     // TODO: remove and read workers from config
     void add_worker(std::shared_ptr<Worker> worker);
 
+    // stop the component and destroy all workers
+    void stop();
+
 private:
 
     void parse_config();

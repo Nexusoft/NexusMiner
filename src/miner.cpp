@@ -35,7 +35,8 @@ namespace nexusminer
 
 		m_signals->async_wait([this](auto, auto)
 		{
-			m_logger->error("Shutting down NexusMiner");
+			m_logger->info("Shutting down NexusMiner");
+			m_worker_manager->stop();
 			m_io_context->stop();
 			exit(1);
 		});
