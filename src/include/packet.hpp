@@ -94,7 +94,7 @@ namespace nexusminer
 			std::vector<uint8_t> BYTES(1, m_header);
 
 			/** Handle for Data Packets. **/
-			if (m_header < 128)
+			if (m_header < 128 && m_length > 0)
 			{
 				BYTES.push_back((m_length >> 24)); 
 				BYTES.push_back((m_length >> 16));

@@ -119,7 +119,7 @@ void Worker_software_hash::run()
 
 void Worker_software_hash::print_statistics()
 {
-    m_statistics->print();
+   // m_statistics->print();
 }
 
 bool Worker_software_hash::difficultyCheck()

@@ -64,13 +64,16 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
                 // set channel
                 std::uint32_t channel = (self->m_config.get_mining_mode() == Config::PRIME) ? 1U : 2U;
-                Packet packet;
-                packet.m_header = Packet::SET_CHANNEL;
-                packet.m_length = 4;
-                packet.m_data = std::make_shared<std::vector<std::uint8_t>>(uint2bytes(channel));
+                Packet packet_set_channel;
+                packet_set_channel.m_header = Packet::SET_CHANNEL;
+                packet_set_channel.m_length = 4;
+                packet_set_channel.m_data = std::make_shared<std::vector<std::uint8_t>>(uint2bytes(channel));
+                self->m_connection->transmit(packet_set_channel.get_bytes());
 
-                self->m_connection->transmit(packet.get_bytes());
-
+                // get height/new block
+                Packet packet_get_height;
+                packet_get_height.m_header = Packet::NEW_BLOCK;
+                self->m_connection->transmit(packet_get_height.get_bytes());
             }
             else
             {	// data received
@@ -173,6 +176,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         // Block from wallet received
         else if(packet.m_header == Packet::BLOCK_DATA)
         {
+            m_logger->debug("Block data received");
             auto block = deserialize_block(packet.m_data);
 			if (block.nHeight == m_current_height)
 			{
