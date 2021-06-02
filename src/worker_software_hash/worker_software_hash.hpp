@@ -6,7 +6,6 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <condition_variable>
 #include "worker.hpp"
 #include "nexus_skein.hpp"
 #include "nexus_keccak.hpp"
@@ -48,8 +47,8 @@ private:
     NexusSkein skein;
     Block_data block_;
     std::mutex mtx;
-    std::condition_variable cv;
-    bool mine = false;
+    //std::condition_variable cv;
+    //std::atomic<bool> mine = false;
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;

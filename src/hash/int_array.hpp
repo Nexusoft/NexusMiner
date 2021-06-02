@@ -48,18 +48,27 @@ public:
         fromBytes(HexStringToBytes(hexString));
     }
 
-    std::string toHexString() const
+    std::string toHexString(bool unformatted = false) const
     {
         std::ostringstream ss;
         ss << std::hex << std::uppercase << std::setfill('0');
-
-        for (size_t i = 0; i < SIZE - 1; i++)
+        if (unformatted)
         {
-            ss << "0x" << std::setw(intSize() * 2) << intArray[i] << ", ";
+            for (size_t i = 0; i < SIZE; i++)
+            {
+                ss << std::setw(intSize() * 2) << intArray[i];
+            }
         }
-        if (SIZE > 0)
+        else
         {
-            ss << "0x" << std::setw(intSize() * 2) << intArray[SIZE - 1];
+            for (size_t i = 0; i < SIZE - 1; i++)
+            {
+                ss << "0x" << std::setw(intSize() * 2) << intArray[i] << ", ";
+            }
+            if (SIZE > 0)
+            {
+                ss << "0x" << std::setw(intSize() * 2) << intArray[SIZE - 1];
+            }
         }
         return ss.str();
     }

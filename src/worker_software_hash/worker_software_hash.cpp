@@ -7,37 +7,32 @@ namespace nexusminer
 
 Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context) 
 : stop{false}
-, mine{true}  //set this to true to mine without waiting for a block header.
 , leadingZeros{18}  //set this lower to find more nonce candidates.
 , m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
 {
 	
 	runThread = std::thread(&Worker_software_hash::run,this);
-	cv.notify_one();
 }
 
 Worker_software_hash::~Worker_software_hash() 
 { 
 	//make sure the run thread exits the loop
 	stop = true;  
-	mine = true;
-	cv.notify_one();
 	runThread.join(); 
 }
 
 void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_found_handler result)
 {
-	std::unique_lock<std::mutex> lck(mtx);
-	mine = false;
+
+	std::scoped_lock<std::mutex> lck(mtx);
 	m_logger->debug("New Block");
 	foundNonceCallback = result;
 	block_.merkle_root = block.hashMerkleRoot;
 	block_.previous_hash = block.hashPrevBlock;
 
-
 	uint64_t starting_nonce = 0;
-	block_.nonce = starting_nonce;
+	block_.nNonce = starting_nonce;
 	//convert header data to byte strings
 	std::vector<unsigned char> blockHeightB = IntToBytes(block.nHeight, 4);
 	std::vector<unsigned char> versionB = IntToBytes(block.nVersion, 4);
@@ -61,8 +56,6 @@ void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_fou
 
 	//calculate midstate
 	skein.setMessage(headerB);
-	mine = true;
-	cv.notify_one();
     
 }
 
@@ -70,9 +63,7 @@ void Worker_software_hash::run()
 {
 	while (!stop)
 	{
-		//block until the header is ready
-		std::unique_lock<std::mutex> lck(mtx);
-		cv.wait(lck, [&] {return mine; });
+		std::scoped_lock<std::mutex> lck(mtx);
 		//calculate the remainder of the skein hash starting from the midstate.
 		skein.calculateHash();
 		//run keccak on the result from skein
@@ -89,7 +80,7 @@ void Worker_software_hash::run()
 			{
 				m_logger->debug("PASSES difficulty check. {}", nonce);
 				//update the block with the nonce and call the callback function;
-				block_.nonce = nonce;
+				block_.nNonce = nonce;
 				if (foundNonceCallback)
 				{
 					std::weak_ptr<Worker_software_hash> weak_self = shared_from_this();
@@ -106,14 +97,19 @@ void Worker_software_hash::run()
 				else
 				{
 					m_logger->debug("Miner callback function not set.");
+<<<<<<< Updated upstream
 				}				
+=======
+				}
+
+>>>>>>> Stashed changes
 			}
 			else
 			{
 				m_logger->debug("FAILS difficulty check {}", nonce);
 			}
 		}
-		skein.setNonce(++nonce);
+		skein.setNonce(++nonce);	
 	}
 }
 

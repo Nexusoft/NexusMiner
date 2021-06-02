@@ -12,3 +12,4 @@ Makefile
 build/
 .vs/
 CMakeSettings.json
+out/

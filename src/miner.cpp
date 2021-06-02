@@ -6,6 +6,7 @@
 #include "worker_manager.hpp"
 #include "worker.hpp"
 #include "worker_software_hash/worker_software_hash.hpp"
+#include "fpga/worker_fpga.hpp"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -68,7 +69,8 @@ namespace nexusminer
 			m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
 
-		m_worker_manager->add_worker(std::make_shared<Worker_software_hash>(m_io_context));
+		//m_worker_manager->add_worker(std::make_shared<Worker_software_hash>(m_io_context));
+		m_worker_manager->add_worker(std::make_shared<Worker_fpga>(m_io_context, "COM4"));
 		return true;
 	}
 

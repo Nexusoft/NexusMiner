@@ -15,10 +15,12 @@ public:
 
 	uint512 merkle_root;
     uint1024 previous_hash;
+	uint32_t nHeight = 2023276;
+	uint32_t nVersion = 4;
+	uint32_t nChannel = 2;
+	uint32_t nBits = 0x7b032ed8;
+	uint64_t nNonce = 21155560019;
 
-	// result
-	std::uint64_t nonce;
-	std::uint32_t nonce_difficulty;
 };
 
 class Worker {
