@@ -7,7 +7,7 @@ namespace nexusminer
 
 Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context) 
 : stop{false}
-, leadingZeros{18}  //set this lower to find more nonce candidates.
+, leadingZerosRequired{18}  //set this lower to find more nonce candidates.
 , m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
 {
@@ -97,12 +97,8 @@ void Worker_software_hash::run()
 				else
 				{
 					m_logger->debug("Miner callback function not set.");
-<<<<<<< Updated upstream
-				}				
-=======
 				}
 
->>>>>>> Stashed changes
 			}
 			else
 			{
@@ -126,7 +122,7 @@ bool Worker_software_hash::difficultyCheck()
 
 uint64_t Worker_software_hash::leadingZeroMask()
 {
-	return ((1ull << leadingZeros) - 1) << (64 - leadingZeros);
+	return ((1ull << leadingZerosRequired) - 1) << (64 - leadingZerosRequired);
 }
 
 

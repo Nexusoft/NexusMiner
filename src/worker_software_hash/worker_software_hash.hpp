@@ -42,7 +42,7 @@ private:
     Worker::Block_found_handler foundNonceCallback;
     std::unique_ptr<Statistics> m_statistics;
 
-    int leadingZeros;  //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
+    int leadingZerosRequired;  //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
     
     NexusSkein skein;
     Block_data block_;

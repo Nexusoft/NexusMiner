@@ -1,7 +1,7 @@
 #include "worker_fpga.hpp"
 #include "statistics.hpp"
-#include "../LLP/block.hpp"
-
+#include "LLP/block.hpp"
+#include "nexus_hash_utils.hpp"
 
 namespace nexusminer
 {
@@ -51,14 +51,14 @@ void Worker_fpga::set_block(const LLP::CBlock& block, Worker::Block_found_handle
 	block_.nChannel = block.nChannel;
 	block_.nHeight = block.nHeight;
 
-	uint64_t starting_nonce = 0;
-	block_.nNonce = starting_nonce;
+	startingNonce = 0;
+	block_.nNonce = startingNonce;
 	//convert header data to byte strings
 	std::vector<unsigned char> blockHeightB = IntToBytes(block.nHeight, 4);
 	std::vector<unsigned char> versionB = IntToBytes(block.nVersion, 4);
 	std::vector<unsigned char> channelB = IntToBytes(block.nChannel, 4);
 	std::vector<unsigned char> bitsB = IntToBytes(block.nBits, 4);
-	std::vector<unsigned char> nonceB = IntToBytes(starting_nonce, 8);
+	std::vector<unsigned char> nonceB = IntToBytes(block_.nNonce, 8);
 	std::vector<unsigned char> merkleB = block_.merkle_root.GetBytes();
 	std::vector<unsigned char> prevHashB = block_.previous_hash.GetBytes();
 
@@ -177,7 +177,7 @@ void Worker_fpga::run()
 	std::string workPackageStr = key2Str + message2Str;
 
 	std::vector<unsigned char> fpgaWorkPackage = HexStringToBytes(workPackageStr);
-
+	startingNonce = nNonce;
 	//send new work package over the serial port
 	if (serial.is_open())
 	{
@@ -212,13 +212,19 @@ void Worker_fpga::run()
 
 		std::reverse(receive_bytes.begin(), receive_bytes.end());
 		uint64_t nonce = bytesToInt<uint64_t>(receive_bytes);
-
+		if (startingNonce - nonce == 1)
 		{
-			m_logger->debug("found a nonce candidate {}", nonce);
+			//the fpga will respond with starting nonce - 1 to acknowledge receipt of the work package.
+			m_logger->info("New block receipt acknowledged by FPGA.");
+		}
+		else
+		{
+			m_logger->info("Found a nonce candidate {}", nonce);
+			skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficultyCheck())
 			{
-				m_logger->debug("PASSES difficulty check. {}", nonce);
+				//m_logger->debug("PASSES difficulty check. {}", nonce);
 				//update the block with the nonce and call the callback function;
 				block_.nNonce = nonce;
 				{
@@ -240,7 +246,7 @@ void Worker_fpga::run()
 			}
 			else
 			{
-				m_logger->debug("FAILS difficulty check {}", nonce);
+				//m_logger->debug("FAILS difficulty check.");
 			}
 		}
 
@@ -249,13 +255,36 @@ void Worker_fpga::run()
 
 void Worker_fpga::print_statistics()
 {
-    m_statistics->print();
+    //m_statistics->print();
 }
 
 bool Worker_fpga::difficultyCheck()
 {
-	//perform a more precise difficulty check prior to submitting the nonce 
-	return true;
+	//perform additional difficulty filtering prior to submitting the nonce 
+	
+	//leading zeros in bits required of the hash for it to pass the current difficulty.
+	int leadingZerosRequired;
+	uint64_t difficultyTest64;
+	decodeBits(block_.nBits, leadingZerosRequired, difficultyTest64);
+	skein.calculateHash();
+	//run keccak on the result from skein
+	NexusKeccak keccak(skein.getHash());
+	keccak.calculateHash();
+	uint64_t keccakHash = keccak.getResult();
+	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
+	m_logger->info("Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
+
+	//check the hash result is less than the difficulty.  We truncate to just use the upper 64 bits for easier calculation.
+	if (keccakHash <= difficultyTest64)
+	{
+		m_logger->info("Nonce passes difficulty check.");
+		return true;
+	}
+	else
+	{
+		m_logger->info("Nonce fails difficulty check.");
+		return false;
+	}
 }
 
 Block_data Worker_fpga::get_block_data() const

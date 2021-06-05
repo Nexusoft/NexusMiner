@@ -8,6 +8,8 @@
 #include <chrono>
 #include "worker.hpp"
 #include "nexus_skein.hpp"
+#include "nexus_keccak.hpp"
+#include "nexus_hash_utils.hpp"
 #include <asio.hpp>
 #include <spdlog/spdlog.h>
 
@@ -45,7 +47,7 @@ private:
     NexusSkein skein;
     static constexpr int workPackageLength = 224; //bytes
     static constexpr int responseLength = 8; //bytes
-
+    uint64_t startingNonce = 0;
 
 
     Block_data block_;
@@ -53,6 +55,7 @@ private:
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
+
 
 
 };

@@ -1,5 +1,6 @@
 #include "worker_manager.hpp"
 #include "worker_software_hash.hpp"
+#include "fpga/worker_fpga.hpp"
 #include "packet.hpp"
 #include "config.hpp"
 #include "LLP/block.hpp"
@@ -192,7 +193,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 		                submit_block.m_header = Packet::SUBMIT_BLOCK;
 			
 			            submit_block.m_data = std::make_shared<std::vector<uint8_t>>(block_data->merkle_root.GetBytes());
-			            std::vector<std::uint8_t> nonce  = uint2bytes64(block_data->nonce);
+			            std::vector<std::uint8_t> nonce  = uint2bytes64(block_data->nNonce);
 
                         submit_block.m_data->insert(submit_block.m_data->end(), nonce.begin(), nonce.end());
 			            submit_block.m_length = 72;
