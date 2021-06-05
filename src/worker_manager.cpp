@@ -170,7 +170,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
                 Packet packet_get_block;
 		        packet_get_block.m_header = Packet::GET_BLOCK;
 
-                m_connection->transmit(packet.get_bytes());                
+                m_connection->transmit(packet_get_block.get_bytes());                
 			}			
 		}
         // Block from wallet received
@@ -212,11 +212,13 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         {
             m_logger->info("Block Accepted By Nexus Network.");
             // TODO add to statistics
+            // TODO start work again
         }
         else if(packet.m_header == Packet::REJECT)
         {
             m_logger->info("Block Rejected by Nexus Network.");
             // TODO add to statistics
+            // TODO start work again
         }
         else
         {
