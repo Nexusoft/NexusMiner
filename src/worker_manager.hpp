@@ -41,6 +41,8 @@ private:
     chrono::Timer::Handler connection_retry_handler(network::Endpoint const& wallet_endpoint);
     chrono::Timer::Handler statistics_handler(std::uint16_t print_statistics_interval);
 
+    void get_block();
+
     Config& m_config;
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;

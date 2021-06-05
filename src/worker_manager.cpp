@@ -62,7 +62,6 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
                 self->m_statistics_timer->start(chrono::Seconds(print_statistics_interval), self->statistics_handler(print_statistics_interval));
 
-
                 // set channel
                 std::uint32_t channel = (self->m_config.get_mining_mode() == Config::PRIME) ? 1U : 2U;
                 Packet packet_set_channel;
@@ -71,6 +70,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 packet_set_channel.m_data = std::make_shared<std::vector<std::uint8_t>>(uint2bytes(channel));
                 self->m_connection->transmit(packet_set_channel.get_bytes());
 
+                self->m_current_height = 0;     // reset height
                 // get height/new block
                 Packet packet_get_height;
                 packet_get_height.m_header = Packet::NEW_BLOCK;
@@ -164,14 +164,9 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 
 			if (height > m_current_height)
 			{
-				m_logger->info("Nexus Network: New Block [Height] {}", height);
 				m_current_height = height;
 
-                // get new block from wallet
-                Packet packet_get_block;
-		        packet_get_block.m_header = Packet::GET_BLOCK;
-
-                m_connection->transmit(packet.get_bytes());                
+                get_block();             
 			}			
 		}
         // Block from wallet received
@@ -213,16 +208,33 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         {
             m_logger->info("Block Accepted By Nexus Network.");
             // TODO add to statistics
+            // get height/new block
+            Packet packet_get_height;
+            packet_get_height.m_header = Packet::NEW_BLOCK;
+            m_connection->transmit(packet_get_height.get_bytes());
         }
         else if(packet.m_header == Packet::REJECT)
         {
             m_logger->info("Block Rejected by Nexus Network.");
+            get_block();
             // TODO add to statistics
+            // TODO start work again
         }
         else
         {
             m_logger->error("Invalid header received.");
         }
+}
+
+void Worker_manager::get_block()
+{
+    m_logger->info("Nexus Network: New Block [Height] {}", m_current_height);
+
+    // get new block from wallet
+    Packet packet_get_block;
+    packet_get_block.m_header = Packet::GET_BLOCK;
+
+    m_connection->transmit(packet_get_block.get_bytes());         
 }
 
 /** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
