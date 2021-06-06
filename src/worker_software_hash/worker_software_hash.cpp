@@ -1,13 +1,15 @@
 #include "worker_software_hash.hpp"
 #include "statistics.hpp"
 #include "LLP/block.hpp"
+#include "nexus_hash_utils.hpp"
+#include <random>
 
 namespace nexusminer
 {
 
 Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context) 
 : stop{false}
-, leadingZerosRequired{18}  //set this lower to find more nonce candidates.
+, leadingZerosRequired{20}  //set this lower to find more nonce candidates.
 , m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
 {
@@ -30,18 +32,31 @@ void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_fou
 	foundNonceCallback = result;
 	block_.merkle_root = block.hashMerkleRoot;
 	block_.previous_hash = block.hashPrevBlock;
+	block_.nVersion = block.nVersion;
+	block_.nBits = block.nBits;
+	block_.nChannel = block.nChannel;
+	block_.nHeight = block.nHeight;
 
-	uint64_t starting_nonce = 0;
-	block_.nNonce = starting_nonce;
+	//startingNonce = 0x0FFFFFFFFFFFFFFF;
+	//TODO: remove random starting nonce once the connection to the wallet is stable.  
+	std::random_device rd;
+	std::mt19937_64 gen(rd());
+	std::uniform_int_distribution<uint64_t> dis;
+	startingNonce = dis(gen);
+	block_.nNonce = startingNonce;
 	//convert header data to byte strings
 	std::vector<unsigned char> blockHeightB = IntToBytes(block.nHeight, 4);
 	std::vector<unsigned char> versionB = IntToBytes(block.nVersion, 4);
 	std::vector<unsigned char> channelB = IntToBytes(block.nChannel, 4);
 	std::vector<unsigned char> bitsB = IntToBytes(block.nBits, 4);
-	std::vector<unsigned char> nonceB = IntToBytes(starting_nonce, 8);
-	std::vector<unsigned char> merkleB = block_.merkle_root.GetBytes();
-	std::vector<unsigned char> prevHashB = block_.previous_hash.GetBytes();
-
+	std::vector<unsigned char> nonceB = IntToBytes(block_.nNonce, 8);
+	std::string merkleStr = block_.merkle_root.GetHex();
+	std::string hashPrevBlockStr = block_.previous_hash.GetHex();
+	std::vector<unsigned char> merkleB = HexStringToBytes(merkleStr);
+	std::vector<unsigned char> prevHashB = HexStringToBytes(hashPrevBlockStr);
+	std::reverse(merkleB.begin(), merkleB.end());
+	std::reverse(prevHashB.begin(), prevHashB.end());
+	
 	//Concatenate the bytes
 	std::vector<unsigned char> headerB = versionB;
 	headerB.insert(headerB.end(), prevHashB.begin(), prevHashB.end());
@@ -74,35 +89,29 @@ void Worker_software_hash::run()
 		//check the result for leading zeros
 		if ((keccakHash & leadingZeroMask()) == 0)
 		{
-			m_logger->debug("found a nonce candidate {}", nonce);
+			m_logger->info("Found a nonce candidate {}", nonce);
+			skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficultyCheck())
 			{
-				m_logger->debug("PASSES difficulty check. {}", nonce);
+				//m_logger->debug("PASSES difficulty check. {}", nonce);
 				//update the block with the nonce and call the callback function;
 				block_.nNonce = nonce;
-				if (foundNonceCallback)
 				{
-					std::weak_ptr<Worker_software_hash> weak_self = shared_from_this();
-					m_io_context->post([weak_self]()
+					if (foundNonceCallback)
 					{
-						auto self = weak_self.lock();
-						if(self)
+						m_io_context->post([self = shared_from_this()]()
 						{
 							auto block_data = self->get_block_data();
 							self->foundNonceCallback(std::make_unique<Block_data>(block_data));
-					 	}
-					});
-				}
-				else
-				{
-					m_logger->debug("Miner callback function not set.");
+						});
+					}
+					else
+					{
+						m_logger->debug("Miner callback function not set.");
+					}
 				}
 
-			}
-			else
-			{
-				m_logger->debug("FAILS difficulty check {}", nonce);
 			}
 		}
 		skein.setNonce(++nonce);	
@@ -116,8 +125,31 @@ void Worker_software_hash::print_statistics()
 
 bool Worker_software_hash::difficultyCheck()
 {
-	//perform a more precise difficulty check prior to submitting the nonce 
-	return true;
+	//perform additional difficulty filtering prior to submitting the nonce 
+
+	//leading zeros in bits required of the hash for it to pass the current difficulty.
+	int leadingZerosRequired;
+	uint64_t difficultyTest64;
+	decodeBits(block_.nBits, leadingZerosRequired, difficultyTest64);
+	skein.calculateHash();
+	//run keccak on the result from skein
+	NexusKeccak keccak(skein.getHash());
+	keccak.calculateHash();
+	uint64_t keccakHash = keccak.getResult();
+	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
+	m_logger->info("Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
+
+	//check the hash result is less than the difficulty.  We truncate to just use the upper 64 bits for easier calculation.
+	if (keccakHash <= difficultyTest64)
+	{
+		m_logger->info("Nonce passes difficulty check.");
+		return true;
+	}
+	else
+	{
+		m_logger->info("Nonce fails difficulty check.");
+		return false;
+	}
 }
 
 uint64_t Worker_software_hash::leadingZeroMask()

@@ -68,9 +68,13 @@ namespace nexusminer
 		m_worker_manager = std::make_unique<Worker_manager>(m_config, timer_factory, 
 			m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
+		int num_software_workers = 4;
+		for (auto i = 0; i < num_software_workers; i++)
+		{
+			m_worker_manager->add_worker(std::make_shared<Worker_software_hash>(m_io_context));
+		}
 
-		//m_worker_manager->add_worker(std::make_shared<Worker_software_hash>(m_io_context));
-		m_worker_manager->add_worker(std::make_shared<Worker_fpga>(m_io_context, "COM4"));
+		//m_worker_manager->add_worker(std::make_shared<Worker_fpga>(m_io_context, "COM4"));
 		return true;
 	}
 

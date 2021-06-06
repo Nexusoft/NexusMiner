@@ -47,6 +47,7 @@ private:
     NexusSkein skein;
     Block_data block_;
     std::mutex mtx;
+    uint64_t startingNonce = 0;
     //std::condition_variable cv;
     //std::atomic<bool> mine = false;
 
