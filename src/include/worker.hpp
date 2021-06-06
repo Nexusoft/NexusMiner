@@ -29,7 +29,7 @@ public:
 	virtual ~Worker() = default;
 
     // A call to the BlockFoundHandler informs the user about a new found block.
-    using Block_found_handler = std::function<void(std::unique_ptr<Block_data>&& block)>;
+    using Block_found_handler = std::function<void(std::uint32_t id, std::unique_ptr<Block_data>&& block)>;
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData

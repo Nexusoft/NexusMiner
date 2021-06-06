@@ -103,7 +103,8 @@ void Worker_software_hash::run()
 						m_io_context->post([self = shared_from_this()]()
 						{
 							auto block_data = self->get_block_data();
-							self->foundNonceCallback(std::make_unique<Block_data>(block_data));
+							// TODO: add real internal id
+							self->foundNonceCallback(0, std::make_unique<Block_data>(block_data));
 						});
 					}
 					else

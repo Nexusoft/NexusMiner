@@ -202,7 +202,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 			{
 	            for(auto& worker : m_workers)
                 {
-                    worker->set_block(block, [self = shared_from_this()](auto block_data)
+                    worker->set_block(block, [self = shared_from_this()](auto id, auto block_data)
                     {
                         // create block and submit
                         self->m_logger->info("Submitting Block...");
