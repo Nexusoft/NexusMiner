@@ -12,7 +12,7 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, std::stri
 	, m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
 	, serialPortStr{serialPort}
-	, serial{ *io_context }
+	, serial{ *m_io_context }
 {
 	try {
 		serial.open(serialPort);
