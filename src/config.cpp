@@ -62,6 +62,38 @@ namespace nexusminer
 		j.at("use_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
 
+		// read worker config
+  		for (auto& workers_json : j["workers"])
+		{
+			for(auto& worker_config_json : workers_json)
+			{
+				Worker_config worker_config;
+				worker_config.m_id = worker_config_json["id"];
+
+				auto& worker_mode_json = worker_config_json["mode"];
+
+				if(worker_mode_json["hardware"] == "cpu")
+				{
+					worker_config.m_worker_mode = Worker_config_cpu{};
+				}
+				else if(worker_mode_json["hardware"] == "gpu")
+				{
+					worker_config.m_worker_mode = Worker_config_gpu{};
+				}
+				else if(worker_mode_json["hardware"] == "fpga")
+				{
+					worker_config.m_worker_mode = Worker_config_fpga{worker_mode_json["serial_port"]};
+				}
+				else
+				{
+					// invalid config
+					return false;
+				}
+
+				m_worker_config.push_back(worker_config);			
+			}
+		}
+
 		// advanced configs
 		if (j.count("connection_retry_interval") != 0)
 		{
@@ -76,15 +108,10 @@ namespace nexusminer
 			j.at("get_height_interval").get_to(m_get_height_interval);
 		}
 
-
-
-
 		j.at("logfile").get_to(m_logfile);
 
 		print_config();
 		// TODO Need to add exception handling here and set return value appropriately
 		return true;
 	}
-
-
-} // end namespace
+}
