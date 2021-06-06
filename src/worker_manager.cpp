@@ -223,7 +223,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 			}
 			else
 			{
-				m_logger->info("Block Obsolete Height = {}, Skipping over.", block.nHeight);
+				m_logger->warn("Block Obsolete Height = {}, Skipping over.", block.nHeight);
 			}
         }
         else if(packet.m_header == Packet::ACCEPT)
@@ -234,7 +234,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         }
         else if(packet.m_header == Packet::REJECT)
         {
-            m_logger->info("Block Rejected by Nexus Network.");
+            m_logger->warn("Block Rejected by Nexus Network.");
             get_block();
             // TODO add to statistics
         }

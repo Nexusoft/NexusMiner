@@ -148,7 +148,7 @@ bool Worker_software_hash::difficultyCheck()
 	}
 	else
 	{
-		m_logger->info("Nonce fails difficulty check.");
+		m_logger->warn("Nonce fails difficulty check.");
 		return false;
 	}
 }

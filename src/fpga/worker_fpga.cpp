@@ -286,7 +286,7 @@ bool Worker_fpga::difficultyCheck()
 	}
 	else
 	{
-		m_logger->info("Nonce fails difficulty check.");
+		m_logger->warn("Nonce fails difficulty check.");
 		return false;
 	}
 }
