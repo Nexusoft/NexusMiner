@@ -28,6 +28,7 @@ public:
 	std::string const& get_logfile() const { return m_logfile; }
 	std::uint16_t get_connection_retry_interval() const { return m_connection_retry_interval; }
 	std::uint16_t get_print_statistics_interval() const { return m_print_statistics_interval; }
+	std::uint16_t get_height_interval() const { return m_get_height_interval; }
 
 private:
 
@@ -37,8 +38,10 @@ private:
 	bool		 m_use_pool;
 	std::uint32_t m_min_share;
 	std::string  m_logfile;
+	// advanced configs
 	std::uint16_t m_connection_retry_interval;
 	std::uint16_t m_print_statistics_interval;
+	std::uint16_t m_get_height_interval;
 
 };
 

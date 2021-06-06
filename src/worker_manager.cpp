@@ -16,12 +16,14 @@ Worker_manager::Worker_manager(Config& config, chrono::Timer_factory::Sptr timer
 {
     m_connection_retry_timer = m_timer_factory->create_timer();
     m_statistics_timer = m_timer_factory->create_timer();
+    m_get_height_timer = m_timer_factory->create_timer();
 }
 
 void Worker_manager::stop()
 {
     m_connection_retry_timer->cancel();
     m_statistics_timer->cancel();
+    m_get_height_timer->cancel();
 
     // close connection
     m_connection.reset();
@@ -48,6 +50,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
             {
                 self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
                 self->m_connection = nullptr;		// close connection (socket etc)
+                self->m_current_height = 0;     // reset height
 
                 // retry connect
                 auto const connection_retry_interval = self->m_config.get_connection_retry_interval();
@@ -71,10 +74,8 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_connection->transmit(packet_set_channel.get_bytes());
 
                 self->m_current_height = 0;     // reset height
-                // get height/new block
-                Packet packet_get_height;
-                packet_get_height.m_header = Packet::NEW_BLOCK;
-                self->m_connection->transmit(packet_get_height.get_bytes());
+                auto const get_height_interval = self->m_config.get_height_interval();
+                self->m_get_height_timer->start(chrono::Seconds(get_height_interval), self->get_height_handler(get_height_interval));
             }
             else
             {	// data received
@@ -136,6 +137,29 @@ chrono::Timer::Handler Worker_manager::statistics_handler(std::uint16_t print_st
     }; 
 }
 
+chrono::Timer::Handler Worker_manager::get_height_handler(std::uint16_t get_height_interval)
+{
+    std::weak_ptr<Worker_manager> weak_self = shared_from_this();
+    return[weak_self, get_height_interval](bool canceled)
+    {
+        if (canceled)	// don't do anything if the timer has been canceled
+        {
+            return;
+        }
+
+        auto self = weak_self.lock();
+        if(self)
+        {
+            Packet packet_get_height;
+            packet_get_height.m_header = Packet::NEW_BLOCK;
+            self->m_connection->transmit(packet_get_height.get_bytes());
+            // restart timer
+            self->m_statistics_timer->start(chrono::Seconds(get_height_interval), 
+                self->get_height_handler(get_height_interval));
+        }
+    }; 
+}
+
 void Worker_manager::add_worker(std::shared_ptr<Worker> worker)
 {
     m_workers.push_back(std::move(worker));
@@ -193,9 +217,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
                         submit_block.m_data->insert(submit_block.m_data->end(), nonce.begin(), nonce.end());
 			            submit_block.m_length = 72;
 
-                        self->m_connection->transmit(submit_block.get_bytes());   
-
-                        // get new block
+                        self->m_connection->transmit(submit_block.get_bytes());
                     });
                 }
 			}
@@ -208,17 +230,13 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         {
             m_logger->info("Block Accepted By Nexus Network.");
             // TODO add to statistics
-            // get height/new block
-            Packet packet_get_height;
-            packet_get_height.m_header = Packet::NEW_BLOCK;
-            m_connection->transmit(packet_get_height.get_bytes());
+
         }
         else if(packet.m_header == Packet::REJECT)
         {
             m_logger->info("Block Rejected by Nexus Network.");
             get_block();
             // TODO add to statistics
-            // TODO start work again
         }
         else
         {

@@ -17,6 +17,8 @@ namespace nexusminer
 		, m_min_share{ 40000000 }
 		, m_logfile{""}		// no logfile usage, default
 		, m_connection_retry_interval{5}
+		, m_print_statistics_interval{5}
+		, m_get_height_interval{2}
 	{
 	}
 
@@ -31,6 +33,7 @@ namespace nexusminer
 
 		std::cout << "Connection Retry Interval: " << m_connection_retry_interval << std::endl;
 		std::cout << "Print Statistics Interval: " << m_print_statistics_interval << std::endl;		
+		std::cout << "Get Height Interval: " << m_get_height_interval << std::endl;		
 
 		std::cout << "Pool: " << m_use_pool << std::endl;;
 		std::cout << "Min Share Diff: " << m_min_share << std::endl;
@@ -56,11 +59,25 @@ namespace nexusminer
 		j.at("wallet_ip").get_to(m_wallet_ip);
 		j.at("port").get_to(m_port);
 		j.at("mining_mode").get_to(m_mining_mode);
-		
-		j.at("connection_retry_interval").get_to(m_connection_retry_interval);
-		j.at("print_statistics_interval").get_to(m_print_statistics_interval);
 		j.at("use_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
+
+		// advanced configs
+		if (j.count("connection_retry_interval") != 0)
+		{
+			j.at("connection_retry_interval").get_to(m_connection_retry_interval);
+		}
+		if (j.count("print_statistics_interval") != 0)
+		{
+			j.at("print_statistics_interval").get_to(m_print_statistics_interval);
+		}
+		if (j.count("get_height_interval") != 0)
+		{
+			j.at("get_height_interval").get_to(m_get_height_interval);
+		}
+
+
+
 
 		j.at("logfile").get_to(m_logfile);
 

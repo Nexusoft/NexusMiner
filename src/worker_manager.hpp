@@ -40,6 +40,7 @@ private:
 
     chrono::Timer::Handler connection_retry_handler(network::Endpoint const& wallet_endpoint);
     chrono::Timer::Handler statistics_handler(std::uint16_t print_statistics_interval);
+    chrono::Timer::Handler get_height_handler(std::uint16_t get_height_interval);
 
     void get_block();
 
@@ -50,6 +51,7 @@ private:
     chrono::Timer_factory::Sptr m_timer_factory;
     chrono::Timer::Uptr m_connection_retry_timer;
     chrono::Timer::Uptr m_statistics_timer;
+    chrono::Timer::Uptr m_get_height_timer;
 
     std::vector<std::shared_ptr<Worker>> m_workers;
 
