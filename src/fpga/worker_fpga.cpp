@@ -8,12 +8,13 @@ namespace nexusminer
 {
 
 Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, int workerID, std::string serialPort)
-	: stop{ false }
-	, m_io_context{ io_context }
+	: m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
+	, serial{ *m_io_context }
 	, serialPortStr{serialPort}
+	, stop{ false }
 	, log_leader{"FPGA Worker " + std::to_string(workerID) + " " + serialPort + ": " }
-	, serial{ *io_context }
+
 {
 	workerID_ = workerID;
 	try {

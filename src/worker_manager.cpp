@@ -220,7 +220,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
                         if (self->m_connection)
                             self->m_connection->transmit(submit_block.get_bytes());  
                         else
-                            self->m_logger->debug("No connection. Can't submit block.");
+                            self->m_logger->error("No connection. Can't submit block.");
                     });
                 }
 			}

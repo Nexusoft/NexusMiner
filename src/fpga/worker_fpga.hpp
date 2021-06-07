@@ -38,9 +38,12 @@ private:
     void run();
     bool difficultyCheck();
 
+    std::shared_ptr<asio::io_context> m_io_context;
+    std::shared_ptr<spdlog::logger> m_logger;
+    asio::serial_port serial;
+
     int baud = 230400;
     std::string serialPortStr;
-    asio::serial_port serial;
     std::atomic<bool> stop;
     std::thread runThread;
     Worker::Block_found_handler foundNonceCallback;
@@ -54,8 +57,6 @@ private:
     Block_data block_;
     std::mutex mtx;
 
-    std::shared_ptr<asio::io_context> m_io_context;
-    std::shared_ptr<spdlog::logger> m_logger;
     std::string log_leader;
 
 
