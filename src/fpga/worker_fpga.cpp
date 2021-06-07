@@ -12,8 +12,8 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, int worke
 	, m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
 	, serialPortStr{serialPort}
-	, serial{ *io_context }
 	, log_leader{"FPGA Worker " + std::to_string(workerID) + " " + serialPort + ": " }
+	, serial{ *m_io_context }
 {
 	workerID_ = workerID;
 	try {
@@ -130,7 +130,8 @@ void Worker_fpga::run()
 						m_io_context->post([self = shared_from_this()]()
 						{
 							auto block_data = self->get_block_data();
-							self->foundNonceCallback(std::make_unique<Block_data>(block_data));
+							// TODO add real internal id
+							self->foundNonceCallback(0, std::make_unique<Block_data>(block_data));
 						});
 					}
 					else
@@ -174,7 +175,7 @@ bool Worker_fpga::difficultyCheck()
 	}
 	else
 	{
-		m_logger->info(log_leader + "Nonce fails difficulty check.");
+		m_logger->warn(log_leader + "Nonce fails difficulty check.");
 		return false;
 	}
 }

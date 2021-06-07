@@ -2,9 +2,36 @@
 #define NEXUSMINER_CONFIG_HPP
 
 #include <string>
+#include <vector>
+#include <variant>
 
 namespace nexusminer
 {
+struct Worker_config_cpu
+{
+
+};
+
+struct Worker_config_fpga
+{
+	std::string serial_port{};
+
+};
+
+struct Worker_config_gpu
+{
+
+};
+
+class Worker_config
+{
+public:
+
+	std::string m_id{};
+	std::variant<Worker_config_cpu, Worker_config_fpga, Worker_config_gpu>
+		m_worker_mode;
+};
+
 class Config
 {
 public:
@@ -28,6 +55,8 @@ public:
 	std::string const& get_logfile() const { return m_logfile; }
 	std::uint16_t get_connection_retry_interval() const { return m_connection_retry_interval; }
 	std::uint16_t get_print_statistics_interval() const { return m_print_statistics_interval; }
+	std::uint16_t get_height_interval() const { return m_get_height_interval; }
+	std::vector<Worker_config> const& get_worker_config() const { return m_worker_config; }
 
 private:
 
@@ -37,8 +66,14 @@ private:
 	bool		 m_use_pool;
 	std::uint32_t m_min_share;
 	std::string  m_logfile;
+
+	// workers
+	std::vector<Worker_config> m_worker_config;
+
+	// advanced configs
 	std::uint16_t m_connection_retry_interval;
 	std::uint16_t m_print_statistics_interval;
+	std::uint16_t m_get_height_interval;
 
 };
 
