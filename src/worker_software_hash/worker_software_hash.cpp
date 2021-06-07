@@ -1,20 +1,22 @@
 #include "worker_software_hash.hpp"
+#include "config.hpp"
 #include "statistics.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
+#include <asio.hpp>
 #include <random>
 
 namespace nexusminer
 {
 
-Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context, int workerID) 
-: stop{false}
-, leadingZerosRequired{20}  //set this lower to find more nonce candidates.
-, m_io_context{std::move(io_context)}
+Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config) 
+: m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
-, log_leader{"Software Worker " + std::to_string(workerID) + ": " }
+, m_config{config}
+, stop{false}
+, leadingZerosRequired{20}  //set this lower to find more nonce candidates.
+, log_leader{"Software Worker " + m_config.m_id + ": " }
 {
-	workerID_ = workerID;
 	runThread = std::thread(&Worker_software_hash::run,this);
 }
 
@@ -104,8 +106,7 @@ void Worker_software_hash::run()
 						m_io_context->post([self = shared_from_this()]()
 						{
 							auto block_data = self->get_block_data();
-							// TODO: add real internal id
-							self->foundNonceCallback(0, std::make_unique<Block_data>(block_data));
+							self->foundNonceCallback(self->m_config.m_internal_id, std::make_unique<Block_data>(block_data));
 						});
 					}
 					else

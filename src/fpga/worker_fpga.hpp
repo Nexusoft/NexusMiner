@@ -10,18 +10,19 @@
 #include "nexus_skein.hpp"
 #include "nexus_keccak.hpp"
 #include "nexus_hash_utils.hpp"
-#include <asio.hpp>
 #include <spdlog/spdlog.h>
+#include <asio.hpp>
 
 namespace nexusminer {
 
 class Statistics;
+class Worker_config;
 
 class Worker_fpga : public Worker, public std::enable_shared_from_this<Worker_fpga>
 {
 public:
 
-    Worker_fpga(std::shared_ptr<asio::io_context> io_context, int workerID, std::string serialPort);
+    Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
     ~Worker_fpga();
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
@@ -40,6 +41,7 @@ private:
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
+    Worker_config& m_config;
     asio::serial_port serial;
 
     int baud = 230400;

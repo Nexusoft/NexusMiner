@@ -9,18 +9,20 @@
 #include "worker.hpp"
 #include "nexus_skein.hpp"
 #include "nexus_keccak.hpp"
-#include <asio.hpp>
 #include <spdlog/spdlog.h>
+
+namespace asio { class io_context; }
 
 namespace nexusminer {
 
 class Statistics;
+class Worker_config;
 
 class Worker_software_hash : public Worker, public std::enable_shared_from_this<Worker_software_hash>
 {
 public:
 
-    Worker_software_hash(std::shared_ptr<asio::io_context> io_context, int workerID);
+    Worker_software_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
     ~Worker_software_hash();
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
@@ -35,7 +37,11 @@ private:
 
     void run();
     bool difficultyCheck();
-    uint64_t leadingZeroMask();  
+    std::uint64_t leadingZeroMask();  
+
+    std::shared_ptr<asio::io_context> m_io_context;
+    std::shared_ptr<spdlog::logger> m_logger;
+    Worker_config& m_config;
 
     std::atomic<bool> stop;
     std::thread runThread;
@@ -51,8 +57,7 @@ private:
     //std::condition_variable cv;
     //std::atomic<bool> mine = false;
 
-    std::shared_ptr<asio::io_context> m_io_context;
-    std::shared_ptr<spdlog::logger> m_logger;
+
     std::string log_leader;
 
 

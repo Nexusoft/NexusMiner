@@ -33,8 +33,8 @@ if(MSVC)
 endif()
 
 include_directories(src/include/)
-include_directories(src/worker_software_hash/)
-include_directories(src/fpga/)
+#include_directories(src/worker_software_hash/)
+#include_directories(src/fpga/)
 
 # add submodules
 add_subdirectory(src/chrono)

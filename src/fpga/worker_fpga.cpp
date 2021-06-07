@@ -2,23 +2,24 @@
 #include "statistics.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
+#include "config.hpp"
 #include <random>
 
 namespace nexusminer
 {
 
-Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, int workerID, std::string serialPort)
+Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_config& config)
 	: m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
+	, m_config{config}
 	, serial{ *m_io_context }
-	, serialPortStr{serialPort}
 	, stop{ false }
-	, log_leader{"FPGA Worker " + std::to_string(workerID) + " " + serialPort + ": " }
-
 {
-	workerID_ = workerID;
+	auto& worker_config_fpga = std::get<Worker_config_fpga>(m_config.m_worker_mode);
+	serialPortStr = worker_config_fpga.serial_port;
+	log_leader = std::string{"FPGA Worker " + m_config.m_id + " " + serialPortStr + ": " };
 	try {
-		serial.open(serialPort);
+		serial.open(serialPortStr);
 		serial.set_option(asio::serial_port_base::baud_rate(baud));
 		serial.set_option(asio::serial_port_base::character_size(8));
 		serial.set_option(asio::serial_port_base::stop_bits(asio::serial_port_base::stop_bits::one));
@@ -131,8 +132,7 @@ void Worker_fpga::run()
 						m_io_context->post([self = shared_from_this()]()
 						{
 							auto block_data = self->get_block_data();
-							// TODO add real internal id
-							self->foundNonceCallback(0, std::make_unique<Block_data>(block_data));
+							self->foundNonceCallback(self->m_config.m_internal_id, std::make_unique<Block_data>(block_data));
 						});
 					}
 					else

@@ -78,7 +78,6 @@ public:
     virtual void set_block(const LLP::CBlock& block, Block_found_handler result) = 0;
 
     virtual void print_statistics() = 0;
-	int workerID_ = 0;
 };
 
 }

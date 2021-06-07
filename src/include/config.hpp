@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include "json/json.hpp"
 
 namespace nexusminer
 {
@@ -27,7 +28,16 @@ class Worker_config
 {
 public:
 
+	enum Mode
+	{
+		CPU = 0,
+		FPGA,
+		GPU
+	};
+
 	std::string m_id{};
+	std::uint16_t m_internal_id{0U};
+	Mode m_mode{Mode::CPU};
 	std::variant<Worker_config_cpu, Worker_config_fpga, Worker_config_gpu>
 		m_worker_mode;
 };
@@ -56,9 +66,11 @@ public:
 	std::uint16_t get_connection_retry_interval() const { return m_connection_retry_interval; }
 	std::uint16_t get_print_statistics_interval() const { return m_print_statistics_interval; }
 	std::uint16_t get_height_interval() const { return m_get_height_interval; }
-	std::vector<Worker_config> const& get_worker_config() const { return m_worker_config; }
+	std::vector<Worker_config>& get_worker_config() { return m_worker_config; }
 
 private:
+
+	bool read_worker_config(nlohmann::json& j);
 
 	std::string  m_wallet_ip;
 	std::uint16_t m_port;

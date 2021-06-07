@@ -1,6 +1,5 @@
 
 #include "config.hpp"
-#include "json/json.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -63,35 +62,9 @@ namespace nexusminer
 		j.at("min_share").get_to(m_min_share);
 
 		// read worker config
-  		for (auto& workers_json : j["workers"])
+		if(!read_worker_config(j))
 		{
-			for(auto& worker_config_json : workers_json)
-			{
-				Worker_config worker_config;
-				worker_config.m_id = worker_config_json["id"];
-
-				auto& worker_mode_json = worker_config_json["mode"];
-
-				if(worker_mode_json["hardware"] == "cpu")
-				{
-					worker_config.m_worker_mode = Worker_config_cpu{};
-				}
-				else if(worker_mode_json["hardware"] == "gpu")
-				{
-					worker_config.m_worker_mode = Worker_config_gpu{};
-				}
-				else if(worker_mode_json["hardware"] == "fpga")
-				{
-					worker_config.m_worker_mode = Worker_config_fpga{worker_mode_json["serial_port"]};
-				}
-				else
-				{
-					// invalid config
-					return false;
-				}
-
-				m_worker_config.push_back(worker_config);			
-			}
+			return false;
 		}
 
 		// advanced configs
@@ -113,5 +86,43 @@ namespace nexusminer
 		print_config();
 		// TODO Need to add exception handling here and set return value appropriately
 		return true;
+	}
+
+	bool Config::read_worker_config(nlohmann::json& j)
+	{
+		for (auto& workers_json : j["workers"])
+		{
+			for(auto& worker_config_json : workers_json)
+			{
+				Worker_config worker_config;
+				worker_config.m_id = worker_config_json["id"];
+
+				auto& worker_mode_json = worker_config_json["mode"];
+
+				if(worker_mode_json["hardware"] == "cpu")
+				{
+					worker_config.m_mode = Worker_config::CPU;
+					worker_config.m_worker_mode = Worker_config_cpu{};
+				}
+				else if(worker_mode_json["hardware"] == "gpu")
+				{
+					worker_config.m_mode = Worker_config::GPU;
+					worker_config.m_worker_mode = Worker_config_gpu{};
+				}
+				else if(worker_mode_json["hardware"] == "fpga")
+				{
+					worker_config.m_mode = Worker_config::FPGA;
+					worker_config.m_worker_mode = Worker_config_fpga{worker_mode_json["serial_port"]};
+				}
+				else
+				{
+					// invalid config
+					return false;
+				}
+
+				m_worker_config.push_back(worker_config);		
+			}
+		}
+		return true;	
 	}
 }

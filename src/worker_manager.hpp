@@ -11,6 +11,7 @@
 #include <memory>
 
 namespace LLP { class CBlock; }
+namespace asio { class io_context; }
 
 namespace nexusminer 
 {
@@ -22,11 +23,10 @@ class Worker_manager : public std::enable_shared_from_this<Worker_manager>
 {
 public:
 
-    Worker_manager(Config& config, chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket);
+    Worker_manager(std::shared_ptr<asio::io_context> io_context, Config& config, 
+        chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket);
 
     bool connect(network::Endpoint const& wallet_endpoint);
-    // TODO: remove and read workers from config
-    void add_worker(std::shared_ptr<Worker> worker);
 
     // stop the component and destroy all workers
     void stop();
@@ -44,6 +44,9 @@ private:
 
     void get_block();
 
+    void create_workers();
+
+	std::shared_ptr<::asio::io_context> m_io_context;
     Config& m_config;
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;

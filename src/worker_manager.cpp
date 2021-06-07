@@ -1,5 +1,5 @@
 #include "worker_manager.hpp"
-#include "worker_software_hash.hpp"
+#include "worker_software_hash/worker_software_hash.hpp"
 #include "fpga/worker_fpga.hpp"
 #include "packet.hpp"
 #include "config.hpp"
@@ -7,8 +7,10 @@
 
 namespace nexusminer
 {
-Worker_manager::Worker_manager(Config& config, chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket)
-: m_config{config}
+Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Config& config, 
+    chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket)
+: m_io_context{std::move(io_context)}
+, m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
 , m_timer_factory{std::move(timer_factory)}
@@ -17,6 +19,36 @@ Worker_manager::Worker_manager(Config& config, chrono::Timer_factory::Sptr timer
     m_connection_retry_timer = m_timer_factory->create_timer();
     m_statistics_timer = m_timer_factory->create_timer();
     m_get_height_timer = m_timer_factory->create_timer();
+
+    create_workers();
+}
+
+void Worker_manager::create_workers()
+{
+    auto internal_id = 0U;
+    for(auto& worker_config : m_config.get_worker_config())
+    {
+        worker_config.m_internal_id = internal_id;
+        switch(worker_config.m_mode)
+        {
+            case Worker_config::FPGA:
+            {
+                m_workers.push_back(std::make_shared<Worker_fpga>(m_io_context, worker_config));
+                break;
+            }
+            case Worker_config::GPU:
+            {
+                break;
+            }
+            case Worker_config::CPU:    // falltrough
+            default:
+            {
+                m_workers.push_back(std::make_shared<Worker_software_hash>(m_io_context, worker_config));
+                break;
+            }
+        }
+        internal_id++;
+    }
 }
 
 void Worker_manager::stop()
@@ -158,11 +190,6 @@ chrono::Timer::Handler Worker_manager::get_height_handler(std::uint16_t get_heig
                 self->get_height_handler(get_height_interval));
         }
     }; 
-}
-
-void Worker_manager::add_worker(std::shared_ptr<Worker> worker)
-{
-    m_workers.push_back(std::move(worker));
 }
 
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
