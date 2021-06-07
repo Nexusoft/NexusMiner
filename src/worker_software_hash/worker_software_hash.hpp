@@ -20,7 +20,7 @@ class Worker_software_hash : public Worker, public std::enable_shared_from_this<
 {
 public:
 
-    Worker_software_hash(std::shared_ptr<asio::io_context> io_context);
+    Worker_software_hash(std::shared_ptr<asio::io_context> io_context, int workerID);
     ~Worker_software_hash();
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
@@ -53,6 +53,7 @@ private:
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
+    std::string log_leader;
 
 
 };

@@ -7,13 +7,15 @@
 namespace nexusminer
 {
 
-Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, std::string serialPort)
+Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, int workerID, std::string serialPort)
 	: stop{ false }
 	, m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
 	, serialPortStr{serialPort}
 	, serial{ *io_context }
+	, log_leader{"FPGA Worker " + std::to_string(workerID) + " " + serialPort + ": " }
 {
+	workerID_ = workerID;
 	try {
 		serial.open(serialPort);
 		serial.set_option(asio::serial_port_base::baud_rate(baud));
@@ -43,66 +45,21 @@ void Worker_fpga::set_block(const LLP::CBlock& block, Worker::Block_found_handle
 {
 	std::scoped_lock<std::mutex> lck(mtx);
 	
-	m_logger->debug("New Block");
+	//m_logger->debug(log_leader + "New Block");
 	foundNonceCallback = result;
-	block_.merkle_root = block.hashMerkleRoot;
-	block_.previous_hash = block.hashPrevBlock;
-	block_.nVersion = block.nVersion;
-	block_.nBits = block.nBits;
-	block_.nChannel = block.nChannel;
-	block_.nHeight = block.nHeight;
+	block_ = Block_data{ block };
 
-	startingNonce = 0;// 0x0FFFFFFFFFFFFFFF;
 	//TODO: Remove random starting nonce once connection to wallet is stable
 	std::random_device rd;
 	std::mt19937_64 gen(rd());
 	std::uniform_int_distribution<uint64_t> dis;
 	startingNonce = dis(gen);
+	startingNonce = 0;
 	block_.nNonce = startingNonce;
-	//convert header data to byte strings
-	std::vector<unsigned char> blockHeightB = IntToBytes(block.nHeight, 4);
-	std::vector<unsigned char> versionB = IntToBytes(block.nVersion, 4);
-	std::vector<unsigned char> channelB = IntToBytes(block.nChannel, 4);
-	std::vector<unsigned char> bitsB = IntToBytes(block.nBits, 4);
-	std::vector<unsigned char> nonceB = IntToBytes(block_.nNonce, 8);
-	std::string merkleStr = block_.merkle_root.GetHex();
-	std::string hashPrevBlockStr = block_.previous_hash.GetHex();
-	std::vector<unsigned char> merkleB = HexStringToBytes(merkleStr);
-	std::vector<unsigned char> prevHashB = HexStringToBytes(hashPrevBlockStr);
-	std::reverse(merkleB.begin(), merkleB.end());
-	std::reverse(prevHashB.begin(), prevHashB.end());
 
+	//SetTestBlock();
 
-	//TEST
-	// use a sample Nexus block as a test vector
-	//uint32_t nHeight = 2023276;
-	//uint32_t nVersion = 4;
-	//uint32_t nChannel = 2;
-	//uint32_t nBits = 0x7b032ed8;
-	//uint64_t nNonce = 21155560019;
-	//std::string merkleStr = "31f5a458fc4207cd30fd1c4f43c26a3140193ed088f75004aa5b07beebf6be905fd49a412294c73850b422437c414429a6160df514b8ec919ea8a2346d3a3025";
-	//std::string hashPrevBlockStr = "00000902546301d2a29b00cad593cf05c798469b0e3f39fe623e6762111d6f9eed3a6a18e0e5453e81da8d0db5e89808e68e96c8df13005b714b1e63d7fa44a5025d1370f6f255af2d5121c4f65624489f1b401f651b5bd505002d3a5efc098aa6fa762d270433a51697d7d8d3252d56bbbfbe62f487f258c757690d31e493a7";
-	//blockHeightB = IntToBytes(nHeight, 4);
-	//versionB = IntToBytes(nVersion, 4);
-	//channelB = IntToBytes(nChannel, 4);
-	//bitsB = IntToBytes(nBits, 4);
-	//nonceB = IntToBytes(nNonce, 8);
-	////convert byte strings to little endian byte order
-	//std::reverse(merkleB.begin(), merkleB.end());
-	//std::reverse(prevHashB.begin(), prevHashB.end());
-	//END TEST
-
-	//Concatenate the bytes
-	std::vector<unsigned char> headerB = versionB;
-	headerB.insert(headerB.end(), prevHashB.begin(), prevHashB.end());
-	headerB.insert(headerB.end(), merkleB.begin(), merkleB.end());
-	headerB.insert(headerB.end(), channelB.begin(), channelB.end());
-	headerB.insert(headerB.end(), blockHeightB.begin(), blockHeightB.end());
-	headerB.insert(headerB.end(), bitsB.begin(), bitsB.end());
-	headerB.insert(headerB.end(), nonceB.begin(), nonceB.end());
-	//The header length should be 216 bytes
-	//std::cout << "Header length: " << headerB.size() << " bytes" << std::endl;
-
+	std::vector<unsigned char> headerB = block_.GetHeaderBytes();
 
 	//calculate midstate
 	skein.setMessage(headerB);
@@ -131,74 +88,6 @@ void Worker_fpga::set_block(const LLP::CBlock& block, Worker::Block_found_handle
 
 void Worker_fpga::run()
 {
-	m_logger->debug("FPGA Test");
-
-	//TEST
-
-	////convert header data to byte strings
-	//std::vector<unsigned char> blockHeightB;
-	//std::vector<unsigned char> versionB;
-	//std::vector<unsigned char> channelB;
-	//std::vector<unsigned char> bitsB;
-	//std::vector<unsigned char> nonceB;
-	//std::vector<unsigned char> merkleB;
-	//std::vector<unsigned char> prevHashB;
-
-	//// use a sample Nexus block as a test vector
-	//uint32_t nHeight = 2023276;
-	//uint32_t nVersion = 4;
-	//uint32_t nChannel = 2;
-	//uint32_t nBits = 0x7b032ed8;
-	//uint64_t nNonce = 21155560019;
-	//std::string merkleStr = "31f5a458fc4207cd30fd1c4f43c26a3140193ed088f75004aa5b07beebf6be905fd49a412294c73850b422437c414429a6160df514b8ec919ea8a2346d3a3025";
-	//std::string hashPrevBlockStr = "00000902546301d2a29b00cad593cf05c798469b0e3f39fe623e6762111d6f9eed3a6a18e0e5453e81da8d0db5e89808e68e96c8df13005b714b1e63d7fa44a5025d1370f6f255af2d5121c4f65624489f1b401f651b5bd505002d3a5efc098aa6fa762d270433a51697d7d8d3252d56bbbfbe62f487f258c757690d31e493a7";
-	//merkleB = HexStringToBytes(merkleStr);
-	//prevHashB = HexStringToBytes(hashPrevBlockStr);
-	//blockHeightB = IntToBytes(nHeight, 4);
-	//versionB = IntToBytes(nVersion, 4);
-	//channelB = IntToBytes(nChannel, 4);
-	//bitsB = IntToBytes(nBits, 4);
-	//nonceB = IntToBytes(nNonce, 8);
-	////convert byte strings to little endian byte order
-	//std::reverse(merkleB.begin(), merkleB.end());
-	//std::reverse(prevHashB.begin(), prevHashB.end());
-
-	////Concatenate the bytes
-	//std::vector<unsigned char> headerB = versionB;
-	//headerB.insert(headerB.end(), prevHashB.begin(), prevHashB.end());
-	//headerB.insert(headerB.end(), merkleB.begin(), merkleB.end());
-	//headerB.insert(headerB.end(), channelB.begin(), channelB.end());
-	//headerB.insert(headerB.end(), blockHeightB.begin(), blockHeightB.end());
-	//headerB.insert(headerB.end(), bitsB.begin(), bitsB.end());
-	//headerB.insert(headerB.end(), nonceB.begin(), nonceB.end());
-	////The header length should be 216 bytes
-	////std::cout << "Header length: " << headerB.size() << " bytes" << std::endl;
-	////std::cout << "Header: " << BytesToHexString(headerB) << std::endl;
-
-	////calculate midstate
-	//skein.setMessage(headerB);
-	//NexusSkein::stateType m2 = skein.getMessage2();
-	////std::cout << "Message 2" << std::endl << m2.toHexString() << std::endl;
-	//NexusSkein::keyType key2 = skein.getKey2();
-	////std::cout << "Key 2" << std::endl << key2.toHexString() << std::endl;
-
-	//std::string key2Str = key2.toHexString(true);
-	//std::string message2Str = m2.toHexString(true);
-	//message2Str.resize(88 * 2);  //crop to first 88 bytes
-	//std::string workPackageStr = key2Str + message2Str;
-
-	//std::vector<unsigned char> fpgaWorkPackage = HexStringToBytes(workPackageStr);
-	//startingNonce = nNonce;
-	////send new work package over the serial port
-	//if (serial.is_open())
-	//{
-	//	asio::write(serial, asio::buffer(fpgaWorkPackage));
-	//}
-	////wait for at least 10ms before sending another package
-	//using namespace std::chrono_literals;
-	//std::this_thread::sleep_for(10ms);
-
-	//END TEST
 
 	while (!stop)
 	{
@@ -223,11 +112,11 @@ void Worker_fpga::run()
 		if (startingNonce - nonce == 1)
 		{
 			//the fpga will respond with starting nonce - 1 to acknowledge receipt of the work package.
-			m_logger->info("New block receipt acknowledged by FPGA.");
+			m_logger->info(log_leader + "New block receipt acknowledged by FPGA.");
 		}
 		else
 		{
-			m_logger->info("Found a nonce candidate {}", nonce);
+			m_logger->info(log_leader + "found a nonce candidate {}", nonce);
 			skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficultyCheck())
@@ -246,7 +135,7 @@ void Worker_fpga::run()
 					}
 					else
 					{
-						m_logger->debug("Miner callback function not set.");
+						m_logger->debug(log_leader + "Miner callback function not set.");
 					}
 				}
 
@@ -275,17 +164,17 @@ bool Worker_fpga::difficultyCheck()
 	keccak.calculateHash();
 	uint64_t keccakHash = keccak.getResult();
 	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
-	m_logger->info("Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
+	m_logger->info(log_leader + "Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
 
 	//check the hash result is less than the difficulty.  We truncate to just use the upper 64 bits for easier calculation.
 	if (keccakHash <= difficultyTest64)
 	{
-		m_logger->info("Nonce passes difficulty check.");
+		m_logger->info(log_leader + "Nonce passes difficulty check.");
 		return true;
 	}
 	else
 	{
-		m_logger->info("Nonce fails difficulty check.");
+		m_logger->info(log_leader + "Nonce fails difficulty check.");
 		return false;
 	}
 }
@@ -293,6 +182,24 @@ bool Worker_fpga::difficultyCheck()
 Block_data Worker_fpga::get_block_data() const
 {
 	return block_;
+}
+
+void Worker_fpga::SetTestBlock()
+{
+	// use a sample Nexus block as a test vector
+	// hashing this block should result in a number with 49 leading zeros
+	std::string merkleStr = "31f5a458fc4207cd30fd1c4f43c26a3140193ed088f75004aa5b07beebf6be905fd49a412294c73850b422437c414429a6160df514b8ec919ea8a2346d3a3025";
+	std::string hashPrevBlockStr = "00000902546301d2a29b00cad593cf05c798469b0e3f39fe623e6762111d6f9eed3a6a18e0e5453e81da8d0db5e89808e68e96c8df13005b714b1e63d7fa44a5025d1370f6f255af2d5121c4f65624489f1b401f651b5bd505002d3a5efc098aa6fa762d270433a51697d7d8d3252d56bbbfbe62f487f258c757690d31e493a7";
+	block_.nBits = 0x7b032ed8;
+	block_.nChannel = 2;
+	block_.nHeight = 2023276;
+	block_.nVersion = 4;
+	block_.nNonce = 21155560019;
+	block_.merkle_root.SetHex(merkleStr);
+	block_.previous_hash.SetHex(hashPrevBlockStr);
+	startingNonce = block_.nNonce;
+	
+
 }
 
 }

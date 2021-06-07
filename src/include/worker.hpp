@@ -4,14 +4,55 @@
 #include <memory>
 #include <functional>
 #include "uint1024.h"
+#include "LLP/block.hpp"
+#include "byte_utils.hpp"
 
-namespace LLP { class CBlock; }
+//namespace LLP { class CBlock; }
 
 namespace nexusminer {
 
 class Block_data
 {
 public:
+
+	Block_data(const LLP::CBlock& block)
+		:merkle_root{block.hashMerkleRoot}
+		, previous_hash{block.hashPrevBlock}
+		, nHeight {block.nHeight}
+		, nVersion {block.nVersion}
+		, nChannel {block.nChannel}
+		, nBits {block.nBits}
+		, nNonce{ block.nNonce }{}
+
+	Block_data() {}
+
+	std::vector<unsigned char> GetHeaderBytes()
+	{
+		//convert header data to byte strings
+		std::vector<unsigned char> blockHeightB = IntToBytes(nHeight, 4);
+		std::vector<unsigned char> versionB = IntToBytes(nVersion, 4);
+		std::vector<unsigned char> channelB = IntToBytes(nChannel, 4);
+		std::vector<unsigned char> bitsB = IntToBytes(nBits, 4);
+		std::vector<unsigned char> nonceB = IntToBytes(nNonce, 8);
+		std::string merkleStr = merkle_root.GetHex();
+		std::string hashPrevBlockStr = previous_hash.GetHex();
+		std::vector<unsigned char> merkleB = HexStringToBytes(merkleStr);
+		std::vector<unsigned char> prevHashB = HexStringToBytes(hashPrevBlockStr);
+		std::reverse(merkleB.begin(), merkleB.end());
+		std::reverse(prevHashB.begin(), prevHashB.end());
+
+		//Concatenate the bytes
+		std::vector<unsigned char> headerB = versionB;
+		headerB.insert(headerB.end(), prevHashB.begin(), prevHashB.end());
+		headerB.insert(headerB.end(), merkleB.begin(), merkleB.end());
+		headerB.insert(headerB.end(), channelB.begin(), channelB.end());
+		headerB.insert(headerB.end(), blockHeightB.begin(), blockHeightB.end());
+		headerB.insert(headerB.end(), bitsB.begin(), bitsB.end());
+		headerB.insert(headerB.end(), nonceB.begin(), nonceB.end());
+
+		return headerB;
+
+	}
 
 	uint512 merkle_root;
     uint1024 previous_hash;
@@ -25,6 +66,7 @@ public:
 
 class Worker {
 public:
+	
 
 	virtual ~Worker() = default;
 
@@ -36,6 +78,7 @@ public:
     virtual void set_block(const LLP::CBlock& block, Block_found_handler result) = 0;
 
     virtual void print_statistics() = 0;
+	int workerID_ = 0;
 };
 
 }

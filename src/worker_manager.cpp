@@ -193,7 +193,10 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
                         submit_block.m_data->insert(submit_block.m_data->end(), nonce.begin(), nonce.end());
 			            submit_block.m_length = 72;
 
-                        self->m_connection->transmit(submit_block.get_bytes());   
+                        if (self->m_connection)
+                            self->m_connection->transmit(submit_block.get_bytes());  
+                        else
+                            self->m_logger->debug("No connection. Can't submit block.");
 
                         // get new block
                     });

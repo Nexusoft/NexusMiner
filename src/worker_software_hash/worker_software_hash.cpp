@@ -7,13 +7,14 @@
 namespace nexusminer
 {
 
-Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context) 
+Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context, int workerID) 
 : stop{false}
 , leadingZerosRequired{20}  //set this lower to find more nonce candidates.
 , m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
+, log_leader{"Software Worker " + std::to_string(workerID) + ": " }
 {
-	
+	workerID_ = workerID;
 	runThread = std::thread(&Worker_software_hash::run,this);
 }
 
@@ -28,7 +29,7 @@ void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_fou
 {
 
 	std::scoped_lock<std::mutex> lck(mtx);
-	m_logger->debug("New Block");
+	//m_logger->debug(log_leader + "New Block");
 	foundNonceCallback = result;
 	block_.merkle_root = block.hashMerkleRoot;
 	block_.previous_hash = block.hashPrevBlock;
@@ -89,7 +90,7 @@ void Worker_software_hash::run()
 		//check the result for leading zeros
 		if ((keccakHash & leadingZeroMask()) == 0)
 		{
-			m_logger->info("Found a nonce candidate {}", nonce);
+			m_logger->info(log_leader + "Found a nonce candidate {}", nonce);
 			skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficultyCheck())
@@ -108,7 +109,7 @@ void Worker_software_hash::run()
 					}
 					else
 					{
-						m_logger->debug("Miner callback function not set.");
+						m_logger->debug(log_leader + "Miner callback function not set.");
 					}
 				}
 
@@ -137,17 +138,17 @@ bool Worker_software_hash::difficultyCheck()
 	keccak.calculateHash();
 	uint64_t keccakHash = keccak.getResult();
 	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
-	m_logger->info("Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
+	m_logger->info(log_leader + "Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
 
 	//check the hash result is less than the difficulty.  We truncate to just use the upper 64 bits for easier calculation.
 	if (keccakHash <= difficultyTest64)
 	{
-		m_logger->info("Nonce passes difficulty check.");
+		m_logger->info(log_leader + "Nonce passes difficulty check.");
 		return true;
 	}
 	else
 	{
-		m_logger->info("Nonce fails difficulty check.");
+		m_logger->info(log_leader + "Nonce fails difficulty check.");
 		return false;
 	}
 }

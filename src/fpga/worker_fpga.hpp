@@ -21,7 +21,7 @@ class Worker_fpga : public Worker, public std::enable_shared_from_this<Worker_fp
 {
 public:
 
-    Worker_fpga(std::shared_ptr<asio::io_context> io_context, std::string serialPort);
+    Worker_fpga(std::shared_ptr<asio::io_context> io_context, int workerID, std::string serialPort);
     ~Worker_fpga();
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
@@ -30,6 +30,7 @@ public:
     void print_statistics() override;
 
     Block_data get_block_data() const;
+    void SetTestBlock();
 
 
 private:
@@ -55,6 +56,7 @@ private:
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
+    std::string log_leader;
 
 
 
