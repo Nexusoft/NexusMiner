@@ -30,9 +30,6 @@ public:
     void set_block(const LLP::CBlock& block, Worker::Block_found_handler result) override;
     void print_statistics() override;
 
-    Block_data get_block_data() const;
-
-
 private:
 
     void run();

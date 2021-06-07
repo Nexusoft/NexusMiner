@@ -1,5 +1,5 @@
 #include "worker_manager.hpp"
-#include "worker_software_hash/worker_software_hash.hpp"
+#include "cpu/worker_software_hash.hpp"
 #include "fpga/worker_fpga.hpp"
 #include "packet.hpp"
 #include "config.hpp"

@@ -5,8 +5,6 @@
 #include "chrono/timer_factory.hpp"
 #include "worker_manager.hpp"
 #include "worker.hpp"
-//#include "worker_software_hash/worker_software_hash.hpp"
-//#include "fpga/worker_fpga.hpp"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>

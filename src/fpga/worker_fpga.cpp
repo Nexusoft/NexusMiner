@@ -131,8 +131,7 @@ void Worker_fpga::run()
 					{
 						m_io_context->post([self = shared_from_this()]()
 						{
-							auto block_data = self->get_block_data();
-							self->foundNonceCallback(self->m_config.m_internal_id, std::make_unique<Block_data>(block_data));
+							self->foundNonceCallback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->block_));
 						});
 					}
 					else
@@ -179,11 +178,6 @@ bool Worker_fpga::difficultyCheck()
 		m_logger->warn(log_leader + "Nonce fails difficulty check.");
 		return false;
 	}
-}
-
-Block_data Worker_fpga::get_block_data() const
-{
-	return block_;
 }
 
 void Worker_fpga::SetTestBlock()

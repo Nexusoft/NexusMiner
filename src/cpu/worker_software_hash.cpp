@@ -105,8 +105,7 @@ void Worker_software_hash::run()
 					{
 						m_io_context->post([self = shared_from_this()]()
 						{
-							auto block_data = self->get_block_data();
-							self->foundNonceCallback(self->m_config.m_internal_id, std::make_unique<Block_data>(block_data));
+							self->foundNonceCallback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->block_));
 						});
 					}
 					else
@@ -158,12 +157,6 @@ bool Worker_software_hash::difficultyCheck()
 uint64_t Worker_software_hash::leadingZeroMask()
 {
 	return ((1ull << leadingZerosRequired) - 1) << (64 - leadingZerosRequired);
-}
-
-
-Block_data Worker_software_hash::get_block_data() const
-{
-	return block_;
 }
 
 }

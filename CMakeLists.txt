@@ -33,8 +33,6 @@ if(MSVC)
 endif()
 
 include_directories(src/include/)
-#include_directories(src/worker_software_hash/)
-#include_directories(src/fpga/)
 
 # add submodules
 add_subdirectory(src/chrono)
@@ -46,7 +44,7 @@ add_executable(NexusMiner
                 src/main.cpp 
                 src/miner.cpp 
                 src/worker_manager.cpp 
-                src/worker_software_hash/worker_software_hash.cpp
+                src/cpu/worker_software_hash.cpp
                 src/fpga/worker_fpga.cpp)
 
 target_link_libraries(NexusMiner chrono)
