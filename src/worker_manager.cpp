@@ -186,7 +186,7 @@ chrono::Timer::Handler Worker_manager::get_height_handler(std::uint16_t get_heig
             packet_get_height.m_header = Packet::NEW_BLOCK;
             self->m_connection->transmit(packet_get_height.get_bytes());
             // restart timer
-            self->m_statistics_timer->start(chrono::Seconds(get_height_interval), 
+            self->m_get_height_timer->start(chrono::Seconds(get_height_interval), 
                 self->get_height_handler(get_height_interval));
         }
     }; 
@@ -223,7 +223,6 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         // Block from wallet received
         else if(packet.m_header == Packet::BLOCK_DATA)
         {
-            m_logger->debug("Block data received");
             auto block = deserialize_block(packet.m_data);
 			if (block.nHeight == m_current_height)
 			{
