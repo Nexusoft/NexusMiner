@@ -28,7 +28,7 @@ namespace nexusminer
 		std::cout << "Wallet IP: " << m_wallet_ip << std::endl;
 		std::cout << "Port: " << m_port << std::endl;
 
-		std::cout << "Mining Mode: " << m_mining_mode << std::endl;
+		std::cout << "Mining Mode: " << ((m_mining_mode == Mining_mode::HASH) ? "HASH" : "PRIME") << std::endl;
 
 		std::cout << "Connection Retry Interval: " << m_connection_retry_interval << std::endl;
 		std::cout << "Print Statistics Interval: " << m_print_statistics_interval << std::endl;		
@@ -57,7 +57,21 @@ namespace nexusminer
 		json j = json::parse(config_file);
 		j.at("wallet_ip").get_to(m_wallet_ip);
 		j.at("port").get_to(m_port);
-		j.at("mining_mode").get_to(m_mining_mode);
+
+		std::string mining_mode = j["mining_mode"];
+		std::for_each(mining_mode.begin(), mining_mode.end(), [](char & c) {
+        	c = ::tolower(c);
+    	});
+
+		if(mining_mode == "prime")
+		{
+			m_mining_mode = Mining_mode::PRIME;
+		}
+		else
+		{
+			m_mining_mode = Mining_mode::HASH;
+		}
+
 		j.at("use_pool").get_to(m_use_pool);
 		j.at("min_share").get_to(m_min_share);
 
