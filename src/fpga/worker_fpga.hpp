@@ -2,8 +2,6 @@
 #define NEXUSMINER_WORKER_FPGA_HPP
 
 #include <memory>
-#include <thread>
-#include <atomic>
 #include <mutex>
 #include <chrono>
 #include "worker.hpp"
@@ -29,38 +27,31 @@ public:
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
     void set_block(const LLP::CBlock& block, Worker::Block_found_handler result) override;
     void print_statistics() override;
-
-    void SetTestBlock();
-
+    void set_test_block();
 
 private:
 
-    void run();
-    bool difficultyCheck();
+    void start_read();
+    void handle_read(const asio::error_code& error, std::size_t bytes_transferred);
+    bool difficulty_check();
+
+    static constexpr int baud = 230400;
+    static constexpr int workPackageLength = 224; //bytes
+    static constexpr int responseLength = 8; //bytes
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
+    std::vector<unsigned char> m_receive_nonce_buffer;
     Worker_config& m_config;
-    asio::serial_port serial;
-
-    int baud = 230400;
-    std::string serialPortStr;
-    std::atomic<bool> stop;
-    std::thread runThread;
-    Worker::Block_found_handler foundNonceCallback;
+    asio::serial_port m_serial;
+    std::string m_serial_port_path;
+    Worker::Block_found_handler m_found_nonce_callback;
     std::unique_ptr<Statistics> m_statistics;
-    NexusSkein skein;
-    static constexpr int workPackageLength = 224; //bytes
-    static constexpr int responseLength = 8; //bytes
-    uint64_t startingNonce = 0;
-
-
-    Block_data block_;
-    std::mutex mtx;
-
-    std::string log_leader;
-
-
+    NexusSkein m_skein;
+    uint64_t m_starting_nonce = 0;
+    Block_data m_block;
+    std::mutex m_mtx;
+    std::string m_log_leader;
 
 };
 

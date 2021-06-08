@@ -33,30 +33,24 @@ public:
 private:
 
     void run();
-    bool difficultyCheck();
-    std::uint64_t leadingZeroMask();  
+    bool difficulty_check();
+    std::uint64_t leading_zero_mask();  
+
+    //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
+    static constexpr int leading_zeros_required = 20;    //set lower to find more nonce candidates
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
     Worker_config& m_config;
-
-    std::atomic<bool> stop;
-    std::thread runThread;
-    Worker::Block_found_handler foundNonceCallback;
+    std::atomic<bool> m_stop;
+    std::thread m_run_thread;
+    Worker::Block_found_handler m_found_nonce_callback;
     std::unique_ptr<Statistics> m_statistics;
-
-    int leadingZerosRequired;  //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
-    
-    NexusSkein skein;
-    Block_data block_;
-    std::mutex mtx;
-    uint64_t startingNonce = 0;
-    //std::condition_variable cv;
-    //std::atomic<bool> mine = false;
-
-
-    std::string log_leader;
-
+    NexusSkein m_skein;
+    Block_data m_block;
+    std::mutex m_mtx;
+    uint64_t m_starting_nonce = 0;
+    std::string m_log_leader;
 
 };
 
