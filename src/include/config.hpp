@@ -54,7 +54,7 @@ public:
 
 	Config();
 
-	bool read_config();
+	bool read_config(std::string const& miner_config_file);
 	void print_config() const;
 
 	std::string const& get_wallet_ip() const { return m_wallet_ip; }

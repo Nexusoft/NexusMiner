@@ -1,10 +1,8 @@
 #ifndef NEXUSMINER_MINER_HPP
 #define NEXUSMINER_MINER_HPP
 
-#include <thread>
-#include <vector>
 #include <memory>
-#include <mutex>
+#include <string>
 
 #include "config.hpp"
 #include <spdlog/spdlog.h>
@@ -26,7 +24,7 @@ public:
 	Miner();
 	~Miner();
 
-	bool init();
+	bool init(std::string const& miner_config_file);
 	void run();
 
 private:

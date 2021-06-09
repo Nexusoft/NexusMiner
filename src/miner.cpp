@@ -46,9 +46,9 @@ namespace nexusminer
 		m_io_context->stop();
 	}
 
-	bool Miner::init()
+	bool Miner::init(std::string const& miner_config_file)
 	{
-		if (!m_config.read_config())
+		if (!m_config.read_config(miner_config_file))
 		{
 			return false;
 		}

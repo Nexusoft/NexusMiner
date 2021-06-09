@@ -43,14 +43,15 @@ namespace nexusminer
 
 	}
 
-	bool Config::read_config()
+	bool Config::read_config(std::string const& miner_config_file)
 	{
-		std::cout << "Reading config file miner.conf" << std::endl;
+		std::string miner_config_tmp = miner_config_file.empty() ? "miner.conf" : miner_config_file;
+		std::cout << "Reading config file " << miner_config_tmp << std::endl;
 
-		std::ifstream config_file("miner.conf");
+		std::ifstream config_file(miner_config_tmp);
 		if (!config_file.is_open())
 		{
-			std::cerr << "Unable to read miner.conf";
+			std::cerr << "Unable to read " << miner_config_tmp << std::endl;
 			return false;
 		}
 
