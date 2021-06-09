@@ -1,6 +1,6 @@
 #include "worker_software_hash.hpp"
 #include "config.hpp"
-#include "statistics.hpp"
+#include "stats_collector.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
 #include <asio.hpp>
@@ -100,15 +100,17 @@ void Worker_software_hash::run()
 	}
 }
 
-void Worker_software_hash::print_statistics()
+void Worker_software_hash::update_statistics(Stats_collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
-   // m_statistics->print();
 	std::stringstream ss;
 	ss << "Worker " << m_config.m_id << " stats: ";
 	ss << std::setprecision(2) << std::fixed << get_hash_rate()/1.0e6 << "MH/s ";
 	ss << m_met_difficulty_count << " blocks found.  Most difficult: " << m_best_leading_zeros;
 	m_logger->info(ss.str());
+
+	stats_collector.update_worker_stats(m_config.m_internal_id, 
+		Stats_hash{m_hash_count, m_best_leading_zeros, m_met_difficulty_count});
 
 }
 

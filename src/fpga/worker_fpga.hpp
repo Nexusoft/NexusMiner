@@ -13,7 +13,7 @@
 
 namespace nexusminer {
 
-class Statistics;
+class Stats_collector;
 class Worker_config;
 
 class Worker_fpga : public Worker, public std::enable_shared_from_this<Worker_fpga>
@@ -26,7 +26,7 @@ public:
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
     void set_block(const LLP::CBlock& block, Worker::Block_found_handler result) override;
-    void print_statistics() override;
+    void update_statistics(Stats_collector& stats_collector) override;
     void set_test_block();
 
 private:
@@ -46,7 +46,6 @@ private:
     asio::serial_port m_serial;
     std::string m_serial_port_path;
     Worker::Block_found_handler m_found_nonce_callback;
-    std::unique_ptr<Statistics> m_statistics;
     NexusSkein m_skein;
     uint64_t m_starting_nonce = 0;
     Block_data m_block;

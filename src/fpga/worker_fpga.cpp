@@ -1,5 +1,5 @@
 #include "worker_fpga.hpp"
-#include "statistics.hpp"
+#include "stats_collector.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
 #include "config.hpp"
@@ -148,15 +148,17 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 
 }
 
-void Worker_fpga::print_statistics()
+void Worker_fpga::update_statistics(Stats_collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
-	// m_statistics->print();
 	std::stringstream ss;
 	ss << "Worker " << m_config.m_id << " stats: ";
 	ss << std::setprecision(2) << std::fixed << get_hash_rate() / 1.0e6 << "MH/s. ";
 	ss << m_nonce_candidates_recieved << " candidates found. Most difficult: " << m_best_leading_zeros;
 	m_logger->info(ss.str());
+
+	stats_collector.update_worker_stats(m_config.m_internal_id, 
+		Stats_hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count});
 }
 
 bool Worker_fpga::difficulty_check()

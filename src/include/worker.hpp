@@ -11,6 +11,8 @@
 
 namespace nexusminer {
 
+class Stats_collector;
+
 class Block_data
 {
 public:
@@ -67,7 +69,6 @@ public:
 class Worker {
 public:
 	
-
 	virtual ~Worker() = default;
 
     // A call to the BlockFoundHandler informs the user about a new found block.
@@ -77,7 +78,7 @@ public:
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
     virtual void set_block(const LLP::CBlock& block, Block_found_handler result) = 0;
 
-    virtual void print_statistics() = 0;
+    virtual void update_statistics(Stats_collector& stats_collector) = 0;
 };
 
 }
