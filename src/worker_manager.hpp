@@ -6,7 +6,7 @@
 #include "network/types.hpp"
 #include <spdlog/spdlog.h>
 #include "chrono/timer_factory.hpp"
-#include "chrono/timer.hpp"
+#include "timer_manager.hpp"
 
 #include <memory>
 
@@ -33,14 +33,9 @@ public:
 
 private:
 
-    void parse_config();
 	void process_data(network::Shared_payload&& receive_buffer);	// handle network messages
 
     LLP::CBlock deserialize_block(network::Shared_payload data);
-
-    chrono::Timer::Handler connection_retry_handler(network::Endpoint const& wallet_endpoint);
-    chrono::Timer::Handler statistics_handler(std::uint16_t print_statistics_interval);
-    chrono::Timer::Handler get_height_handler(std::uint16_t get_height_interval);
 
     void get_block();
 
@@ -51,10 +46,7 @@ private:
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
-    chrono::Timer_factory::Sptr m_timer_factory;
-    chrono::Timer::Uptr m_connection_retry_timer;
-    chrono::Timer::Uptr m_statistics_timer;
-    chrono::Timer::Uptr m_get_height_timer;
+    Timer_manager m_timer_manager;
 
     std::vector<std::shared_ptr<Worker>> m_workers;
 

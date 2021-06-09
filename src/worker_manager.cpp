@@ -13,13 +13,9 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
-, m_timer_factory{std::move(timer_factory)}
+, m_timer_manager{m_config, std::move(timer_factory)}
 , m_current_height{0}
 {
-    m_connection_retry_timer = m_timer_factory->create_timer();
-    m_statistics_timer = m_timer_factory->create_timer();
-    m_get_height_timer = m_timer_factory->create_timer();
-
     create_workers();
 }
 
@@ -53,9 +49,7 @@ void Worker_manager::create_workers()
 
 void Worker_manager::stop()
 {
-    m_connection_retry_timer->cancel();
-    m_statistics_timer->cancel();
-    m_get_height_timer->cancel();
+    m_timer_manager.stop();
 
     // close connection
     m_connection.reset();
@@ -87,15 +81,11 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 // retry connect
                 auto const connection_retry_interval = self->m_config.get_connection_retry_interval();
                 self->m_logger->info("Connection retry {} seconds", connection_retry_interval);
-                self->m_connection_retry_timer->start(chrono::Seconds(connection_retry_interval), 
-                    self->connection_retry_handler(wallet_endpoint));
+                self->m_timer_manager.start_connection_retry_timer(self, wallet_endpoint);
             }
             else if (result == network::Result::connection_ok)
             {
                 self->m_logger->info("Connection to wallet established");
-
-                auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
-                self->m_statistics_timer->start(chrono::Seconds(print_statistics_interval), self->statistics_handler(print_statistics_interval));
 
                 // set channel
                 std::uint32_t channel = (self->m_config.get_mining_mode() == Config::PRIME) ? 1U : 2U;
@@ -106,8 +96,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_connection->transmit(packet_set_channel.get_bytes());
 
                 self->m_current_height = 0;     // reset height
-                auto const get_height_interval = self->m_config.get_height_interval();
-                self->m_get_height_timer->start(chrono::Seconds(get_height_interval), self->get_height_handler(get_height_interval));
+                self->m_timer_manager.start_get_height_timer(self->m_connection);
             }
             else
             {	// data received
@@ -123,73 +112,6 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
     m_connection = std::move(connection);
     return true;
-}
-
-chrono::Timer::Handler Worker_manager::connection_retry_handler(network::Endpoint const& wallet_endpoint)
-{
-    std::weak_ptr<Worker_manager> weak_self = shared_from_this();
-    return[weak_self, wallet_endpoint](bool canceled)
-    {
-        if (canceled)	// don't do anything if the timer has been canceled
-        {
-            return;
-        }
-
-        auto self = weak_self.lock();
-        if(self)
-        {
-            self->connect(wallet_endpoint);
-        }
-    }; 
-}
-
-chrono::Timer::Handler Worker_manager::statistics_handler(std::uint16_t print_statistics_interval)
-{
-    std::weak_ptr<Worker_manager> weak_self = shared_from_this();
-    return[weak_self, print_statistics_interval](bool canceled)
-    {
-        if (canceled)	// don't do anything if the timer has been canceled
-        {
-            return;
-        }
-
-        auto self = weak_self.lock();
-        if(self)
-        {
-            // print statistics
-             for(auto& worker : self->m_workers)
-             {
-                 worker->print_statistics();
-             }
-
-            // restart timer
-            self->m_statistics_timer->start(chrono::Seconds(print_statistics_interval), 
-                self->statistics_handler(print_statistics_interval));
-        }
-    }; 
-}
-
-chrono::Timer::Handler Worker_manager::get_height_handler(std::uint16_t get_height_interval)
-{
-    std::weak_ptr<Worker_manager> weak_self = shared_from_this();
-    return[weak_self, get_height_interval](bool canceled)
-    {
-        if (canceled)	// don't do anything if the timer has been canceled
-        {
-            return;
-        }
-
-        auto self = weak_self.lock();
-        if(self)
-        {
-            Packet packet_get_height;
-            packet_get_height.m_header = Packet::NEW_BLOCK;
-            self->m_connection->transmit(packet_get_height.get_bytes());
-            // restart timer
-            self->m_get_height_timer->start(chrono::Seconds(get_height_interval), 
-                self->get_height_handler(get_height_interval));
-        }
-    }; 
 }
 
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
