@@ -5,6 +5,10 @@ namespace nexusminer
 {
 Stats_collector::Stats_collector(Config& config)
 : m_config{config}
+, m_start_time{std::chrono::steady_clock::now()}
+, m_accepted_blocks{0}
+, m_rejected_blocks{0}
+, m_connection_retries{0}
 {
     for(auto& worker_config : m_config.get_worker_config())
     {
@@ -30,7 +34,7 @@ void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stat
 void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stats_prime const& stats)
 {
     assert(m_config.get_mining_mode() == Config::PRIME);
-    
+
     auto& prime_stats = std::get<Stats_prime>(m_workers[internal_worker_id]);
     prime_stats += stats;
 }

@@ -13,7 +13,8 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
-, m_timer_manager{m_config, std::move(timer_factory)}
+, m_stats_collector{m_config}
+, m_timer_manager{m_config, m_stats_collector, std::move(timer_factory)}
 , m_current_height{0}
 {
     create_workers();
@@ -77,6 +78,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
                 self->m_connection = nullptr;		// close connection (socket etc)
                 self->m_current_height = 0;     // reset height
+                self->m_stats_collector.connection_retry_attempt();
 
                 // retry connect
                 auto const connection_retry_interval = self->m_config.get_connection_retry_interval();
@@ -96,7 +98,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_connection->transmit(packet_set_channel.get_bytes());
 
                 self->m_current_height = 0;     // reset height
-                self->m_timer_manager.start_get_height_timer(self->m_connection);
+                self->m_timer_manager.start_get_height_timer(self->m_connection, self->m_workers);
             }
             else
             {	// data received
@@ -180,14 +182,13 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         else if(packet.m_header == Packet::ACCEPT)
         {
             m_logger->info("Block Accepted By Nexus Network.");
-            // TODO add to statistics
-
+            m_stats_collector.block_accpeted();
         }
         else if(packet.m_header == Packet::REJECT)
         {
             m_logger->warn("Block Rejected by Nexus Network.");
             get_block();
-            // TODO add to statistics
+            m_stats_collector.block_rejected();
         }
         else
         {

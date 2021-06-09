@@ -4,11 +4,14 @@
 #include "packet.hpp"
 #include "worker_manager.hpp"
 #include "config.hpp"
+#include "stats_collector.hpp"
+#include "worker.hpp"
 
 namespace nexusminer
 {
-Timer_manager::Timer_manager(Config& config, chrono::Timer_factory::Sptr timer_factory)
+Timer_manager::Timer_manager(Config& config, Stats_collector& stats_collector, chrono::Timer_factory::Sptr timer_factory)
 : m_config{config}
+, m_stats_collector{stats_collector}
 , m_timer_factory{std::move(timer_factory)}
 {
     m_connection_retry_timer = m_timer_factory->create_timer();
@@ -23,10 +26,10 @@ void Timer_manager::start_connection_retry_timer(std::weak_ptr<Worker_manager> w
         connection_retry_handler(std::move(worker_manager), wallet_endpoint));
 }
 
-void Timer_manager::start_get_height_timer(std::weak_ptr<network::Connection> connection)
+void Timer_manager::start_get_height_timer(std::weak_ptr<network::Connection> connection,std::vector<std::shared_ptr<Worker>> m_workers)
 {
     auto const get_height_interval = m_config.get_height_interval();
-    m_get_height_timer->start(chrono::Seconds(get_height_interval), get_height_handler(std::move(connection), get_height_interval));
+    m_get_height_timer->start(chrono::Seconds(get_height_interval), get_height_handler(std::move(connection), m_workers, get_height_interval));
 }
 
 void Timer_manager::stop()
@@ -54,9 +57,9 @@ chrono::Timer::Handler Timer_manager::connection_retry_handler(std::weak_ptr<Wor
 }
 
 chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::Connection> connection, 
-    std::uint16_t get_height_interval)
+    std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval)
 {
-    return[this, connection, get_height_interval](bool canceled)
+    return[this, connection, m_workers, get_height_interval](bool canceled)
     {
         if (canceled)	// don't do anything if the timer has been canceled
         {
@@ -69,9 +72,14 @@ chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::
             Packet packet_get_height;
             packet_get_height.m_header = Packet::NEW_BLOCK;
             connection_shared->transmit(packet_get_height.get_bytes());
+
+            for(auto& worker : m_workers)
+            {
+                worker->update_statistics(m_stats_collector);
+            }
             // restart timer
             m_get_height_timer->start(chrono::Seconds(get_height_interval), 
-                get_height_handler(std::move(connection_shared), get_height_interval));
+                get_height_handler(std::move(connection_shared), m_workers, get_height_interval));
         }
     }; 
 }

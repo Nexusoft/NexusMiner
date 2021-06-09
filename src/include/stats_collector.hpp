@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <variant>
+#include <chrono>
 
 namespace nexusminer {
 
@@ -41,10 +42,21 @@ public:
     void update_worker_stats(std::uint16_t internal_worker_id, Stats_hash const& stats);
     void update_worker_stats(std::uint16_t internal_worker_id, Stats_prime const& stats);
 
+    void block_accpeted() { m_accepted_blocks++; }
+    void block_rejected() { m_rejected_blocks++; }
+    void connection_retry_attempt() { m_connection_retries++; }
+
 private:
 
     Config& m_config;
     std::vector<std::variant<Stats_hash, Stats_prime>> m_workers;
+
+    // global stats
+    std::chrono::steady_clock::time_point m_start_time;
+    std::uint32_t m_accepted_blocks;
+    std::uint32_t m_rejected_blocks;
+    std::uint32_t m_connection_retries;
+
 
 };
 

@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 #include "chrono/timer_factory.hpp"
 #include "timer_manager.hpp"
+#include "stats_collector.hpp"
 
 #include <memory>
 
@@ -46,6 +47,7 @@ private:
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
+    Stats_collector m_stats_collector;
     Timer_manager m_timer_manager;
 
     std::vector<std::shared_ptr<Worker>> m_workers;
