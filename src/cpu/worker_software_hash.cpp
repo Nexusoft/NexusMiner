@@ -127,15 +127,14 @@ bool Worker_software_hash::difficulty_check()
 	uint64_t keccakHash = keccak.getResult();
 	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
 	m_logger->info(m_log_leader + "Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
-
+	if (hashActualLeadingZeros > m_best_leading_zeros)
+	{
+		m_best_leading_zeros = hashActualLeadingZeros;
+	}
 	//check the hash result is less than the difficulty.  We truncate to just use the upper 64 bits for easier calculation.
 	if (keccakHash <= difficultyTest64)
 	{
 		m_logger->info(m_log_leader + "Nonce passes difficulty check.");
-		if (hashActualLeadingZeros > m_best_leading_zeros)
-		{
-			m_best_leading_zeros = hashActualLeadingZeros;
-		}
 		return true;
 	}
 	else
