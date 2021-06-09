@@ -6,6 +6,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <chrono>
 #include "worker.hpp"
 #include "nexus_skein.hpp"
 #include "nexus_keccak.hpp"
@@ -35,6 +36,7 @@ private:
     void run();
     bool difficulty_check();
     std::uint64_t leading_zero_mask();  
+ 
 
     //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
     static constexpr int leading_zeros_required = 20;    //set lower to find more nonce candidates
@@ -51,6 +53,17 @@ private:
     std::mutex m_mtx;
     uint64_t m_starting_nonce = 0;
     std::string m_log_leader;
+
+    //stats
+    //TODO move to statistics class
+    double get_hash_rate();
+    void reset_statistics();
+    int elapsed_seconds();
+    std::chrono::steady_clock::time_point m_stats_start_time;
+    int64_t m_hash_count;
+    int m_best_leading_zeros;
+    int m_met_difficulty_count;
+
 
 };
 

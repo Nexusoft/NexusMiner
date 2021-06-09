@@ -211,7 +211,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         else if (packet.m_header == Packet::BLOCK_HEIGHT)
 		{
 			auto const height = bytes2uint(*packet.m_data);
-			m_logger->debug("Height Received {}", height);
+			//m_logger->debug("Height Received {}", height);
 
 			if (height > m_current_height)
 			{

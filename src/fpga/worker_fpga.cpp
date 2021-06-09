@@ -3,7 +3,6 @@
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
 #include "config.hpp"
-#include <random>
 
 namespace nexusminer
 {
@@ -13,6 +12,10 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_co
 	, m_logger{ spdlog::get("logger") }
 	, m_config{config}
 	, m_serial{ *m_io_context }
+	, m_stats_start_time{ std::chrono::steady_clock::now() }
+	, m_nonce_candidates_recieved{ 0 }
+	, m_best_leading_zeros{ 0 }
+	, m_met_difficulty_count{ 0 }
 {
 	auto& worker_config_fpga = std::get<Worker_config_fpga>(m_config.m_worker_mode);
 	m_receive_nonce_buffer.resize(responseLength);
@@ -47,12 +50,7 @@ void Worker_fpga::set_block(const LLP::CBlock& block, Worker::Block_found_handle
 	m_found_nonce_callback = result;
 	m_block = Block_data{ block };
 
-	//TODO: Remove random starting nonce once connection to wallet is stable
-	//std::random_device rd;
-	//std::mt19937_64 gen(rd());
-	//std::uniform_int_distribution<uint64_t> dis;
-	//m_starting_nonce = dis(gen);
-	m_starting_nonce = 0;
+	m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
 	m_block.nNonce = m_starting_nonce;
 
 	std::vector<unsigned char> headerB = m_block.GetHeaderBytes();
@@ -105,11 +103,13 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 		}
 		else
 		{
+			++m_nonce_candidates_recieved;
 			m_logger->info(m_log_leader + "found a nonce candidate {}", nonce);
 			m_skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficulty_check())
 			{
+				++m_met_difficulty_count;
 				//update the block with the nonce and call the callback function;
 				m_block.nNonce = nonce;
 				{
@@ -150,7 +150,13 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 
 void Worker_fpga::print_statistics()
 {
-    //m_statistics->print();
+	std::scoped_lock<std::mutex> lck(m_mtx);
+	// m_statistics->print();
+	std::stringstream ss;
+	ss << "Worker " << m_config.m_id << " stats: ";
+	ss << std::setprecision(2) << std::fixed << get_hash_rate() / 1.0e6 << "MH/s. ";
+	ss << m_nonce_candidates_recieved << " candidates found. Most difficult: " << m_best_leading_zeros;
+	m_logger->info(ss.str());
 }
 
 bool Worker_fpga::difficulty_check()
@@ -173,6 +179,10 @@ bool Worker_fpga::difficulty_check()
 	if (keccakHash <= difficultyTest64)
 	{
 		m_logger->info(m_log_leader + "Nonce passes difficulty check.");
+		if (hashActualLeadingZeros > m_best_leading_zeros)
+		{
+			m_best_leading_zeros = hashActualLeadingZeros;
+		}
 		return true;
 	}
 	else
@@ -200,4 +210,22 @@ void Worker_fpga::set_test_block()
 
 }
 
+double Worker_fpga::get_hash_rate()
+{
+	//returns the overall hashrate for this worker in hashes per second
+	return m_nonce_candidates_recieved * nonce_difficulty_filter / static_cast<double>(elapsed_seconds());
+}
+
+void Worker_fpga::reset_statistics()
+{
+	m_stats_start_time = std::chrono::steady_clock::now();
+	m_nonce_candidates_recieved = 0;
+	m_best_leading_zeros = 0;
+	m_met_difficulty_count = 0;
+}
+
+int Worker_fpga::elapsed_seconds()
+{
+	return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - m_stats_start_time).count());
+}
 }

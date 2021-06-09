@@ -53,6 +53,17 @@ private:
     std::mutex m_mtx;
     std::string m_log_leader;
 
+    //stats
+    //TODO move to statistics class
+    static constexpr uint64_t nonce_difficulty_filter = 1ULL << 32;  //the fixed difficulty check inside the FPGA
+    double get_hash_rate();
+    void reset_statistics();
+    int elapsed_seconds();
+    std::chrono::steady_clock::time_point m_stats_start_time;
+    int m_nonce_candidates_recieved;
+    int m_best_leading_zeros;
+    int m_met_difficulty_count;
+
 };
 
 }

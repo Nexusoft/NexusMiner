@@ -4,7 +4,7 @@
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
 #include <asio.hpp>
-#include <random>
+#include <sstream>
 
 namespace nexusminer
 {
@@ -15,6 +15,10 @@ Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_
 , m_config{config}
 , m_stop{true}
 , m_log_leader{"CPU Worker " + m_config.m_id + ": " }
+, m_stats_start_time{std::chrono::steady_clock::now()}
+, m_hash_count{0}
+, m_best_leading_zeros{0}
+, m_met_difficulty_count {0}
 {
 	
 }
@@ -38,7 +42,8 @@ void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_fou
 		m_found_nonce_callback = result;
 		m_block = Block_data{ block };
 
-		m_starting_nonce = 0;
+		//set the starting nonce for each worker to something different that won't overlap with the others
+		m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
 		m_block.nNonce = m_starting_nonce;
 		std::vector<unsigned char> headerB = m_block.GetHeaderBytes();
 		//calculate midstate
@@ -71,6 +76,7 @@ void Worker_software_hash::run()
 			//verify the difficulty
 			if (difficulty_check())
 			{
+				++m_met_difficulty_count;
 				//update the block with the nonce and call the callback function;
 				m_block.nNonce = nonce;
 				{
@@ -90,12 +96,20 @@ void Worker_software_hash::run()
 			}
 		}
 		m_skein.setNonce(++nonce);	
+		++m_hash_count;
 	}
 }
 
 void Worker_software_hash::print_statistics()
 {
+	std::scoped_lock<std::mutex> lck(m_mtx);
    // m_statistics->print();
+	std::stringstream ss;
+	ss << "Worker " << m_config.m_id << " stats: ";
+	ss << std::setprecision(2) << std::fixed << get_hash_rate()/1.0e6 << "MH/s ";
+	ss << m_met_difficulty_count << " blocks found.  Most difficult: " << m_best_leading_zeros;
+	m_logger->info(ss.str());
+
 }
 
 bool Worker_software_hash::difficulty_check()
@@ -118,6 +132,10 @@ bool Worker_software_hash::difficulty_check()
 	if (keccakHash <= difficultyTest64)
 	{
 		m_logger->info(m_log_leader + "Nonce passes difficulty check.");
+		if (hashActualLeadingZeros > m_best_leading_zeros)
+		{
+			m_best_leading_zeros = hashActualLeadingZeros;
+		}
 		return true;
 	}
 	else
@@ -130,6 +148,25 @@ bool Worker_software_hash::difficulty_check()
 uint64_t Worker_software_hash::leading_zero_mask()
 {
 	return ((1ull << leading_zeros_required) - 1) << (64 - leading_zeros_required);
+}
+
+double Worker_software_hash::get_hash_rate()
+{
+	//returns the overall hashrate for this worker in hashes per second
+	return m_hash_count / static_cast<double>(elapsed_seconds());
+}
+
+void Worker_software_hash::reset_statistics()
+{
+	m_stats_start_time = std::chrono::steady_clock::now();
+	m_hash_count = 0;
+	m_best_leading_zeros = 0;
+	m_met_difficulty_count = 0;
+}
+
+int Worker_software_hash::elapsed_seconds()
+{
+	return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - m_stats_start_time).count());
 }
 
 }
