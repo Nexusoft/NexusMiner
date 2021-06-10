@@ -5,6 +5,7 @@
 #include <vector>
 #include <variant>
 #include <chrono>
+#include <mutex>
 
 namespace nexusminer {
 
@@ -56,6 +57,10 @@ private:
     std::uint32_t m_accepted_blocks;
     std::uint32_t m_rejected_blocks;
     std::uint32_t m_connection_retries;
+
+    // worker stats are updated in seperate worker threads
+    // the access to the worker data (form stats_printer) has to be protected
+    std::mutex m_worker_mutex;
 
 
 };

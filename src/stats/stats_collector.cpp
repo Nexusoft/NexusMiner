@@ -1,4 +1,4 @@
-#include "stats_collector.hpp"
+#include "stats/stats_collector.hpp"
 #include "config.hpp"
 
 namespace nexusminer
@@ -27,6 +27,8 @@ void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stat
 {
     assert(m_config.get_mining_mode() == Config::HASH);
 
+    std::scoped_lock(m_worker_mutex);
+
     auto& hash_stats = std::get<Stats_hash>(m_workers[internal_worker_id]);
     hash_stats += stats;
 }
@@ -35,6 +37,8 @@ void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stat
 {
     assert(m_config.get_mining_mode() == Config::PRIME);
 
+    std::scoped_lock(m_worker_mutex);
+    
     auto& prime_stats = std::get<Stats_prime>(m_workers[internal_worker_id]);
     prime_stats += stats;
 }

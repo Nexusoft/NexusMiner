@@ -1,5 +1,5 @@
 #include "worker_fpga.hpp"
-#include "stats_collector.hpp"
+#include "stats/stats_collector.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
 #include "config.hpp"

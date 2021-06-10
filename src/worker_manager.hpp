@@ -7,7 +7,7 @@
 #include <spdlog/spdlog.h>
 #include "chrono/timer_factory.hpp"
 #include "timer_manager.hpp"
-#include "stats_collector.hpp"
+#include "stats/stats_collector.hpp"
 
 #include <memory>
 

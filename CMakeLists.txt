@@ -45,7 +45,8 @@ add_executable(NexusMiner
                 src/miner.cpp 
                 src/worker_manager.cpp 
                 src/timer_manager.cpp
-                src/stats_collector.cpp
+                src/stats/stats_collector.cpp
+                src/stats/stats_printer_console.cpp
                 src/cpu/worker_software_hash.cpp
                 src/fpga/worker_fpga.cpp)
 

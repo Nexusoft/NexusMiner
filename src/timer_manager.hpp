@@ -3,6 +3,7 @@
 
 #include "chrono/timer_factory.hpp"
 #include "chrono/timer.hpp"
+#include "stats/stats_printer.hpp"
 
 #include <memory>
 
@@ -30,6 +31,8 @@ public:
     // collect also data from the workers
     void start_get_height_timer(std::weak_ptr<network::Connection> connection, std::vector<std::shared_ptr<Worker>> m_workers);
 
+    void start_stats_printer_timer();
+
     void stop();
 
 private:
@@ -38,12 +41,15 @@ private:
         network::Endpoint const& wallet_endpoint);
     chrono::Timer::Handler get_height_handler(std::weak_ptr<network::Connection> connection, 
         std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval);
+    chrono::Timer::Handler stats_printer_handler(std::uint16_t stats_printer_interval);
 
     Config& m_config;
     Stats_collector& m_stats_collector;
+    std::unique_ptr<Stats_printer> m_stats_printer;
     chrono::Timer_factory::Sptr m_timer_factory;
     chrono::Timer::Uptr m_connection_retry_timer;
     chrono::Timer::Uptr m_get_height_timer;
+    chrono::Timer::Uptr m_stats_printer_timer;
 };
 }
 
