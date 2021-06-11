@@ -6,7 +6,6 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <chrono>
 #include "worker.hpp"
 #include "nexus_skein.hpp"
 #include "nexus_keccak.hpp"
@@ -55,10 +54,8 @@ private:
 
     //stats
     //TODO move to statistics class
-    double get_hash_rate();
+ 
     void reset_statistics();
-    int elapsed_seconds();
-    std::chrono::steady_clock::time_point m_stats_start_time;
     std::uint64_t m_hash_count;
     int m_best_leading_zeros;
     int m_met_difficulty_count;

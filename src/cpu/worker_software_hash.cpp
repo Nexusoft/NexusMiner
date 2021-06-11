@@ -4,7 +4,6 @@
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
 #include <asio.hpp>
-#include <sstream>
 
 namespace nexusminer
 {
@@ -15,7 +14,6 @@ Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_
 , m_config{config}
 , m_stop{true}
 , m_log_leader{"CPU Worker " + m_config.m_id + ": " }
-, m_stats_start_time{std::chrono::steady_clock::now()}
 , m_hash_count{0}
 , m_best_leading_zeros{0}
 , m_met_difficulty_count {0}
@@ -103,11 +101,6 @@ void Worker_software_hash::run()
 void Worker_software_hash::update_statistics(Stats_collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
-	std::stringstream ss;
-	ss << "Worker " << m_config.m_id << " stats: ";
-	ss << std::setprecision(2) << std::fixed << get_hash_rate()/1.0e6 << "MH/s ";
-	ss << m_met_difficulty_count << " blocks found.  Most difficult: " << m_best_leading_zeros;
-	m_logger->info(ss.str());
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, 
 		Stats_hash{m_hash_count, m_best_leading_zeros, m_met_difficulty_count});
@@ -151,23 +144,11 @@ uint64_t Worker_software_hash::leading_zero_mask()
 	return ((1ull << leading_zeros_required) - 1) << (64 - leading_zeros_required);
 }
 
-double Worker_software_hash::get_hash_rate()
-{
-	//returns the overall hashrate for this worker in hashes per second
-	return m_hash_count / static_cast<double>(elapsed_seconds());
-}
-
 void Worker_software_hash::reset_statistics()
 {
-	m_stats_start_time = std::chrono::steady_clock::now();
 	m_hash_count = 0;
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
-}
-
-int Worker_software_hash::elapsed_seconds()
-{
-	return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - m_stats_start_time).count());
 }
 
 }

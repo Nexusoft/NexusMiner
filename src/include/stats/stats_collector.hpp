@@ -16,6 +16,7 @@ struct Stats_hash
     std::uint64_t m_hash_count{0};
     int m_best_leading_zeros{0};
     int m_met_difficulty_count{0};
+    int m_nonce_candidates_recieved{0};
 
     Stats_hash& operator+=(Stats_hash const& other)
     {
@@ -42,6 +43,11 @@ public:
 
     void update_worker_stats(std::uint16_t internal_worker_id, Stats_hash const& stats);
     void update_worker_stats(std::uint16_t internal_worker_id, Stats_prime const& stats);
+    // copy of workers stats
+    std::vector<std::variant<Stats_hash, Stats_prime>> get_workers_stats() const { return m_workers; }
+    std::chrono::duration<double> get_elapsed_time_seconds() const { return 
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - m_start_time); }
+
 
     void block_accpeted() { m_accepted_blocks++; }
     void block_rejected() { m_rejected_blocks++; }

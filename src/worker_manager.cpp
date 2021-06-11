@@ -99,6 +99,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
                 self->m_current_height = 0;     // reset height
                 self->m_timer_manager.start_get_height_timer(self->m_connection, self->m_workers);
+                self->m_timer_manager.start_stats_printer_timer();
             }
             else
             {	// data received

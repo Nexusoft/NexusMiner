@@ -13,7 +13,7 @@ namespace nexusminer
 Timer_manager::Timer_manager(Config& config, Stats_collector& stats_collector, chrono::Timer_factory::Sptr timer_factory)
 : m_config{config}
 , m_stats_collector{stats_collector}
-, m_stats_printer{std::make_unique<Stats_printer_console>(stats_collector)} // TODO create printer from config
+, m_stats_printer{std::make_unique<Stats_printer_console>(config, stats_collector)} // TODO create printer from config
 , m_timer_factory{std::move(timer_factory)}
 {
     m_connection_retry_timer = m_timer_factory->create_timer();
