@@ -17,13 +17,20 @@ Stats_printer_console::Stats_printer_console(Config& config, Stats_collector& st
 
 void Stats_printer_console::print()
 {
+    // Log global stats
+    std::stringstream ss;
+    ss << "Blocks accepted: " << m_stats_collector.get_blocks_accepted() 
+        << " rejected: " << m_stats_collector.get_blocks_rejected() << std::endl;
+    ss << "Connection retry attempts: " << m_stats_collector.get_connection_retry_attempts();
+    ss << std::endl;
+
     auto const workers = m_stats_collector.get_workers_stats();
     auto const workers_config =  m_config.get_worker_config();
 
     auto worker_config_index = 0U;
     for(auto const& worker : workers)
     {
-        std::stringstream ss;
+        
         ss << "Worker " << workers_config[worker_config_index].m_id << " stats: ";
         if(m_config.get_mining_mode() == Config::HASH)
         {
@@ -37,11 +44,11 @@ void Stats_printer_console::print()
         {
 
         }
-
-        m_logger->info(ss.str());
         worker_config_index++;
+        ss << std::endl;
     }
 
+    m_logger->info(ss.str());
 }
 
 

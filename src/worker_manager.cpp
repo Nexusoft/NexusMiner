@@ -183,7 +183,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         else if(packet.m_header == Packet::ACCEPT)
         {
             m_logger->info("Block Accepted By Nexus Network.");
-            m_stats_collector.block_accpeted();
+            m_stats_collector.block_accepted();
         }
         else if(packet.m_header == Packet::REJECT)
         {

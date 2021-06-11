@@ -48,10 +48,13 @@ public:
     std::chrono::duration<double> get_elapsed_time_seconds() const { return 
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - m_start_time); }
 
-
-    void block_accpeted() { m_accepted_blocks++; }
+    void block_accepted() { m_accepted_blocks++; }
     void block_rejected() { m_rejected_blocks++; }
     void connection_retry_attempt() { m_connection_retries++; }
+
+    std::uint32_t get_blocks_accepted() const { return m_accepted_blocks; }
+    std::uint32_t get_blocks_rejected() const { return m_rejected_blocks; }
+    std::uint32_t get_connection_retry_attempts() const { return m_connection_retries; }
 
 private:
 
