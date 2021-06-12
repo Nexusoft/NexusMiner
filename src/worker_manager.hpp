@@ -16,14 +16,15 @@ namespace asio { class io_context; }
 
 namespace nexusminer 
 {
-
-class Config;
+namespace config { class Config; }
 class Worker;
 class Stats_collector;
 
 class Worker_manager : public std::enable_shared_from_this<Worker_manager>
 {
 public:
+
+    using Config = config::Config;
 
     Worker_manager(std::shared_ptr<asio::io_context> io_context, Config& config, 
         chrono::Timer_factory::Sptr timer_factory, network::Socket::Sptr socket);

@@ -1,5 +1,6 @@
 #include "stats/stats_collector.hpp"
 #include "config/config.hpp"
+#include "config/types.hpp"
 
 namespace nexusminer
 {
@@ -12,7 +13,7 @@ Stats_collector::Stats_collector(Config& config)
 {
     for(auto& worker_config : m_config.get_worker_config())
     {
-        if(m_config.get_mining_mode() == Config::HASH)
+        if(m_config.get_mining_mode() == config::Mining_mode::HASH)
         {
             m_workers.push_back(Stats_hash{});
         }

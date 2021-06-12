@@ -8,6 +8,8 @@ using json = nlohmann::json;
 
 namespace nexusminer
 {
+namespace config
+{
 	Config::Config()
 		: m_wallet_ip{ "127.0.0.1" }
 		, m_port{ 9323 }
@@ -120,12 +122,12 @@ namespace nexusminer
 
 				if(stats_printer_mode == "console")
 				{
-					stats_printer_config.m_mode = Stats_printer_config::CONSOLE;
+					stats_printer_config.m_mode = Stats_printer_mode::CONSOLE;
 					stats_printer_config.m_printer_mode = Stats_printer_config_console{};
 				}
 				else if(stats_printer_mode == "file")
 				{
-					stats_printer_config.m_mode = Stats_printer_config::FILE;
+					stats_printer_config.m_mode = Stats_printer_mode::FILE;
 					stats_printer_config.m_printer_mode = Stats_printer_config_file{};
 				}
 				else
@@ -153,17 +155,17 @@ namespace nexusminer
 
 				if(worker_mode_json["hardware"] == "cpu")
 				{
-					worker_config.m_mode = Worker_config::CPU;
+					worker_config.m_mode = Worker_mode::CPU;
 					worker_config.m_worker_mode = Worker_config_cpu{};
 				}
 				else if(worker_mode_json["hardware"] == "gpu")
 				{
-					worker_config.m_mode = Worker_config::GPU;
+					worker_config.m_mode = Worker_mode::GPU;
 					worker_config.m_worker_mode = Worker_config_gpu{};
 				}
 				else if(worker_mode_json["hardware"] == "fpga")
 				{
-					worker_config.m_mode = Worker_config::FPGA;
+					worker_config.m_mode = Worker_mode::FPGA;
 					worker_config.m_worker_mode = Worker_config_fpga{worker_mode_json["serial_port"]};
 				}
 				else
@@ -177,4 +179,5 @@ namespace nexusminer
 		}
 		return true;	
 	}
+}
 }

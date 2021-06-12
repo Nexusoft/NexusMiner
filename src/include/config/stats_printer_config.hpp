@@ -1,10 +1,13 @@
-#ifndef NEXUSMINER_STATS_PRINTER_CONFIG_HPP
-#define NEXUSMINER_STATS_PRINTER_CONFIG_HPP
+#ifndef NEXUSMINER_CONFIG_STATS_PRINTER_CONFIG_HPP
+#define NEXUSMINER_CONFIG_STATS_PRINTER_CONFIG_HPP
 
 #include <string>
 #include <variant>
+#include "types.hpp"
 
 namespace nexusminer
+{
+namespace config
 {
 
 struct Stats_printer_config_console
@@ -21,16 +24,11 @@ class Stats_printer_config
 {
 public:
 
-	enum Mode
-	{
-		CONSOLE = 0,
-		FILE
-	};
-
-	Mode m_mode{Mode::CONSOLE};
+	Stats_printer_mode m_mode{Stats_printer_mode::CONSOLE};
 	std::variant<Stats_printer_config_console, Stats_printer_config_file>
 		m_printer_mode;
 };
 
+}
 }
 #endif

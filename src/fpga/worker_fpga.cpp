@@ -16,7 +16,7 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_co
 	, m_best_leading_zeros{ 0 }
 	, m_met_difficulty_count{ 0 }
 {
-	auto& worker_config_fpga = std::get<Worker_config_fpga>(m_config.m_worker_mode);
+	auto& worker_config_fpga = std::get<config::Worker_config_fpga>(m_config.m_worker_mode);
 	m_receive_nonce_buffer.resize(responseLength);
 	m_serial_port_path = worker_config_fpga.serial_port;
 	m_log_leader = std::string{"FPGA Worker " + m_config.m_id + ": " };

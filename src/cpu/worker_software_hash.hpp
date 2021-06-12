@@ -14,13 +14,16 @@
 namespace asio { class io_context; }
 
 namespace nexusminer {
+namespace config{ class Worker_config; }
 
 class Stats_collector;
-class Worker_config;
+
 
 class Worker_software_hash : public Worker, public std::enable_shared_from_this<Worker_software_hash>
 {
 public:
+
+    using Worker_config = config::Worker_config;
 
     Worker_software_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
     ~Worker_software_hash();

@@ -6,19 +6,15 @@
 #include "json/json.hpp"
 #include "worker_config.hpp"
 #include "stats_printer_config.hpp"
+#include "types.hpp"
 
 namespace nexusminer
 {
-
+namespace config
+{
 class Config
 {
 public:
-
-	enum Mining_mode
-	{
-		PRIME = 0,
-		HASH = 1
-	};
 
 	Config();
 
@@ -61,6 +57,6 @@ private:
 	std::uint16_t m_get_height_interval;
 
 };
-
+}
 }
 #endif 

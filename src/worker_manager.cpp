@@ -3,6 +3,7 @@
 #include "fpga/worker_fpga.hpp"
 #include "packet.hpp"
 #include "config/config.hpp"
+#include "config/types.hpp"
 #include "LLP/block.hpp"
 #include "stats/stats_printer_console.hpp"
 #include "stats/stats_collector.hpp"
@@ -29,12 +30,12 @@ void Worker_manager::create_stats_printers()
     {
         switch(stats_printer_config.m_mode)
         {
-            case Stats_printer_config::CONSOLE:
+            case config::Stats_printer_mode::CONSOLE:
             {
                 m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config, *m_stats_collector));
                 break;
             }
-            case Stats_printer_config::FILE:    // falltrough
+            case config::Stats_printer_mode::FILE:    // falltrough
             default:
             {
                 //m_stats_printers.push_back(std::make_shared<Stats_printer_file>(m_config, *m_stats_collector));
@@ -52,16 +53,16 @@ void Worker_manager::create_workers()
         worker_config.m_internal_id = internal_id;
         switch(worker_config.m_mode)
         {
-            case Worker_config::FPGA:
+            case config::Worker_mode::FPGA:
             {
                 m_workers.push_back(std::make_shared<Worker_fpga>(m_io_context, worker_config));
                 break;
             }
-            case Worker_config::GPU:
+            case config::Worker_mode::GPU:
             {
                 break;
             }
-            case Worker_config::CPU:    // falltrough
+            case config::Worker_mode::CPU:    // falltrough
             default:
             {
                 m_workers.push_back(std::make_shared<Worker_software_hash>(m_io_context, worker_config));
@@ -114,7 +115,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_logger->info("Connection to wallet established");
 
                 // set channel
-                std::uint32_t channel = (self->m_config.get_mining_mode() == Config::PRIME) ? 1U : 2U;
+                std::uint32_t channel = (self->m_config.get_mining_mode() == config::Mining_mode::PRIME) ? 1U : 2U;
                 Packet packet_set_channel;
                 packet_set_channel.m_header = Packet::SET_CHANNEL;
                 packet_set_channel.m_length = 4;

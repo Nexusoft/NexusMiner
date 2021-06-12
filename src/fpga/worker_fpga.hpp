@@ -11,13 +11,14 @@
 #include <asio.hpp>
 
 namespace nexusminer {
-
+namespace config { class Worker_config; }
 class Stats_collector;
-class Worker_config;
 
 class Worker_fpga : public Worker, public std::enable_shared_from_this<Worker_fpga>
 {
 public:
+
+    using Worker_config = config::Worker_config;
 
     Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
     ~Worker_fpga();

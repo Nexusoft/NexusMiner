@@ -8,8 +8,7 @@
 #include <mutex>
 
 namespace nexusminer {
-
-class Config;
+namespace config { class Config; }
 
 struct Stats_hash
 {
@@ -38,6 +37,8 @@ struct Stats_prime
 
 class Stats_collector {
 public:
+
+    using Config = config::Config;
 
 	Stats_collector(Config& config);
 

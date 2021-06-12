@@ -35,7 +35,7 @@ private:
 	std::shared_ptr<Worker_manager> m_worker_manager;
 	std::shared_ptr<spdlog::logger> m_logger;
 
-	Config m_config;
+	config::Config m_config;
 };
 
 }

@@ -6,11 +6,12 @@
 #include <spdlog/spdlog.h>
 
 namespace nexusminer {
-
-class Config;
+namespace config { class Config; }
 
 class Stats_printer_console : public Stats_printer {
 public:
+
+    using Config = config::Config;
 
     Stats_printer_console(Config& config, Stats_collector& stats_collector);
 
