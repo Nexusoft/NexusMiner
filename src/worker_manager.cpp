@@ -32,7 +32,8 @@ void Worker_manager::create_stats_printers()
         {
             case config::Stats_printer_mode::CONSOLE:
             {
-                m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config, *m_stats_collector));
+                m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config.get_mining_mode(), 
+                    m_config.get_worker_config(), *m_stats_collector));
                 break;
             }
             case config::Stats_printer_mode::FILE:    // falltrough

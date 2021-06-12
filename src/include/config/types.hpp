@@ -20,7 +20,7 @@ namespace config
 		FILE
 	};
 
-    enum Worker_mode : std::uint8_t
+    enum class Worker_mode : std::uint8_t
 	{
 		CPU = 0,
 		FPGA,
