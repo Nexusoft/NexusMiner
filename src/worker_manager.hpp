@@ -41,6 +41,7 @@ private:
 
     void get_block();
 
+    void create_stats_printers();
     void create_workers();
 
 	std::shared_ptr<::asio::io_context> m_io_context;
@@ -49,9 +50,9 @@ private:
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
     std::shared_ptr<Stats_collector> m_stats_collector;
-    std::shared_ptr<Stats_printer> m_stats_printer;
     Timer_manager m_timer_manager;
 
+    std::vector<std::shared_ptr<Stats_printer>> m_stats_printers;
     std::vector<std::shared_ptr<Worker>> m_workers;
 
     std::uint32_t m_current_height;

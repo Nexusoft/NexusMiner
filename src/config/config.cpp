@@ -77,6 +77,12 @@ namespace nexusminer
 		j.at("min_share").get_to(m_min_share);
 
 		// read worker config
+		if(!read_stats_printer_config(j))
+		{
+			return false;
+		}
+
+		// read worker config
 		if(!read_worker_config(j))
 		{
 			return false;
@@ -101,6 +107,37 @@ namespace nexusminer
 		print_config();
 		// TODO Need to add exception handling here and set return value appropriately
 		return true;
+	}
+
+	bool Config::read_stats_printer_config(nlohmann::json& j)
+	{
+		for (auto& stats_printers_json : j["stats_printers"])
+		{
+			for(auto& stats_printer_config_json : stats_printers_json)
+			{
+				Stats_printer_config stats_printer_config;
+				auto stats_printer_mode = stats_printer_config_json["mode"];
+
+				if(stats_printer_mode == "console")
+				{
+					stats_printer_config.m_mode = Stats_printer_config::CONSOLE;
+					stats_printer_config.m_printer_mode = Stats_printer_config_console{};
+				}
+				else if(stats_printer_mode == "file")
+				{
+					stats_printer_config.m_mode = Stats_printer_config::FILE;
+					stats_printer_config.m_printer_mode = Stats_printer_config_file{};
+				}
+				else
+				{
+					// invalid config
+					return false;
+				}
+
+				m_stats_printer_config.push_back(stats_printer_config);		
+			}
+		}
+		return true;	
 	}
 
 	bool Config::read_worker_config(nlohmann::json& j)

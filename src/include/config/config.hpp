@@ -5,6 +5,7 @@
 #include <vector>
 #include "json/json.hpp"
 #include "worker_config.hpp"
+#include "stats_printer_config.hpp"
 
 namespace nexusminer
 {
@@ -34,9 +35,11 @@ public:
 	std::uint16_t get_print_statistics_interval() const { return m_print_statistics_interval; }
 	std::uint16_t get_height_interval() const { return m_get_height_interval; }
 	std::vector<Worker_config>& get_worker_config() { return m_worker_config; }
+	std::vector<Stats_printer_config>& get_stats_printer_config() { return m_stats_printer_config; }
 
 private:
 
+	bool read_stats_printer_config(nlohmann::json& j);
 	bool read_worker_config(nlohmann::json& j);
 
 	std::string  m_wallet_ip;
@@ -45,6 +48,9 @@ private:
 	bool		 m_use_pool;
 	std::uint32_t m_min_share;
 	std::string  m_logfile;
+
+	// stats printers
+	std::vector<Stats_printer_config> m_stats_printer_config;
 
 	// workers
 	std::vector<Worker_config> m_worker_config;

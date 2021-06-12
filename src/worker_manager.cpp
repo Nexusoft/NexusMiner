@@ -16,11 +16,32 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
 , m_stats_collector{std::make_shared<Stats_collector>(m_config)}
-, m_stats_printer{std::make_shared<Stats_printer_console>(m_config, *m_stats_collector)} // TODO create printer from config
 , m_timer_manager{std::move(timer_factory)}
 , m_current_height{0}
 {
+    create_stats_printers();
     create_workers();
+}
+
+void Worker_manager::create_stats_printers()
+{
+    for(auto& stats_printer_config : m_config.get_stats_printer_config())
+    {
+        switch(stats_printer_config.m_mode)
+        {
+            case Stats_printer_config::CONSOLE:
+            {
+                m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config, *m_stats_collector));
+                break;
+            }
+            case Stats_printer_config::FILE:    // falltrough
+            default:
+            {
+                //m_stats_printers.push_back(std::make_shared<Stats_printer_file>(m_config, *m_stats_collector));
+                break;
+            }
+        }
+    }
 }
 
 void Worker_manager::create_workers()
@@ -105,7 +126,11 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
                 self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
                     self->m_workers, self->m_stats_collector);
-                self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printer);
+                
+                for(auto& stats_printer : self->m_stats_printers)
+                {
+                    self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, stats_printer);
+                }
             }
             else
             {	// data received
