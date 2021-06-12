@@ -7,7 +7,7 @@
 #include <spdlog/spdlog.h>
 #include "chrono/timer_factory.hpp"
 #include "timer_manager.hpp"
-#include "stats/stats_collector.hpp"
+#include "stats/stats_printer.hpp"
 
 #include <memory>
 
@@ -19,6 +19,7 @@ namespace nexusminer
 
 class Config;
 class Worker;
+class Stats_collector;
 
 class Worker_manager : public std::enable_shared_from_this<Worker_manager>
 {
@@ -47,7 +48,8 @@ private:
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
-    Stats_collector m_stats_collector;
+    std::shared_ptr<Stats_collector> m_stats_collector;
+    std::shared_ptr<Stats_printer> m_stats_printer;
     Timer_manager m_timer_manager;
 
     std::vector<std::shared_ptr<Worker>> m_workers;

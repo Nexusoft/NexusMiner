@@ -4,6 +4,8 @@
 #include "packet.hpp"
 #include "config/config.hpp"
 #include "LLP/block.hpp"
+#include "stats/stats_printer_console.hpp"
+#include "stats/stats_collector.hpp"
 
 namespace nexusminer
 {
@@ -13,8 +15,9 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
-, m_stats_collector{m_config}
-, m_timer_manager{m_config, m_stats_collector, std::move(timer_factory)}
+, m_stats_collector{std::make_shared<Stats_collector>(m_config)}
+, m_stats_printer{std::make_shared<Stats_printer_console>(m_config, *m_stats_collector)} // TODO create printer from config
+, m_timer_manager{std::move(timer_factory)}
 , m_current_height{0}
 {
     create_workers();
@@ -78,12 +81,12 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
                 self->m_connection = nullptr;		// close connection (socket etc)
                 self->m_current_height = 0;     // reset height
-                self->m_stats_collector.connection_retry_attempt();
+                self->m_stats_collector->connection_retry_attempt();
 
                 // retry connect
                 auto const connection_retry_interval = self->m_config.get_connection_retry_interval();
                 self->m_logger->info("Connection retry {} seconds", connection_retry_interval);
-                self->m_timer_manager.start_connection_retry_timer(self, wallet_endpoint);
+                self->m_timer_manager.start_connection_retry_timer(connection_retry_interval, self, wallet_endpoint);
             }
             else if (result == network::Result::connection_ok)
             {
@@ -98,8 +101,11 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_connection->transmit(packet_set_channel.get_bytes());
 
                 self->m_current_height = 0;     // reset height
-                self->m_timer_manager.start_get_height_timer(self->m_connection, self->m_workers);
-                self->m_timer_manager.start_stats_printer_timer();
+                auto const get_height_interval = self->m_config.get_height_interval();
+                auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
+                self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
+                    self->m_workers, self->m_stats_collector);
+                self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printer);
             }
             else
             {	// data received
@@ -183,13 +189,13 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         else if(packet.m_header == Packet::ACCEPT)
         {
             m_logger->info("Block Accepted By Nexus Network.");
-            m_stats_collector.block_accepted();
+            m_stats_collector->block_accepted();
         }
         else if(packet.m_header == Packet::REJECT)
         {
             m_logger->warn("Block Rejected by Nexus Network.");
             get_block();
-            m_stats_collector.block_rejected();
+            m_stats_collector->block_rejected();
         }
         else
         {

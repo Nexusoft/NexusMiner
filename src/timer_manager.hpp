@@ -3,7 +3,6 @@
 
 #include "chrono/timer_factory.hpp"
 #include "chrono/timer.hpp"
-#include "stats/stats_printer.hpp"
 
 #include <memory>
 
@@ -15,23 +14,24 @@ namespace network
     class Connection;
 }
 
-class Config;
-class Stats_collector;
 class Worker_manager;
 class Worker;
+class Stats_printer;
+class Stats_collector;
 
 class Timer_manager
 {
 public:
 
-    Timer_manager(Config& config, Stats_collector& stats_collector, chrono::Timer_factory::Sptr timer_factory);
+    Timer_manager(chrono::Timer_factory::Sptr timer_factory);
 
-    void start_connection_retry_timer(std::weak_ptr<Worker_manager> worker_manager, 
+    void start_connection_retry_timer(std::uint16_t timer_interval, std::weak_ptr<Worker_manager> worker_manager, 
         network::Endpoint const& wallet_endpoint);
     // collect also data from the workers
-    void start_get_height_timer(std::weak_ptr<network::Connection> connection, std::vector<std::shared_ptr<Worker>> m_workers);
+    void start_get_height_timer(std::uint16_t timer_interval, std::weak_ptr<network::Connection> connection, 
+        std::vector<std::shared_ptr<Worker>> m_workers, std::shared_ptr<Stats_collector> stats_collector);
 
-    void start_stats_printer_timer();
+    void start_stats_printer_timer(std::uint16_t timer_interval, std::shared_ptr<Stats_printer> stats_printer);
 
     void stop();
 
@@ -40,12 +40,9 @@ private:
     chrono::Timer::Handler connection_retry_handler(std::weak_ptr<Worker_manager> worker_manager, 
         network::Endpoint const& wallet_endpoint);
     chrono::Timer::Handler get_height_handler(std::weak_ptr<network::Connection> connection, 
-        std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval);
-    chrono::Timer::Handler stats_printer_handler(std::uint16_t stats_printer_interval);
+        std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval, std::shared_ptr<Stats_collector> stats_collector);
+    chrono::Timer::Handler stats_printer_handler(std::uint16_t stats_printer_interval, std::shared_ptr<Stats_printer> stats_printer);
 
-    Config& m_config;
-    Stats_collector& m_stats_collector;
-    std::unique_ptr<Stats_printer> m_stats_printer;
     chrono::Timer_factory::Sptr m_timer_factory;
     chrono::Timer::Uptr m_connection_retry_timer;
     chrono::Timer::Uptr m_get_height_timer;
