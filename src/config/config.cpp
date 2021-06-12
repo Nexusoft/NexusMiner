@@ -1,5 +1,5 @@
 
-#include "config.hpp"
+#include "config/config.hpp"
 
 #include <fstream>
 #include <iostream>

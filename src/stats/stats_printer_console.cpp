@@ -1,5 +1,5 @@
 #include "stats/stats_printer_console.hpp"
-#include "config.hpp"
+#include "config/config.hpp"
 #include <sstream>
 #include <iostream>
 #include <variant>

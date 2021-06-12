@@ -38,9 +38,9 @@ include_directories(src/include/)
 add_subdirectory(src/chrono)
 add_subdirectory(src/network)
 add_subdirectory(src/hash)
+add_subdirectory(src/config)
 
 add_executable(NexusMiner 
-                src/config.cpp 
                 src/main.cpp 
                 src/miner.cpp 
                 src/worker_manager.cpp 
@@ -50,8 +50,6 @@ add_executable(NexusMiner
                 src/cpu/worker_software_hash.cpp
                 src/fpga/worker_fpga.cpp)
 
-target_link_libraries(NexusMiner chrono)
-target_link_libraries(NexusMiner network)
-target_link_libraries(NexusMiner hash)
+target_link_libraries(NexusMiner chrono network hash config)
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)

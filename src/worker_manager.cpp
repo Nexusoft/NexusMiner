@@ -2,7 +2,7 @@
 #include "cpu/worker_software_hash.hpp"
 #include "fpga/worker_fpga.hpp"
 #include "packet.hpp"
-#include "config.hpp"
+#include "config/config.hpp"
 #include "LLP/block.hpp"
 
 namespace nexusminer

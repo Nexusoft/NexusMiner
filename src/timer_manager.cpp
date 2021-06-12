@@ -3,7 +3,7 @@
 #include "network/connection.hpp"
 #include "packet.hpp"
 #include "worker_manager.hpp"
-#include "config.hpp"
+#include "config/config.hpp"
 #include "stats/stats_collector.hpp"
 #include "stats/stats_printer_console.hpp"
 #include "worker.hpp"

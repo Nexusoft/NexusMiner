@@ -1,5 +1,5 @@
 #include "stats/stats_collector.hpp"
-#include "config.hpp"
+#include "config/config.hpp"
 
 namespace nexusminer
 {

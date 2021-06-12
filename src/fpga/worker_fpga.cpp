@@ -2,7 +2,7 @@
 #include "stats/stats_collector.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
-#include "config.hpp"
+#include "config/config.hpp"
 
 namespace nexusminer
 {

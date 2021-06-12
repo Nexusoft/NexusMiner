@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "config.hpp"
+#include "config/config.hpp"
 #include <spdlog/spdlog.h>
 #include <asio/signal_set.hpp>
 

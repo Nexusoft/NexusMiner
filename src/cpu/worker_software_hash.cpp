@@ -1,5 +1,5 @@
 #include "worker_software_hash.hpp"
-#include "config.hpp"
+#include "config/config.hpp"
 #include "stats/stats_collector.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
