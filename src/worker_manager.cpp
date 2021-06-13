@@ -6,7 +6,9 @@
 #include "config/types.hpp"
 #include "LLP/block.hpp"
 #include "stats/stats_printer_console.hpp"
+#include "stats/stats_printer_file.hpp"
 #include "stats/stats_collector.hpp"
+#include <variant>
 
 namespace nexusminer
 {
@@ -26,23 +28,42 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 
 void Worker_manager::create_stats_printers()
 {
+    bool printer_console_created = false;
+    bool printer_file_created = false;
     for(auto& stats_printer_config : m_config.get_stats_printer_config())
     {
         switch(stats_printer_config.m_mode)
         {
-            case config::Stats_printer_mode::CONSOLE:
+            case config::Stats_printer_mode::FILE:
             {
-                m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config.get_mining_mode(), 
-                    m_config.get_worker_config(), *m_stats_collector));
+                if(!printer_file_created)
+                {
+                    printer_file_created = true;
+                    auto& stats_printer_config_file = std::get<config::Stats_printer_config_file>(stats_printer_config.m_printer_mode);
+                    m_stats_printers.push_back(std::make_shared<Stats_printer_file>(stats_printer_config_file.file_name, 
+                        m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
+                }
+
                 break;
             }
-            case config::Stats_printer_mode::FILE:    // falltrough
+            case config::Stats_printer_mode::CONSOLE:    // falltrough
             default:
             {
-                //m_stats_printers.push_back(std::make_shared<Stats_printer_file>(m_config, *m_stats_collector));
+                if(!printer_console_created)
+                {
+                    printer_console_created = true;
+                    m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config.get_mining_mode(), 
+                        m_config.get_worker_config(), *m_stats_collector));
+                }
+
                 break;
             }
         }
+    }
+
+    if(m_stats_printers.empty())
+    {
+        m_logger->warn("No stats printer configured.");
     }
 }
 
@@ -129,10 +150,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
                     self->m_workers, self->m_stats_collector);
                 
-                for(auto& stats_printer : self->m_stats_printers)
-                {
-                    self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, stats_printer);
-                }
+                self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
             }
             else
             {	// data received

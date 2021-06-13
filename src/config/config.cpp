@@ -128,7 +128,7 @@ namespace config
 				else if(stats_printer_mode == "file")
 				{
 					stats_printer_config.m_mode = Stats_printer_mode::FILE;
-					stats_printer_config.m_printer_mode = Stats_printer_config_file{};
+					stats_printer_config.m_printer_mode = Stats_printer_config_file{stats_printer_config_json["filename"]};
 				}
 				else
 				{

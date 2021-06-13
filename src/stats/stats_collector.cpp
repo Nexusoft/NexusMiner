@@ -26,7 +26,7 @@ Stats_collector::Stats_collector(Config& config)
 
 void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stats_hash const& stats)
 {
-    assert(m_config.get_mining_mode() == Config::HASH);
+    assert(m_config.get_mining_mode() == config::Mining_mode::HASH);
 
     std::scoped_lock(m_worker_mutex);
 
@@ -36,7 +36,7 @@ void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stat
 
 void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stats_prime const& stats)
 {
-    assert(m_config.get_mining_mode() == Config::PRIME);
+    assert(m_config.get_mining_mode() == config::Mining_mode::PRIME);
 
     std::scoped_lock(m_worker_mutex);
     

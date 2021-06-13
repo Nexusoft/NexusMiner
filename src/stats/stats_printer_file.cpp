@@ -1,6 +1,6 @@
-#include "stats/stats_printer_console.hpp"
+#include "stats/stats_printer_file.hpp"
 #include "config/worker_config.hpp"
-#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/basic_file_sink.h"
 #include <sstream>
 #include <iostream>
 #include <variant>
@@ -9,17 +9,17 @@
 namespace nexusminer
 {
 
-Stats_printer_console::Stats_printer_console(config::Mining_mode mining_mode, 
+Stats_printer_file::Stats_printer_file(std::string const& filename, config::Mining_mode mining_mode, 
         std::vector<config::Worker_config> const& worker_config, Stats_collector& stats_collector)
 : m_mining_mode{mining_mode}
 , m_worker_config{worker_config}
 , m_stats_collector{stats_collector}
-, m_logger{spdlog::stdout_color_mt("statistics")}
+, m_logger{spdlog::basic_logger_mt("satistics_file", filename.empty() ? "stats.log" : filename, true)}
 {
     m_logger->set_pattern("[%D %H:%M:%S.%e][%^%n%$] %v");
 }
 
-void Stats_printer_console::print()
+void Stats_printer_file::print()
 {
     // Log global stats
     std::stringstream ss;
@@ -52,6 +52,7 @@ void Stats_printer_console::print()
     }
 
     m_logger->info(ss.str());
+    m_logger->flush();
 }
 
 

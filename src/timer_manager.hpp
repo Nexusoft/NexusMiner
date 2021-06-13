@@ -5,6 +5,7 @@
 #include "chrono/timer.hpp"
 
 #include <memory>
+#include <vector>
 
 namespace nexusminer 
 {
@@ -31,7 +32,7 @@ public:
     void start_get_height_timer(std::uint16_t timer_interval, std::weak_ptr<network::Connection> connection, 
         std::vector<std::shared_ptr<Worker>> m_workers, std::shared_ptr<Stats_collector> stats_collector);
 
-    void start_stats_printer_timer(std::uint16_t timer_interval, std::shared_ptr<Stats_printer> stats_printer);
+    void start_stats_printer_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<Stats_printer>> stats_printers);
 
     void stop();
 
@@ -41,7 +42,7 @@ private:
         network::Endpoint const& wallet_endpoint);
     chrono::Timer::Handler get_height_handler(std::weak_ptr<network::Connection> connection, 
         std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval, std::shared_ptr<Stats_collector> stats_collector);
-    chrono::Timer::Handler stats_printer_handler(std::uint16_t stats_printer_interval, std::shared_ptr<Stats_printer> stats_printer);
+    chrono::Timer::Handler stats_printer_handler(std::uint16_t stats_printer_interval, std::vector<std::shared_ptr<Stats_printer>> stats_printers);
 
     chrono::Timer_factory::Sptr m_timer_factory;
     chrono::Timer::Uptr m_connection_retry_timer;

@@ -31,9 +31,9 @@ void Timer_manager::start_get_height_timer(std::uint16_t timer_interval,  std::w
         timer_interval, std::move(stats_collector)));
 }
 
-void Timer_manager::start_stats_printer_timer(std::uint16_t timer_interval, std::shared_ptr<Stats_printer> stats_printer)
+void Timer_manager::start_stats_printer_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<Stats_printer>> stats_printers)
 {
-    m_stats_printer_timer->start(chrono::Seconds(timer_interval), stats_printer_handler(timer_interval, std::move(stats_printer)));
+    m_stats_printer_timer->start(chrono::Seconds(timer_interval), stats_printer_handler(timer_interval, std::move(stats_printers)));
 }
 
 void Timer_manager::stop()
@@ -89,20 +89,24 @@ chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::
     }; 
 }
 
-chrono::Timer::Handler Timer_manager::stats_printer_handler(std::uint16_t stats_printer_interval, std::shared_ptr<Stats_printer> stats_printer)
+chrono::Timer::Handler Timer_manager::stats_printer_handler(std::uint16_t stats_printer_interval, 
+    std::vector<std::shared_ptr<Stats_printer>> stats_printers)
 {
-    return[this, stats_printer_interval, stats_printer = std::move(stats_printer)](bool canceled)
+    return[this, stats_printer_interval, stats_printers = std::move(stats_printers)](bool canceled)
     {
         if (canceled)	// don't do anything if the timer has been canceled
         {
             return;
         }
 
-        stats_printer->print();
+        for(auto& stats_printer : stats_printers)
+        {
+            stats_printer->print();
+        }
 
         // restart timer
          m_stats_printer_timer->start(chrono::Seconds(stats_printer_interval), stats_printer_handler(stats_printer_interval, 
-            std::move(stats_printer)));
+            std::move(stats_printers)));
     }; 
 }
 
