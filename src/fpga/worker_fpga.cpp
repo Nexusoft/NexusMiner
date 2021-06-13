@@ -147,12 +147,12 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 
 }
 
-void Worker_fpga::update_statistics(Stats_collector& stats_collector)
+void Worker_fpga::update_statistics(stats::Collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, 
-		Stats_hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count});
+		stats::Hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count});
 }
 
 bool Worker_fpga::difficulty_check()

@@ -2,14 +2,17 @@
 #define NEXUSMINER_STATS_PRINTER_HPP
 
 namespace nexusminer {
+namespace stats
+{
 
-class Stats_printer {
+class Printer {
 public:
 
-    virtual ~Stats_printer() = default;
+    virtual ~Printer() = default;
 
     virtual void print() = 0;
 };
 
+}
 }
 #endif

@@ -17,8 +17,8 @@ namespace asio { class io_context; }
 namespace nexusminer 
 {
 namespace config { class Config; }
+namespace stats { class Collector; }
 class Worker;
-class Stats_collector;
 
 class Worker_manager : public std::enable_shared_from_this<Worker_manager>
 {
@@ -50,10 +50,10 @@ private:
 	network::Socket::Sptr m_socket;
 	network::Connection::Sptr m_connection;
     std::shared_ptr<spdlog::logger> m_logger;
-    std::shared_ptr<Stats_collector> m_stats_collector;
+    std::shared_ptr<stats::Collector> m_stats_collector;
     Timer_manager m_timer_manager;
 
-    std::vector<std::shared_ptr<Stats_printer>> m_stats_printers;
+    std::vector<std::shared_ptr<stats::Printer>> m_stats_printers;
     std::vector<std::shared_ptr<Worker>> m_workers;
 
     std::uint32_t m_current_height;

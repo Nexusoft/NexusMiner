@@ -15,8 +15,7 @@ namespace asio { class io_context; }
 
 namespace nexusminer {
 namespace config{ class Worker_config; }
-
-class Stats_collector;
+namespace stats { class Collector; }
 
 
 class Worker_software_hash : public Worker, public std::enable_shared_from_this<Worker_software_hash>
@@ -31,7 +30,7 @@ public:
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
     void set_block(const LLP::CBlock& block, Worker::Block_found_handler result) override;
-    void update_statistics(Stats_collector& stats_collector) override;
+    void update_statistics(stats::Collector& stats_collector) override;
 
 private:
 

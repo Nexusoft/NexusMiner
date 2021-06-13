@@ -18,7 +18,7 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_config{config}
 , m_socket{std::move(socket)}
 , m_logger{spdlog::get("logger")}
-, m_stats_collector{std::make_shared<Stats_collector>(m_config)}
+, m_stats_collector{std::make_shared<stats::Collector>(m_config)}
 , m_timer_manager{std::move(timer_factory)}
 , m_current_height{0}
 {
@@ -40,7 +40,7 @@ void Worker_manager::create_stats_printers()
                 {
                     printer_file_created = true;
                     auto& stats_printer_config_file = std::get<config::Stats_printer_config_file>(stats_printer_config.m_printer_mode);
-                    m_stats_printers.push_back(std::make_shared<Stats_printer_file>(stats_printer_config_file.file_name, 
+                    m_stats_printers.push_back(std::make_shared<stats::Printer_file>(stats_printer_config_file.file_name, 
                         m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
                 }
 
@@ -52,7 +52,7 @@ void Worker_manager::create_stats_printers()
                 if(!printer_console_created)
                 {
                     printer_console_created = true;
-                    m_stats_printers.push_back(std::make_shared<Stats_printer_console>(m_config.get_mining_mode(), 
+                    m_stats_printers.push_back(std::make_shared<stats::Printer_console>(m_config.get_mining_mode(), 
                         m_config.get_worker_config(), *m_stats_collector));
                 }
 

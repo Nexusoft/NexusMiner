@@ -25,13 +25,13 @@ void Timer_manager::start_connection_retry_timer(std::uint16_t timer_interval, s
 }
 
 void Timer_manager::start_get_height_timer(std::uint16_t timer_interval,  std::weak_ptr<network::Connection> connection,
-    std::vector<std::shared_ptr<Worker>> m_workers, std::shared_ptr<Stats_collector> stats_collector)
+    std::vector<std::shared_ptr<Worker>> m_workers, std::shared_ptr<stats::Collector> stats_collector)
 {
     m_get_height_timer->start(chrono::Seconds(timer_interval), get_height_handler(std::move(connection), m_workers,
         timer_interval, std::move(stats_collector)));
 }
 
-void Timer_manager::start_stats_printer_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<Stats_printer>> stats_printers)
+void Timer_manager::start_stats_printer_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<stats::Printer>> stats_printers)
 {
     m_stats_printer_timer->start(chrono::Seconds(timer_interval), stats_printer_handler(timer_interval, std::move(stats_printers)));
 }
@@ -62,7 +62,7 @@ chrono::Timer::Handler Timer_manager::connection_retry_handler(std::weak_ptr<Wor
 }
 
 chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::Connection> connection, 
-    std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval, std::shared_ptr<Stats_collector> stats_collector)
+    std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval, std::shared_ptr<stats::Collector> stats_collector)
 {
     return[this, connection, m_workers, get_height_interval, stats_collector = std::move(stats_collector)](bool canceled)
     {
@@ -90,7 +90,7 @@ chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::
 }
 
 chrono::Timer::Handler Timer_manager::stats_printer_handler(std::uint16_t stats_printer_interval, 
-    std::vector<std::shared_ptr<Stats_printer>> stats_printers)
+    std::vector<std::shared_ptr<stats::Printer>> stats_printers)
 {
     return[this, stats_printer_interval, stats_printers = std::move(stats_printers)](bool canceled)
     {

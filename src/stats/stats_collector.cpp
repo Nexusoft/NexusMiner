@@ -4,7 +4,10 @@
 
 namespace nexusminer
 {
-Stats_collector::Stats_collector(Config& config)
+namespace stats
+{
+
+Collector::Collector(Config& config)
 : m_config{config}
 , m_start_time{std::chrono::steady_clock::now()}
 , m_accepted_blocks{0}
@@ -15,32 +18,34 @@ Stats_collector::Stats_collector(Config& config)
     {
         if(m_config.get_mining_mode() == config::Mining_mode::HASH)
         {
-            m_workers.push_back(Stats_hash{});
+            m_workers.push_back(Hash{});
         }
         else
         {
-            m_workers.push_back(Stats_prime{});
+            m_workers.push_back(Prime{});
         }
     }
 }
 
-void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stats_hash const& stats)
+void Collector::update_worker_stats(std::uint16_t internal_worker_id, Hash const& stats)
 {
     assert(m_config.get_mining_mode() == config::Mining_mode::HASH);
 
     std::scoped_lock(m_worker_mutex);
 
-    auto& hash_stats = std::get<Stats_hash>(m_workers[internal_worker_id]);
+    auto& hash_stats = std::get<Hash>(m_workers[internal_worker_id]);
     hash_stats += stats;
 }
 
-void Stats_collector::update_worker_stats(std::uint16_t internal_worker_id, Stats_prime const& stats)
+void Collector::update_worker_stats(std::uint16_t internal_worker_id, Prime const& stats)
 {
     assert(m_config.get_mining_mode() == config::Mining_mode::PRIME);
 
     std::scoped_lock(m_worker_mutex);
     
-    auto& prime_stats = std::get<Stats_prime>(m_workers[internal_worker_id]);
+    auto& prime_stats = std::get<Prime>(m_workers[internal_worker_id]);
     prime_stats += stats;
+}
+
 }
 }

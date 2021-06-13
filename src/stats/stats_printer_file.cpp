@@ -8,9 +8,11 @@
 
 namespace nexusminer
 {
+namespace stats
+{
 
-Stats_printer_file::Stats_printer_file(std::string const& filename, config::Mining_mode mining_mode, 
-        std::vector<config::Worker_config> const& worker_config, Stats_collector& stats_collector)
+Printer_file::Printer_file(std::string const& filename, config::Mining_mode mining_mode, 
+        std::vector<config::Worker_config> const& worker_config, Collector& stats_collector)
 : m_mining_mode{mining_mode}
 , m_worker_config{worker_config}
 , m_stats_collector{stats_collector}
@@ -19,7 +21,7 @@ Stats_printer_file::Stats_printer_file(std::string const& filename, config::Mini
     m_logger->set_pattern("[%D %H:%M:%S.%e][%^%n%$] %v");
 }
 
-void Stats_printer_file::print()
+void Printer_file::print()
 {
     // Log global stats
     std::stringstream ss;
@@ -37,7 +39,7 @@ void Stats_printer_file::print()
         ss << "Worker " << m_worker_config[worker_config_index].m_id << " stats: ";
         if(m_mining_mode == config::Mining_mode::HASH)
         {
-            auto& hash_stats = std::get<Stats_hash>(worker);
+            auto& hash_stats = std::get<Hash>(worker);
             ss << std::setprecision(2) << std::fixed << (hash_stats.m_hash_count / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) / 1.0e6 << "MH/s. ";
             ss << (m_worker_config[worker_config_index].m_mode == config::Worker_mode::FPGA ? hash_stats.m_nonce_candidates_recieved : hash_stats.m_met_difficulty_count) 
                 << " candidates found. Most difficult: " << hash_stats.m_best_leading_zeros;
@@ -55,5 +57,5 @@ void Stats_printer_file::print()
     m_logger->flush();
 }
 
-
+}
 }
