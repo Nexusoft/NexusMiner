@@ -22,6 +22,7 @@ namespace nexusminer
 	{
 		m_logger = spdlog::stdout_color_mt("logger");
 		m_logger->set_level(spdlog::level::debug);
+		m_logger->set_pattern("[%D %H:%M:%S.%e][%^%l%$] %v");
 
 		// Register to handle the signals that indicate when the server should exit.
 		// It is safe to register for the same signal multiple times in a program,
