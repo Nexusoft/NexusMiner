@@ -18,6 +18,7 @@ namespace nexusminer
 {
 namespace config { class Config; }
 namespace stats { class Collector; }
+namespace protocol { class Protocol; }
 class Worker;
 
 class Worker_manager : public std::enable_shared_from_this<Worker_manager>
@@ -40,8 +41,6 @@ private:
 
     LLP::CBlock deserialize_block(network::Shared_payload data);
 
-    void get_block();
-
     void create_stats_printers();
     void create_workers();
 
@@ -52,6 +51,7 @@ private:
     std::shared_ptr<spdlog::logger> m_logger;
     std::shared_ptr<stats::Collector> m_stats_collector;
     Timer_manager m_timer_manager;
+    std::shared_ptr<protocol::Protocol> m_miner_protocol;
 
     std::vector<std::shared_ptr<stats::Printer>> m_stats_printers;
     std::vector<std::shared_ptr<Worker>> m_workers;

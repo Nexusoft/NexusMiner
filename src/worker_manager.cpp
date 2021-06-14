@@ -8,6 +8,8 @@
 #include "stats/stats_printer_console.hpp"
 #include "stats/stats_printer_file.hpp"
 #include "stats/stats_collector.hpp"
+#include "protocol/solo.hpp"
+#include "protocol/pool.hpp"
 #include <variant>
 
 namespace nexusminer
@@ -22,6 +24,15 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_timer_manager{std::move(timer_factory)}
 , m_current_height{0}
 {
+    if(m_config.get_use_bool())
+    {
+        m_miner_protocol = std::make_shared<protocol::Pool>();
+    }
+    else
+    {
+      m_miner_protocol = std::make_shared<protocol::Solo>(m_config.get_mining_mode() == config::Mining_mode::PRIME ? 1U : 2U); 
+    } 
+  
     create_stats_printers();
     create_workers();
 }
@@ -136,13 +147,8 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
             {
                 self->m_logger->info("Connection to wallet established");
 
-                // set channel
-                std::uint32_t channel = (self->m_config.get_mining_mode() == config::Mining_mode::PRIME) ? 1U : 2U;
-                Packet packet_set_channel;
-                packet_set_channel.m_header = Packet::SET_CHANNEL;
-                packet_set_channel.m_length = 4;
-                packet_set_channel.m_data = std::make_shared<std::vector<std::uint8_t>>(uint2bytes(channel));
-                self->m_connection->transmit(packet_set_channel.get_bytes());
+                // login
+                self->m_connection->transmit(self->m_miner_protocol->login());
 
                 self->m_current_height = 0;     // reset height
                 auto const get_height_interval = self->m_config.get_height_interval();
@@ -192,8 +198,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 			if (height > m_current_height)
 			{
 				m_current_height = height;
-
-                get_block();             
+                m_connection->transmit(m_miner_protocol->get_work());          
 			}			
 		}
         // Block from wallet received
@@ -239,24 +244,13 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         else if(packet.m_header == Packet::REJECT)
         {
             m_logger->warn("Block Rejected by Nexus Network.");
-            get_block();
+            m_connection->transmit(m_miner_protocol->get_work());
             m_stats_collector->block_rejected();
         }
         else
         {
             m_logger->error("Invalid header received.");
         }
-}
-
-void Worker_manager::get_block()
-{
-    m_logger->info("Nexus Network: New Block [Height] {}", m_current_height);
-
-    // get new block from wallet
-    Packet packet_get_block;
-    packet_get_block.m_header = Packet::GET_BLOCK;
-
-    m_connection->transmit(packet_get_block.get_bytes());         
 }
 
 /** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/

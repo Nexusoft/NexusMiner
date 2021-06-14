@@ -40,6 +40,7 @@ add_subdirectory(src/network)
 add_subdirectory(src/hash)
 add_subdirectory(src/config)
 add_subdirectory(src/stats)
+add_subdirectory(src/protocol)
 
 add_executable(NexusMiner 
                 src/main.cpp 
@@ -49,6 +50,6 @@ add_executable(NexusMiner
                 src/cpu/worker_software_hash.cpp
                 src/fpga/worker_fpga.cpp)
 
-target_link_libraries(NexusMiner chrono network hash config stats)
+target_link_libraries(NexusMiner chrono network hash config stats protocol)
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)
