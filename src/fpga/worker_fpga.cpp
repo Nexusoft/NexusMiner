@@ -63,8 +63,18 @@ void Worker_fpga::set_block(const LLP::CBlock& block, Worker::Block_found_handle
 	std::string message2Str = m2.toHexString(true);
 	message2Str.resize(88 * 2);  //crop to first 88 bytes
 	std::string workPackageStr = key2Str + message2Str;
-
 	std::vector<unsigned char> fpgaWorkPackage = HexStringToBytes(workPackageStr);
+	
+	//TODO: remove when wolf and I have the same interface
+	if (m_config.m_id == "wolf")
+	{
+		message2Str.resize(80 * 2); //drop the nonce from the message.  keep the first 80 bytes.
+		workPackageStr = message2Str + key2Str;  //put the message first
+		fpgaWorkPackage = HexStringToBytes(workPackageStr);
+		//check the byte order.  if backwards use std::reverse
+		//std::reverse(fpgaWorkPackage.begin(), fpgaWorkPackage.end());
+
+	}
 
 	//send new work package over the serial port
 	if (m_serial.is_open())
@@ -94,7 +104,13 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 	if (!error_code && bytes_transferred == m_receive_nonce_buffer.size())
 	{
 		std::reverse(m_receive_nonce_buffer.begin(), m_receive_nonce_buffer.end());  //nonce byte order is sent big endian over the serial port
-		uint64_t nonce = bytesToInt<uint64_t>(m_receive_nonce_buffer);
+		//TODO: delete wolf mode
+		if (m_config.m_id == "wolf")
+		{
+			//wolf byte order may be reversed for the nonces.  
+			std::reverse(m_receive_nonce_buffer.begin(), m_receive_nonce_buffer.end());  //nonce byte order is sent big endian over the serial port
+		}
+			uint64_t nonce = bytesToInt<uint64_t>(m_receive_nonce_buffer);
 		if (m_starting_nonce - nonce == 1)
 		{
 			//the fpga will respond with starting nonce - 1 to acknowledge receipt of the work package.
