@@ -78,7 +78,15 @@ inline void Socket_impl<ProtocolDescriptionType>::accept(Connect_handler handler
         auto self = weak_self.lock();
         if (self && !error) 
 		{
-            Endpoint remote_ep = Endpoint(std::move(new_connection_socket->remote_endpoint()));
+            ::asio::error_code ec;
+            auto remote_endpoint = new_connection_socket->remote_endpoint(ec);
+            if (ec) 
+            {
+                // TODO log :Connection_accept_failed self->m_local_endpoint, ec.message();
+                self->accept(handler);
+                return;
+            }
+            Endpoint remote_ep = Endpoint(std::move(remote_endpoint));
     
 			auto connection = std::make_shared<Connection_impl<ProtocolDescriptionType>>(
 				self->m_io_context, std::move(new_connection_socket), std::move(remote_ep));

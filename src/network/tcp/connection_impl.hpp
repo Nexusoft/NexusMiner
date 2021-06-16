@@ -3,8 +3,10 @@
 
 #include <memory>
 #include "asio/io_service.hpp"
+#include "asio/write.hpp"
 #include "../connection.hpp"
 #include "protocol_description.hpp"
+#include <queue>
 
 namespace nexusminer {
 namespace network {
@@ -47,6 +49,7 @@ public:
 private:
     std::weak_ptr<Connection_impl<ProtocolDescriptionType>> get_weak_self();
     Result::Code initialise_socket();
+    void transmit_trigger();
     void receive();
     void close();
 
@@ -54,6 +57,7 @@ private:
     std::shared_ptr<Protocol_socket> m_asio_socket;
     Endpoint m_remote_endpoint;
     Endpoint m_local_endpoint;
+    std::queue<Shared_payload> m_tx_queue;
     Connection::Handler m_connection_handler;
 };
 
@@ -66,6 +70,7 @@ inline Connection_impl<ProtocolDescriptionType>::Connection_impl(
     , m_asio_socket{std::make_shared<Protocol_socket>(*m_io_context)}
     , m_remote_endpoint{std::move(remote_endpoint)}
     , m_local_endpoint{std::move(local_endpoint)}
+    , m_tx_queue{}
     , m_connection_handler{std::move(handler)}
 {
 }
@@ -78,6 +83,7 @@ inline Connection_impl<ProtocolDescriptionType>::Connection_impl(
     , m_asio_socket{std::move(asio_socket)}
     , m_remote_endpoint{std::move(remote_endpoint)}
     , m_local_endpoint{}     // will be set later, this constructor is called in accept/listen case
+    , m_tx_queue{}
 	, m_connection_handler{} // will be set later, this constructor is called in accept/listen case
 {
 }
@@ -210,16 +216,35 @@ inline void Connection_impl<ProtocolDescriptionType>::handle_accept(Connection::
 template<typename ProtocolDescriptionType>
 void Connection_impl<ProtocolDescriptionType>::transmit(Shared_payload tx_buffer)
 {
-	// create a transmit lambda in order to perform a post (queue transmit request)
-	// use a shared_ptr, since we want to perform the transmit incocation in any way, even if the connection gets destroyed afterwards
-	// this keeps the users logic idea of transmit data and then terminate the connection
-	auto transmit_lambda = [self = this->shared_from_this(), payload = std::move(tx_buffer)]() mutable
-	{
-		self->m_asio_socket->async_send(asio::buffer(*payload, payload->size()),
-			// don't forget to keep the buffer until transmission has been completed!!!
-			[payload](auto, auto) {});
-	};
-	::asio::post(std::move(transmit_lambda));
+    // only for non closed connection
+    if (m_connection_handler) 
+    {
+        m_tx_queue.emplace(tx_buffer);
+        if (m_tx_queue.size() == 1) 
+        {
+            transmit_trigger();
+        }
+    }
+}
+
+template<typename ProtocolDescriptionType>
+void Connection_impl<ProtocolDescriptionType>::transmit_trigger()
+{
+    auto const payload = m_tx_queue.front();
+    ::asio::async_write(*m_asio_socket, ::asio::buffer(*payload, payload->size()),
+        // don't forget to keep the payload until transmission has been completed!!!
+        [weak_self = get_weak_self(), payload](auto, auto) 
+        {
+            auto self = weak_self.lock();
+            if ((self != nullptr) && self->m_connection_handler) 
+            {
+                self->m_tx_queue.pop();
+                if (!self->m_tx_queue.empty()) 
+                {
+                    self->transmit_trigger();
+                }
+            }
+        });
 }
 
 template<typename ProtocolDescriptionType>
