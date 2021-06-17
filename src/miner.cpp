@@ -63,7 +63,7 @@ namespace nexusminer
 		// network initialisation
 		m_network_component = network::create_component(m_io_context);
 
-		network::Endpoint local_endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
+		network::Endpoint local_endpoint{ network::Transport_protocol::tcp, m_config.get_local_ip(), 0 };
 		m_worker_manager = std::make_unique<Worker_manager>(m_io_context, m_config, timer_factory, 
 			m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		

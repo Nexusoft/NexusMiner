@@ -23,6 +23,7 @@ public:
 
 	std::string const& get_wallet_ip() const { return m_wallet_ip; }
 	std::uint16_t get_port() const { return m_port; }
+	std::string const& get_local_ip() const { return m_local_ip; }
 	Mining_mode get_mining_mode() const { return m_mining_mode; }
 	bool get_use_bool() const { return m_use_pool; }
 	std::uint32_t get_min_share() const { return m_min_share; }
@@ -40,6 +41,7 @@ private:
 
 	std::string  m_wallet_ip;
 	std::uint16_t m_port;
+	std::string m_local_ip;
 	Mining_mode	 m_mining_mode;
 	bool		 m_use_pool;
 	std::uint32_t m_min_share;

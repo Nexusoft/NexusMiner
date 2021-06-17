@@ -13,6 +13,7 @@ namespace config
 	Config::Config()
 		: m_wallet_ip{ "127.0.0.1" }
 		, m_port{ 9323 }
+		, m_local_ip{"127.0.0.1"}
 		, m_mining_mode{ Mining_mode::HASH}
 		, m_use_pool{false}
 		, m_min_share{ 40000000 }
@@ -29,6 +30,7 @@ namespace config
 		std::cout << "-------------" << std::endl;
 		std::cout << "Wallet IP: " << m_wallet_ip << std::endl;
 		std::cout << "Port: " << m_port << std::endl;
+		std::cout << "Local IP: " << m_local_ip << std::endl;
 
 		std::cout << "Mining Mode: " << ((m_mining_mode == Mining_mode::HASH) ? "HASH" : "PRIME") << std::endl;
 
@@ -60,6 +62,10 @@ namespace config
 		json j = json::parse(config_file);
 		j.at("wallet_ip").get_to(m_wallet_ip);
 		j.at("port").get_to(m_port);
+		if (j.count("local_ip") != 0)
+		{
+			j.at("local_ip").get_to(m_local_ip);
+		}
 
 		std::string mining_mode = j["mining_mode"];
 		std::for_each(mining_mode.begin(), mining_mode.end(), [](char & c) {
