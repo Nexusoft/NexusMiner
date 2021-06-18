@@ -39,7 +39,7 @@ Worker_fpga::~Worker_fpga()
 	m_serial.close();
 }
 
-void Worker_fpga::set_block(const LLP::CBlock& block, Worker::Block_found_handler result)
+void Worker_fpga::set_block(LLP::CBlock block, Worker::Block_found_handler result)
 {
 	//send new block info to the device
 	std::scoped_lock<std::mutex> lck(m_mtx);

@@ -11,7 +11,6 @@
 
 #include <memory>
 
-namespace LLP { class CBlock; }
 namespace asio { class io_context; }
 
 namespace nexusminer 
@@ -37,9 +36,7 @@ public:
 
 private:
 
-	void process_data(network::Shared_payload&& receive_buffer);	// handle network messages
-
-    LLP::CBlock deserialize_block(network::Shared_payload data);
+    void process_data(network::Shared_payload&& receive_buffer);
 
     void create_stats_printers();
     void create_workers();
@@ -55,8 +52,6 @@ private:
 
     std::vector<std::shared_ptr<stats::Printer>> m_stats_printers;
     std::vector<std::shared_ptr<Worker>> m_workers;
-
-    std::uint32_t m_current_height;
 };
 }
 

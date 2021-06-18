@@ -29,7 +29,7 @@ Worker_software_hash::~Worker_software_hash()
 		m_run_thread.join(); 
 }
 
-void Worker_software_hash::set_block(const LLP::CBlock& block, Worker::Block_found_handler result)
+void Worker_software_hash::set_block(LLP::CBlock block, Worker::Block_found_handler result)
 {
 	//stop the existing mining loop if it is running
 	m_stop = true;

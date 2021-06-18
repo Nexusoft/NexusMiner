@@ -25,7 +25,7 @@ public:
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
-    void set_block(const LLP::CBlock& block, Worker::Block_found_handler result) override;
+    void set_block(LLP::CBlock block, Worker::Block_found_handler result) override;
     void update_statistics(stats::Collector& stats_collector) override;
     void set_test_block();
 

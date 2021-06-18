@@ -22,7 +22,6 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_logger{spdlog::get("logger")}
 , m_stats_collector{std::make_shared<stats::Collector>(m_config)}
 , m_timer_manager{std::move(timer_factory)}
-, m_current_height{0}
 {
     if(m_config.get_use_bool())
     {
@@ -135,7 +134,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
             {
                 self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
                 self->m_connection = nullptr;		// close connection (socket etc)
-                self->m_current_height = 0;     // reset height
+                self->m_miner_protocol->reset();
                 self->m_stats_collector->connection_retry_attempt();
 
                 // retry connect
@@ -148,13 +147,32 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_logger->info("Connection to wallet established");
 
                 // login
-                self->m_connection->transmit(self->m_miner_protocol->login());
+                self->m_connection->transmit(self->m_miner_protocol->login(self->m_config.get_pool_config().m_username));
 
-                self->m_current_height = 0;     // reset height
-                auto const get_height_interval = self->m_config.get_height_interval();
                 auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
-                self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
-                    self->m_workers, self->m_stats_collector);
+                // only solo miner uses GET_HEIGHT message
+                if(!self->m_config.get_use_bool())
+                {
+                    auto const get_height_interval = self->m_config.get_height_interval();
+                    self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
+                        self->m_workers, self->m_stats_collector);
+                }
+
+                self->m_miner_protocol->set_block_handler([self](auto block)
+                {
+                    for(auto& worker : self->m_workers)
+                    {
+                        worker->set_block(block, [self](auto id, auto block_data)
+                        {
+                             self->m_logger->debug("SET BLOCK HANDLER");
+                            if (self->m_connection)
+                                self->m_connection->transmit(self->m_miner_protocol->submit_block(
+                                    block_data->merkle_root.GetBytes(), uint2bytes64(block_data->nNonce)));
+                            else
+                                self->m_logger->error("No connection. Can't submit block.");
+                        });
+                    }
+                });
                 
                 self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
             }
@@ -176,98 +194,36 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 {
-		Packet packet{ std::move(receive_buffer) };
-		if (!packet.is_valid())
-		{
-			// log invalid packet
-			m_logger->error("Received packet is invalid. Header: {0}", packet.m_header);
-			return;
-		}
+    Packet packet{ std::move(receive_buffer) };
+    if (!packet.is_valid())
+    {
+        // log invalid packet
+        m_logger->error("Received packet is invalid. Header: {0}", packet.m_header);
+        return;
+    }
 
-        if (packet.m_header == Packet::PING)
-        {
-            Packet response;
-            response = response.get_packet(Packet::PING);
-            m_connection->transmit(response.get_bytes());
-        }
-        else if (packet.m_header == Packet::BLOCK_HEIGHT)
-		{
-			auto const height = bytes2uint(*packet.m_data);
-			//m_logger->debug("Height Received {}", height);
-
-			if (height > m_current_height)
-			{
-				m_current_height = height;
-                m_connection->transmit(m_miner_protocol->get_work());          
-			}			
-		}
-        // Block from wallet received
-        else if(packet.m_header == Packet::BLOCK_DATA)
-        {
-            auto block = deserialize_block(packet.m_data);
-			if (block.nHeight == m_current_height)
-			{
-	            for(auto& worker : m_workers)
-                {
-                    worker->set_block(block, [self = shared_from_this()](auto id, auto block_data)
-                    {
-                        // create block and submit
-                        self->m_logger->info("Submitting Block...");
-
-                        Packet PACKET;
-                        Packet submit_block;
-		                submit_block.m_header = Packet::SUBMIT_BLOCK;
-			
-			            submit_block.m_data = std::make_shared<std::vector<uint8_t>>(block_data->merkle_root.GetBytes());
-			            std::vector<std::uint8_t> nonce  = uint2bytes64(block_data->nNonce);
-
-                        submit_block.m_data->insert(submit_block.m_data->end(), nonce.begin(), nonce.end());
-			            submit_block.m_length = 72;
-
-                        if (self->m_connection)
-                            self->m_connection->transmit(submit_block.get_bytes());  
-                        else
-                            self->m_logger->error("No connection. Can't submit block.");
-                    });
-                }
-			}
-			else
-			{
-				m_logger->warn("Block Obsolete Height = {}, Skipping over.", block.nHeight);
-			}
-        }
-        else if(packet.m_header == Packet::ACCEPT)
-        {
-            m_logger->info("Block Accepted By Nexus Network.");
-            m_stats_collector->block_accepted();
-        }
-        else if(packet.m_header == Packet::REJECT)
-        {
-            m_logger->warn("Block Rejected by Nexus Network.");
-            m_connection->transmit(m_miner_protocol->get_work());
-            m_stats_collector->block_rejected();
-        }
-        else
-        {
-            m_logger->error("Invalid header received.");
-        }
-}
-
-/** Convert the Header of a Block into a Byte Stream for Reading and Writing Across Sockets. **/
-LLP::CBlock Worker_manager::deserialize_block(network::Shared_payload data)
-{
-    LLP::CBlock block;
-    block.nVersion = bytes2uint(std::vector<uint8_t>(data->begin(), data->begin() + 4));
-
-    block.hashPrevBlock.SetBytes(std::vector<uint8_t>(data->begin() + 4, data->begin() + 132));
-    block.hashMerkleRoot.SetBytes(std::vector<uint8_t>(data->begin() + 132, data->end() - 20));
-
-    block.nChannel = bytes2uint(std::vector<uint8_t>(data->end() - 20, data->end() - 16));
-    block.nHeight = bytes2uint(std::vector<uint8_t>(data->end() - 16, data->end() - 12));
-    block.nBits = bytes2uint(std::vector<uint8_t>(data->end() - 12, data->end() - 8));
-    block.nNonce = bytes2uint64(std::vector<uint8_t>(data->end() - 8, data->end()));
-
-    return block;
+    if (packet.m_header == Packet::PING)
+    {
+        Packet response;
+        response = response.get_packet(Packet::PING);
+        m_connection->transmit(response.get_bytes());
+    }
+    else if(packet.m_header == Packet::ACCEPT)
+    {
+        m_logger->info("Block Accepted By Nexus Network.");
+        m_stats_collector->block_accepted();
+    }
+    else if(packet.m_header == Packet::REJECT)
+    {
+        m_logger->warn("Block Rejected by Nexus Network.");
+        m_connection->transmit(m_miner_protocol->get_work());
+        m_stats_collector->block_rejected();
+    }
+    else
+    {
+        // solo/pool specific messages
+        m_miner_protocol->process_messages(std::move(packet), m_connection);
+    }
 }
 
 }
