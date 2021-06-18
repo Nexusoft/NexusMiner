@@ -6,6 +6,7 @@
 #include "json/json.hpp"
 #include "worker_config.hpp"
 #include "stats_printer_config.hpp"
+#include "pool.hpp"
 #include "types.hpp"
 
 namespace nexusminer
@@ -26,13 +27,13 @@ public:
 	std::string const& get_local_ip() const { return m_local_ip; }
 	Mining_mode get_mining_mode() const { return m_mining_mode; }
 	bool get_use_bool() const { return m_use_pool; }
-	std::uint32_t get_min_share() const { return m_min_share; }
 	std::string const& get_logfile() const { return m_logfile; }
 	std::uint16_t get_connection_retry_interval() const { return m_connection_retry_interval; }
 	std::uint16_t get_print_statistics_interval() const { return m_print_statistics_interval; }
 	std::uint16_t get_height_interval() const { return m_get_height_interval; }
 	std::vector<Worker_config>& get_worker_config() { return m_worker_config; }
 	std::vector<Stats_printer_config>& get_stats_printer_config() { return m_stats_printer_config; }
+	Pool const& get_pool_config() const { return m_pool_config; }
 
 private:
 
@@ -44,7 +45,7 @@ private:
 	std::string m_local_ip;
 	Mining_mode	 m_mining_mode;
 	bool		 m_use_pool;
-	std::uint32_t m_min_share;
+	Pool 		 m_pool_config; 
 	std::string  m_logfile;
 
 	// stats printers

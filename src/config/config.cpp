@@ -16,7 +16,7 @@ namespace config
 		, m_local_ip{"127.0.0.1"}
 		, m_mining_mode{ Mining_mode::HASH}
 		, m_use_pool{false}
-		, m_min_share{ 40000000 }
+		, m_pool_config{}
 		, m_logfile{""}		// no logfile usage, default
 		, m_connection_retry_interval{5}
 		, m_print_statistics_interval{5}
@@ -39,7 +39,6 @@ namespace config
 		std::cout << "Get Height Interval: " << m_get_height_interval << std::endl;		
 
 		std::cout << "Pool: " << m_use_pool << std::endl;;
-		std::cout << "Min Share Diff: " << m_min_share << std::endl;
 
 		std::cout << "Logfile: " << m_logfile << std::endl;
 
@@ -82,7 +81,10 @@ namespace config
 		}
 
 		j.at("use_pool").get_to(m_use_pool);
-		j.at("min_share").get_to(m_min_share);
+		if(m_use_pool)
+		{
+			m_pool_config.m_username = j.at("pool")["username"];
+		}
 
 		// read worker config
 		if(!read_stats_printer_config(j))
