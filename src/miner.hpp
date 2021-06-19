@@ -5,6 +5,7 @@
 #include <string>
 
 #include "config/config.hpp"
+#include "network/endpoint.hpp"
 #include <spdlog/spdlog.h>
 #include <asio/signal_set.hpp>
 
@@ -28,6 +29,8 @@ public:
 	void run();
 
 private:
+
+	network::Endpoint resolve_dns(std::string const& dns_name, std::uint16_t port);
 
 	std::shared_ptr<::asio::io_context> m_io_context;
 	std::shared_ptr<::asio::signal_set> m_signals;

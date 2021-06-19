@@ -10,7 +10,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 
-#include <asio/io_context.hpp>
+#include <asio.hpp>
 #include <chrono>
 
 namespace nexusminer
@@ -72,7 +72,21 @@ namespace nexusminer
 
 	void Miner::run()
 	{
-		network::Endpoint wallet_endpoint{ network::Transport_protocol::tcp, m_config.get_wallet_ip(), m_config.get_port() };
+		auto const ip_address = m_config.get_wallet_ip();
+		auto const port = m_config.get_port();
+		
+		network::Endpoint wallet_endpoint{network::Transport_protocol::tcp, ip_address, port};
+		if(wallet_endpoint.transport_protocol() == network::Transport_protocol::none)
+		{
+			// resolve dns name
+			wallet_endpoint = resolve_dns(ip_address, port);
+			if(wallet_endpoint.transport_protocol() == network::Transport_protocol::none)
+			{
+				m_logger->error("Failed to resolve DNS name: {}", ip_address);
+				return;
+			}
+		}
+
 		auto result = m_worker_manager->connect(wallet_endpoint);
 		if (!result)
 		{
@@ -84,4 +98,19 @@ namespace nexusminer
 
 	}
 
+	network::Endpoint Miner::resolve_dns(std::string const& dns_name, std::uint16_t port)
+	{
+		//::asio::ip::tcp::resolver::query resolver_query( asio::ip::tcp::resolver::query::numeric_service);
+		::asio::ip::tcp::resolver resolver(*m_io_context);
+
+		::asio::error_code ec;
+		auto it = resolver.resolve(dns_name, std::string{std::to_string(port)}, ec);
+
+		if(ec) 
+		{
+			return network::Endpoint{};
+		}
+
+		return network::Endpoint{it->endpoint()};
+	}
 }
