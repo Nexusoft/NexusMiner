@@ -219,17 +219,6 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
         response = response.get_packet(Packet::PING);
         m_connection->transmit(response.get_bytes());
     }
-    else if(packet.m_header == Packet::ACCEPT)
-    {
-        m_logger->info("Block Accepted By Nexus Network.");
-        m_stats_collector->block_accepted();
-    }
-    else if(packet.m_header == Packet::REJECT)
-    {
-        m_logger->warn("Block Rejected by Nexus Network.");
-        m_connection->transmit(m_miner_protocol->get_work());
-        m_stats_collector->block_rejected();
-    }
     else
     {
         // solo/pool specific messages

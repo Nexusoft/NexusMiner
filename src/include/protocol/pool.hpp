@@ -29,7 +29,7 @@ private:
     std::shared_ptr<spdlog::logger> m_logger;
     Set_block_handler m_set_block_handler;
     Login_handler m_login_handler;
-
+    std::uint32_t m_current_height;
 };
 
 }

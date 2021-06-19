@@ -12,12 +12,13 @@ Pool::Pool()
 : m_logger{spdlog::get("logger")}
 , m_set_block_handler{}
 , m_login_handler{}
+, m_current_height{0}
 {
 }
 
 void Pool::reset()
 {
-
+   m_current_height = 0;
 }
 
 network::Shared_payload Pool::login(std::string const& account_name, Login_handler handler)
@@ -76,6 +77,32 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         {
             m_login_handler(false);
         }
+    }
+    else if(packet.m_header == Packet::BLOCK_DATA)
+    {
+        auto block = deserialize_block(packet.m_data);
+        if (block.nHeight > m_current_height)
+        {
+            m_current_height = block.nHeight;
+            if(m_set_block_handler)
+            {
+                m_set_block_handler(block);
+            }
+            else
+            {
+                m_logger->error("No Block handler set");
+            }
+        }
+    }
+    else if(packet.m_header == Packet::ACCEPT)
+    {
+        m_logger->info("Share Accepted By Pool.");
+       //m_stats_collector->block_accepted();
+    }
+    else if(packet.m_header == Packet::REJECT)
+    {
+        m_logger->warn("Share Rejected by Pool.");
+      //  m_stats_collector->block_rejected();
     }
 }
 

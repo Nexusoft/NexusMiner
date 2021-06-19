@@ -90,6 +90,17 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_logger->warn("Block Obsolete Height = {}, Skipping over.", block.nHeight);
         }
     }
+    else if(packet.m_header == Packet::ACCEPT)
+    {
+        m_logger->info("Block Accepted By Nexus Network.");
+       //m_stats_collector->block_accepted();
+    }
+    else if(packet.m_header == Packet::REJECT)
+    {
+        m_logger->warn("Block Rejected by Nexus Network.");
+        connection->transmit(get_work());
+      //  m_stats_collector->block_rejected();
+    }
     else
     {
         m_logger->error("Invalid header received.");
