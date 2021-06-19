@@ -25,9 +25,9 @@ void Printer_console::print()
 {
     // Log global stats
     std::stringstream ss;
-    ss << "Blocks accepted: " << m_stats_collector.get_blocks_accepted() 
-        << " rejected: " << m_stats_collector.get_blocks_rejected() << std::endl;
-    ss << "Connection retry attempts: " << m_stats_collector.get_connection_retry_attempts();
+    ss << "Blocks accepted: " << m_stats_collector.get_blocks_accepted()
+        << " rejected: " << m_stats_collector.get_blocks_rejected();
+    ss << " Connection retry attempts: " << m_stats_collector.get_connection_retry_attempts() << std::endl;
     ss << std::endl;
 
     auto const workers = m_stats_collector.get_workers_stats();

@@ -15,6 +15,8 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_co
 	, m_nonce_candidates_recieved{ 0 }
 	, m_best_leading_zeros{ 0 }
 	, m_met_difficulty_count{ 0 }
+	, m_nBits_pool{ 0 }
+	, m_is_pool{ false }
 {
 	auto& worker_config_fpga = std::get<config::Worker_config_fpga>(m_config.m_worker_mode);
 	m_receive_nonce_buffer.resize(responseLength);
@@ -119,7 +121,7 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 		else
 		{
 			++m_nonce_candidates_recieved;
-			m_logger->info(m_log_leader + "found a nonce candidate {}", nonce);
+			//m_logger->info(m_log_leader + "found a nonce candidate {}", nonce);
 			m_skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficulty_check())
@@ -168,7 +170,7 @@ void Worker_fpga::update_statistics(stats::Collector& stats_collector)
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, 
-		stats::Hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count});
+		stats::Hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count, m_nonce_candidates_recieved });
 }
 
 bool Worker_fpga::difficulty_check()
@@ -178,14 +180,14 @@ bool Worker_fpga::difficulty_check()
 	//leading zeros in bits required of the hash for it to pass the current difficulty.
 	int leadingZerosRequired;
 	uint64_t difficultyTest64;
-	decodeBits(m_block.nBits, leadingZerosRequired, difficultyTest64);
+	decodeBits(get_nBits(), leadingZerosRequired, difficultyTest64);
 	m_skein.calculateHash();
 	//run keccak on the result from skein
 	NexusKeccak keccak(m_skein.getHash());
 	keccak.calculateHash();
 	uint64_t keccakHash = keccak.getResult();
 	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
-	m_logger->info(m_log_leader + "Leading Zeros Found/Required {}/{}", hashActualLeadingZeros, leadingZerosRequired);
+	m_logger->info(m_log_leader + "Found a candidate with {} leading zeros, {} required.", hashActualLeadingZeros, leadingZerosRequired);
 	if (hashActualLeadingZeros > m_best_leading_zeros)
 	{
 		m_best_leading_zeros = hashActualLeadingZeros;
@@ -226,6 +228,20 @@ void Worker_fpga::reset_statistics()
 	m_nonce_candidates_recieved = 0;
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
+}
+
+uint32_t Worker_fpga::get_nBits()
+{
+	if (m_is_pool)
+		return m_nBits_pool;
+	else
+		return m_block.nBits;
+}
+
+void Worker_fpga::set_nBits_pool(uint32_t nBits_pool)
+{
+	m_nBits_pool = nBits_pool;
+	m_is_pool = true;
 }
 
 }

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.19)
 
 add_library(hash STATIC ${CMAKE_CURRENT_SOURCE_DIR}/nexus_keccak.cpp 
                 ${CMAKE_CURRENT_SOURCE_DIR}/nexus_skein.cpp)

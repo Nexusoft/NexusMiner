@@ -20,9 +20,10 @@ struct Hash
 
     Hash& operator+=(Hash const& other)
     {
-        m_hash_count += other.m_hash_count;
-        m_best_leading_zeros += other.m_best_leading_zeros;
-        m_met_difficulty_count += other.m_met_difficulty_count;
+        m_hash_count = other.m_hash_count;
+        m_best_leading_zeros = std::max(m_best_leading_zeros, other.m_best_leading_zeros);
+        m_met_difficulty_count = other.m_met_difficulty_count;
+        m_nonce_candidates_recieved = other.m_nonce_candidates_recieved;
 
         return *this;
     }

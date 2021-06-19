@@ -17,6 +17,8 @@ Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_
 , m_hash_count{0}
 , m_best_leading_zeros{0}
 , m_met_difficulty_count {0}
+, m_nBits_pool{0}
+, m_is_pool{false}
 {
 	
 }
@@ -107,6 +109,7 @@ void Worker_software_hash::update_statistics(stats::Collector& stats_collector)
 
 }
 
+
 bool Worker_software_hash::difficulty_check()
 {
 	//perform additional difficulty filtering prior to submitting the nonce 
@@ -114,7 +117,7 @@ bool Worker_software_hash::difficulty_check()
 	//leading zeros in bits required of the hash for it to pass the current difficulty.
 	int leadingZerosRequired;
 	uint64_t difficultyTest64;
-	decodeBits(m_block.nBits, leadingZerosRequired, difficultyTest64);
+	decodeBits(get_nBits(), leadingZerosRequired, difficultyTest64);
 	m_skein.calculateHash();
 	//run keccak on the result from skein
 	NexusKeccak keccak(m_skein.getHash());
@@ -149,6 +152,21 @@ void Worker_software_hash::reset_statistics()
 	m_hash_count = 0;
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
+}
+
+uint32_t Worker_software_hash::get_nBits()
+{
+
+	if (m_is_pool)
+		return m_nBits_pool;
+	else
+		return m_block.nBits;
+}
+
+void Worker_software_hash::set_nBits_pool(uint32_t nBits_pool)
+{
+	m_nBits_pool = nBits_pool;
+	m_is_pool = true;
 }
 
 }

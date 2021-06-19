@@ -60,6 +60,11 @@ private:
     int m_best_leading_zeros;
     int m_met_difficulty_count;
 
+    uint32_t get_nBits();
+    void set_nBits_pool(uint32_t nBits_pool);
+    uint32_t m_nBits_pool;
+    bool m_is_pool;
+
 };
 
 }
