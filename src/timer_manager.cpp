@@ -14,6 +14,7 @@ Timer_manager::Timer_manager(chrono::Timer_factory::Sptr timer_factory)
 {
     m_connection_retry_timer = m_timer_factory->create_timer();
     m_get_height_timer = m_timer_factory->create_timer();
+    m_stats_collector_timer = m_timer_factory->create_timer();
     m_stats_printer_timer = m_timer_factory->create_timer();
 }
 
@@ -24,11 +25,16 @@ void Timer_manager::start_connection_retry_timer(std::uint16_t timer_interval, s
         connection_retry_handler(std::move(worker_manager), wallet_endpoint));
 }
 
-void Timer_manager::start_get_height_timer(std::uint16_t timer_interval,  std::weak_ptr<network::Connection> connection,
-    std::vector<std::shared_ptr<Worker>> m_workers, std::shared_ptr<stats::Collector> stats_collector)
+void Timer_manager::start_get_height_timer(std::uint16_t timer_interval, std::weak_ptr<network::Connection> connection)
 {
-    m_get_height_timer->start(chrono::Seconds(timer_interval), get_height_handler(std::move(connection), m_workers,
-        timer_interval, std::move(stats_collector)));
+    m_get_height_timer->start(chrono::Seconds(timer_interval), get_height_handler(timer_interval, std::move(connection)));
+}
+
+void Timer_manager::start_stats_collector_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<Worker>> workers, 
+    std::shared_ptr<stats::Collector> stats_collector)
+{
+    m_stats_collector_timer->start(chrono::Seconds(timer_interval), stats_collector_handler(timer_interval, workers, 
+        std::move(stats_collector)));
 }
 
 void Timer_manager::start_stats_printer_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<stats::Printer>> stats_printers)
@@ -40,6 +46,7 @@ void Timer_manager::stop()
 {
     m_connection_retry_timer->cancel();
     m_get_height_timer->cancel();
+    m_stats_collector_timer->cancel();
     m_stats_printer_timer->cancel();
 }
 
@@ -61,10 +68,9 @@ chrono::Timer::Handler Timer_manager::connection_retry_handler(std::weak_ptr<Wor
     }; 
 }
 
-chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::Connection> connection, 
-    std::vector<std::shared_ptr<Worker>> m_workers, std::uint16_t get_height_interval, std::shared_ptr<stats::Collector> stats_collector)
+chrono::Timer::Handler Timer_manager::get_height_handler(std::uint16_t get_height_interval, std::weak_ptr<network::Connection> connection)
 {
-    return[this, connection, m_workers, get_height_interval, stats_collector = std::move(stats_collector)](bool canceled)
+    return[this, connection, get_height_interval](bool canceled)
     {
         if (canceled)	// don't do anything if the timer has been canceled
         {
@@ -78,14 +84,30 @@ chrono::Timer::Handler Timer_manager::get_height_handler(std::weak_ptr<network::
             packet_get_height.m_header = Packet::NEW_BLOCK;
             connection_shared->transmit(packet_get_height.get_bytes());
 
-            for(auto& worker : m_workers)
-            {
-                worker->update_statistics(*stats_collector);
-            }
             // restart timer
             m_get_height_timer->start(chrono::Seconds(get_height_interval), 
-                get_height_handler(std::move(connection_shared), m_workers, get_height_interval, std::move(stats_collector)));
+                get_height_handler(get_height_interval, std::move(connection_shared)));
         }
+    }; 
+}
+
+chrono::Timer::Handler Timer_manager::stats_collector_handler(std::uint16_t stats_collector_interval, 
+    std::vector<std::shared_ptr<Worker>> workers, std::shared_ptr<stats::Collector> stats_collector)
+{
+    return[this, workers, stats_collector_interval, stats_collector = std::move(stats_collector)](bool canceled)
+    {
+        if (canceled)	// don't do anything if the timer has been canceled
+        {
+            return;
+        }
+
+        for(auto& worker : workers)
+        {
+            worker->update_statistics(*stats_collector);
+        }
+        // restart timer
+        m_stats_collector_timer->start(chrono::Seconds(stats_collector_interval), 
+            stats_collector_handler(stats_collector_interval, workers, std::move(stats_collector)));
     }; 
 }
 

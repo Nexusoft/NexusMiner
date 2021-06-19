@@ -162,13 +162,13 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                     }
 
                     auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
+                    self->m_timer_manager.start_stats_collector_timer(print_statistics_interval, self->m_workers, self->m_stats_collector);
                     self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
                     // only solo miner uses GET_HEIGHT message
                     if(!self->m_config.get_use_bool())
                     {
                         auto const get_height_interval = self->m_config.get_height_interval();
-                        self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
-                            self->m_workers, self->m_stats_collector);
+                        self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection);
                     }
 
                     self->m_miner_protocol->set_block_handler([self](auto block)

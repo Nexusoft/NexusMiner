@@ -64,8 +64,6 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     if (packet.m_header == Packet::BLOCK_HEIGHT)
     {
         auto const height = bytes2uint(*packet.m_data);
-        //m_logger->debug("Height Received {}", height);
-
         if (height > m_current_height)
         {
             m_current_height = height;
@@ -92,7 +90,6 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_logger->warn("Block Obsolete Height = {}, Skipping over.", block.nHeight);
         }
     }
-
     else
     {
         m_logger->error("Invalid header received.");
