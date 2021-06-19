@@ -41,6 +41,8 @@ private:
     void create_stats_printers();
     void create_workers();
 
+    void retry_connect(network::Endpoint const& wallet_endpoint);
+
 	std::shared_ptr<::asio::io_context> m_io_context;
     Config& m_config;
 	network::Socket::Sptr m_socket;

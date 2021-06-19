@@ -119,6 +119,18 @@ void Worker_manager::stop()
     }
 }
 
+void Worker_manager::retry_connect(network::Endpoint const& wallet_endpoint)
+{           
+    m_connection = nullptr;		// close connection (socket etc)
+    m_miner_protocol->reset();
+    m_stats_collector->connection_retry_attempt();
+
+    // retry connect
+    auto const connection_retry_interval = m_config.get_connection_retry_interval();
+    m_logger->info("Connection retry {} seconds", connection_retry_interval);
+    m_timer_manager.start_connection_retry_timer(connection_retry_interval, shared_from_this(), wallet_endpoint);
+}
+
 bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 {
     std::weak_ptr<Worker_manager> weak_self = shared_from_this();
@@ -133,48 +145,47 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 result == network::Result::connection_error)
             {
                 self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
-                self->m_connection = nullptr;		// close connection (socket etc)
-                self->m_miner_protocol->reset();
-                self->m_stats_collector->connection_retry_attempt();
-
-                // retry connect
-                auto const connection_retry_interval = self->m_config.get_connection_retry_interval();
-                self->m_logger->info("Connection retry {} seconds", connection_retry_interval);
-                self->m_timer_manager.start_connection_retry_timer(connection_retry_interval, self, wallet_endpoint);
+                self->retry_connect(wallet_endpoint);
             }
             else if (result == network::Result::connection_ok)
             {
                 self->m_logger->info("Connection to wallet established");
 
                 // login
-                self->m_connection->transmit(self->m_miner_protocol->login(self->m_config.get_pool_config().m_username));
-
-                auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
-                // only solo miner uses GET_HEIGHT message
-                if(!self->m_config.get_use_bool())
+                self->m_connection->transmit(self->m_miner_protocol->login(self->m_config.get_pool_config().m_username,
+                [self, wallet_endpoint](bool login_result)
                 {
-                    auto const get_height_interval = self->m_config.get_height_interval();
-                    self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
-                        self->m_workers, self->m_stats_collector);
-                }
-
-                self->m_miner_protocol->set_block_handler([self](auto block)
-                {
-                    for(auto& worker : self->m_workers)
+                    if(!login_result)
                     {
-                        worker->set_block(block, [self](auto id, auto block_data)
-                        {
-                             self->m_logger->debug("SET BLOCK HANDLER");
-                            if (self->m_connection)
-                                self->m_connection->transmit(self->m_miner_protocol->submit_block(
-                                    block_data->merkle_root.GetBytes(), uint2bytes64(block_data->nNonce)));
-                            else
-                                self->m_logger->error("No connection. Can't submit block.");
-                        });
+                        self->retry_connect(wallet_endpoint);
+                        return;
                     }
-                });
-                
-                self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
+
+                    auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
+                    self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
+                    // only solo miner uses GET_HEIGHT message
+                    if(!self->m_config.get_use_bool())
+                    {
+                        auto const get_height_interval = self->m_config.get_height_interval();
+                        self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection, 
+                            self->m_workers, self->m_stats_collector);
+                    }
+
+                    self->m_miner_protocol->set_block_handler([self](auto block)
+                    {
+                        for(auto& worker : self->m_workers)
+                        {
+                            worker->set_block(block, [self](auto id, auto block_data)
+                            {
+                                if (self->m_connection)
+                                    self->m_connection->transmit(self->m_miner_protocol->submit_block(
+                                        block_data->merkle_root.GetBytes(), uint2bytes64(block_data->nNonce)));
+                                else
+                                    self->m_logger->error("No connection. Can't submit block.");
+                            });
+                        }
+                    });
+                }));
             }
             else
             {	// data received

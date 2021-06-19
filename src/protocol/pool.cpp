@@ -11,6 +11,7 @@ namespace protocol
 Pool::Pool()
 : m_logger{spdlog::get("logger")}
 , m_set_block_handler{}
+, m_login_handler{}
 {
 }
 
@@ -19,8 +20,9 @@ void Pool::reset()
 
 }
 
-network::Shared_payload Pool::login(std::string account_name)
+network::Shared_payload Pool::login(std::string const& account_name, Login_handler handler)
 {
+    m_login_handler = std::move(handler);
     Packet packet;
     packet.m_header = Packet::LOGIN;
     std::vector<std::uint8_t> username_data{account_name.begin(), account_name.end()};
@@ -62,10 +64,18 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     if(packet.m_header == Packet::LOGIN_SKMINER_SUCCESS)
     {
         m_logger->info("Login to Pool successful");
+        if(m_login_handler)
+        {
+            m_login_handler(true);
+        }
     }
     else if(packet.m_header == Packet::LOGIN_SKMINER_FAIL)
     {
         m_logger->error("Login to Pool not successful");
+        if(m_login_handler)
+        {
+            m_login_handler(false);
+        }
     }
 }
 

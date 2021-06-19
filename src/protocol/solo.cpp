@@ -20,12 +20,14 @@ void Solo::reset()
     m_current_height = 0;
 }
 
-network::Shared_payload Solo::login(std::string account_name)
+network::Shared_payload Solo::login(std::string const& account_name, Login_handler handler)
 {
     Packet packet;
     packet.m_header = Packet::SET_CHANNEL;
     packet.m_length = 4;
     packet.m_data = std::make_shared<std::vector<std::uint8_t>>(uint2bytes(m_channel));
+    // call the login handler here because for solo mining this is always a "success"
+    handler(true);
     return packet.get_bytes();
 }
 

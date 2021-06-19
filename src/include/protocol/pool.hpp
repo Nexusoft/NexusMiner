@@ -16,7 +16,7 @@ public:
 	Pool();
 
     void reset() override;
-    network::Shared_payload login(std::string account_name) override;
+    network::Shared_payload login(std::string const& account_name, Login_handler handler) override;
     network::Shared_payload get_work() override;
     network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data, 
         std::vector<std::uint8_t> const& nonce ) override;
@@ -28,6 +28,7 @@ private:
 
     std::shared_ptr<spdlog::logger> m_logger;
     Set_block_handler m_set_block_handler;
+    Login_handler m_login_handler;
 
 };
 

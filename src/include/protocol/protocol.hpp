@@ -16,12 +16,13 @@ namespace protocol
 class Protocol {
 public:
 
+    using Login_handler = std::function<void(bool login_result)>;
     using Set_block_handler = std::function<void(LLP::CBlock block)>;
 
     virtual ~Protocol() = default;
 
     virtual void reset() = 0;
-    virtual network::Shared_payload login(std::string account_name) = 0;
+    virtual network::Shared_payload login(std::string const& account_name, Login_handler handler) = 0;
     virtual network::Shared_payload get_work() = 0;
     virtual network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data, 
         std::vector<std::uint8_t> const& nonce ) = 0;
