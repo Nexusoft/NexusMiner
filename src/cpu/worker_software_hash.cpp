@@ -17,8 +17,6 @@ Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_
 , m_hash_count{0}
 , m_best_leading_zeros{0}
 , m_met_difficulty_count {0}
-, m_nBits_pool{0}
-, m_is_pool{false}
 {
 	
 }
@@ -31,7 +29,7 @@ Worker_software_hash::~Worker_software_hash()
 		m_run_thread.join(); 
 }
 
-void Worker_software_hash::set_block(LLP::CBlock block, Worker::Block_found_handler result)
+void Worker_software_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
 	//stop the existing mining loop if it is running
 	m_stop = true;
@@ -45,6 +43,11 @@ void Worker_software_hash::set_block(LLP::CBlock block, Worker::Block_found_hand
 		//set the starting nonce for each worker to something different that won't overlap with the others
 		m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
 		m_block.nNonce = m_starting_nonce;
+		if(nbits != 0)	// take nBits provided from pool
+		{
+			m_block.nBits = nbits;
+		}
+
 		std::vector<unsigned char> headerB = m_block.GetHeaderBytes();
 		//calculate midstate
 		m_skein.setMessage(headerB);
@@ -117,7 +120,7 @@ bool Worker_software_hash::difficulty_check()
 	//leading zeros in bits required of the hash for it to pass the current difficulty.
 	int leadingZerosRequired;
 	uint64_t difficultyTest64;
-	decodeBits(get_nBits(), leadingZerosRequired, difficultyTest64);
+	decodeBits(m_block.nBits, leadingZerosRequired, difficultyTest64);
 	m_skein.calculateHash();
 	//run keccak on the result from skein
 	NexusKeccak keccak(m_skein.getHash());
@@ -153,20 +156,4 @@ void Worker_software_hash::reset_statistics()
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
 }
-
-uint32_t Worker_software_hash::get_nBits()
-{
-
-	if (m_is_pool)
-		return m_nBits_pool;
-	else
-		return m_block.nBits;
-}
-
-void Worker_software_hash::set_nBits_pool(uint32_t nBits_pool)
-{
-	m_nBits_pool = nBits_pool;
-	m_is_pool = true;
-}
-
 }

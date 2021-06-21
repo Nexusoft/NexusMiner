@@ -78,7 +78,7 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         {
             if(m_set_block_handler)
             {
-                m_set_block_handler(block);
+                m_set_block_handler(block, 0);
             }
             else
             {

@@ -25,7 +25,7 @@ public:
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
-    void set_block(LLP::CBlock block, Worker::Block_found_handler result) override;
+    void set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result) override;
     void update_statistics(stats::Collector& stats_collector) override;
     void set_test_block();
 
@@ -52,19 +52,12 @@ private:
     std::mutex m_mtx;
     std::string m_log_leader;
 
-    //stats
-    //TODO move to statistics class
+
     static constexpr uint64_t nonce_difficulty_filter = 1ULL << 32;  //the fixed difficulty check inside the FPGA
     void reset_statistics();
     int m_nonce_candidates_recieved;
     int m_best_leading_zeros;
     int m_met_difficulty_count;
-
-    uint32_t get_nBits();
-    void set_nBits_pool(uint32_t nBits_pool);
-    uint32_t m_nBits_pool;
-    bool m_is_pool;
-
 };
 
 }

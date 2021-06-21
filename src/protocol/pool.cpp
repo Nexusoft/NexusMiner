@@ -2,7 +2,6 @@
 #include "packet.hpp"
 #include "../network/connection.hpp"
 
-
 namespace nexusminer
 {
 namespace protocol
@@ -86,7 +85,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_current_height = block.nHeight;
             if(m_set_block_handler)
             {
-                m_set_block_handler(block);
+                m_set_block_handler(block, bytes2uint(std::vector<unsigned char>(packet.m_data->begin(), packet.m_data->begin() + 4)));
             }
             else
             {
