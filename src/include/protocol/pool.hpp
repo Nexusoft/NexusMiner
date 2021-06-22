@@ -26,6 +26,9 @@ public:
 
 private:
 
+    // out_param nbits. Returns data without the nbits from pool.
+    network::Shared_payload extract_nbits_from_block(network::Shared_payload data, std::uint32_t& nbits);
+
     std::shared_ptr<spdlog::logger> m_logger;
     Set_block_handler m_set_block_handler;
     Login_handler m_login_handler;

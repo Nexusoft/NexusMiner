@@ -79,13 +79,15 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     }
     else if(packet.m_header == Packet::BLOCK_DATA)
     {
-        auto block = deserialize_block(packet.m_data);
+        std::uint32_t nbits{0U};
+        auto original_block = extract_nbits_from_block(std::move(packet.m_data), nbits);
+        auto block = deserialize_block(std::move(original_block));
         if (block.nHeight > m_current_height)
         {
             m_current_height = block.nHeight;
             if(m_set_block_handler)
             {
-                m_set_block_handler(block, bytes2uint(std::vector<unsigned char>(packet.m_data->begin(), packet.m_data->begin() + 4)));
+                m_set_block_handler(block, nbits);
             }
             else
             {
@@ -103,6 +105,12 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         m_logger->warn("Share Rejected by Pool.");
       //  m_stats_collector->block_rejected();
     }
+}
+
+network::Shared_payload Pool::extract_nbits_from_block(network::Shared_payload data, std::uint32_t& nbits)
+{
+    nbits = bytes2uint(std::vector<unsigned char>(data->begin(), data->begin() + 4));
+    return std::make_shared<network::Payload>(data->begin() + 4, data->end());
 }
 
 }

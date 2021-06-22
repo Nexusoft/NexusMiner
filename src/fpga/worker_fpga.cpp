@@ -15,6 +15,7 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_co
 	, m_nonce_candidates_recieved{ 0 }
 	, m_best_leading_zeros{ 0 }
 	, m_met_difficulty_count{ 0 }
+	, m_pool_nbits{0}
 {
 	auto& worker_config_fpga = std::get<config::Worker_config_fpga>(m_config.m_worker_mode);
 	m_receive_nonce_buffer.resize(responseLength);
@@ -55,7 +56,7 @@ void Worker_fpga::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 	if(nbits != 0)
 	{
 		// take nbits provided by pool
-		m_block.nNonce = nbits;
+		m_pool_nbits = nbits;
 	}
 
 	std::vector<unsigned char> headerB = m_block.GetHeaderBytes();
@@ -184,7 +185,7 @@ bool Worker_fpga::difficulty_check()
 	//leading zeros in bits required of the hash for it to pass the current difficulty.
 	int leadingZerosRequired;
 	uint64_t difficultyTest64;
-	decodeBits(m_block.nBits, leadingZerosRequired, difficultyTest64);
+	decodeBits(m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits, leadingZerosRequired, difficultyTest64);
 	m_skein.calculateHash();
 	//run keccak on the result from skein
 	NexusKeccak keccak(m_skein.getHash());

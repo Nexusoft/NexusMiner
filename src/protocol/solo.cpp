@@ -73,7 +73,7 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     // Block from wallet received
     else if(packet.m_header == Packet::BLOCK_DATA)
     {
-        auto block = deserialize_block(packet.m_data);
+        auto block = deserialize_block(std::move(packet.m_data));
         if (block.nHeight == m_current_height)
         {
             if(m_set_block_handler)

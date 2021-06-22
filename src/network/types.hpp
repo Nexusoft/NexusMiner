@@ -58,7 +58,8 @@ inline bool is_error(Code code)
 
 } // namespace Result
 
-using Shared_payload = std::shared_ptr<std::vector<uint8_t>>;
+using Payload = std::vector<std::uint8_t>;
+using Shared_payload = std::shared_ptr<Payload>;
 
 enum class Transport_protocol { tcp = 0, udp = 1, none = 3 };
 

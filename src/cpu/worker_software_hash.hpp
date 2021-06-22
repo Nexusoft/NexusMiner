@@ -59,6 +59,8 @@ private:
     int m_best_leading_zeros;
     int m_met_difficulty_count;
 
+    std::uint32_t m_pool_nbits;
+
 };
 
 }
