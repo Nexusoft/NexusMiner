@@ -3,6 +3,7 @@
 #include "network/create_component.hpp"
 #include "network/component.hpp"
 #include "chrono/timer_factory.hpp"
+#include "config/validator.hpp"
 #include "worker_manager.hpp"
 #include "worker.hpp"
 
@@ -12,6 +13,7 @@
 
 #include <asio.hpp>
 #include <chrono>
+#include <fstream>
 
 namespace nexusminer
 {
@@ -47,15 +49,28 @@ namespace nexusminer
 		m_io_context->stop();
 	}
 
+	bool Miner::check_config(std::string const& miner_config_file)
+	{
+		m_logger->info("Running config check for {}", miner_config_file);
+		std::ifstream config(miner_config_file);
+		if (!config.is_open())
+		{
+			m_logger->critical("Unable to read {}", miner_config_file);
+			return false;
+		}
+
+		config::Validator validator{};
+		auto result = validator.check(miner_config_file);
+		result ? m_logger->info(validator.get_check_result()) : m_logger->error(validator.get_check_result());
+		return result;
+	}
+
 	bool Miner::init(std::string const& miner_config_file)
 	{
 		if (!m_config.read_config(miner_config_file))
 		{
 			return false;
 		}
-
-		// std::err logger
-		auto console_err = spdlog::stderr_color_mt("console_err");
 
 		// timer initialisation
 		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);

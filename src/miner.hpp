@@ -26,6 +26,7 @@ public:
 	~Miner();
 
 	bool init(std::string const& miner_config_file);
+	bool check_config(std::string const& miner_config_file);
 	void run();
 
 private:

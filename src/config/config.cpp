@@ -48,13 +48,12 @@ namespace config
 
 	bool Config::read_config(std::string const& miner_config_file)
 	{
-		std::string miner_config_tmp = miner_config_file.empty() ? "miner.conf" : miner_config_file;
-		std::cout << "Reading config file " << miner_config_tmp << std::endl;
+		std::cout << "Reading config file " << miner_config_file << std::endl;
 
-		std::ifstream config_file(miner_config_tmp);
+		std::ifstream config_file(miner_config_file);
 		if (!config_file.is_open())
 		{
-			std::cerr << "Unable to read " << miner_config_tmp << std::endl;
+			std::cerr << "Unable to read " << miner_config_file << std::endl;
 			return false;
 		}
 
@@ -86,7 +85,7 @@ namespace config
 			m_pool_config.m_username = j.at("pool")["username"];
 		}
 
-		// read worker config
+		// read stats printer config
 		if(!read_stats_printer_config(j))
 		{
 			return false;
