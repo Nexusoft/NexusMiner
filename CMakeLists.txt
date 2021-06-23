@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(${CMAKE_SOURCE_DIR}/include/)
 
+option(WITH_GPU "Build with gpu workers, CUDA needed" OFF)
+
 find_package(Threads REQUIRED)
 
 # OpenSSL
@@ -32,6 +34,18 @@ if(MSVC)
     add_definitions(/permissive-)
 endif()
 
+#GPU
+if(WITH_GPU)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        set_target_properties(NexusMiner PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    else()
+        message(STATUS "No CUDA compiler found")
+    endif()
+endif()
+
 include_directories(src/include/)
 include_directories(src/hash/)
 
@@ -45,6 +59,10 @@ add_subdirectory(src/protocol)
 add_subdirectory(src/cpu)
 add_subdirectory(src/fpga)
 
+if(WITH_GPU)
+    add_subdirectory(src/gpu)
+endif()
+
 add_executable(NexusMiner 
                 src/main.cpp 
                 src/miner.cpp 
@@ -52,5 +70,8 @@ add_executable(NexusMiner
                 src/timer_manager.cpp)
 
 target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga)
+if(WITH_GPU)
+    target_link_libraries(NexusMiner gpu)
+endif()
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)
