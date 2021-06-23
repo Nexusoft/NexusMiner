@@ -1,5 +1,5 @@
-#ifndef NEXUSMINER_WORKER_SOFTWARE_HASH_HPP
-#define NEXUSMINER_WORKER_SOFTWARE_HASH_HPP
+#ifndef NEXUSMINER_CPU_WORKER_HASH_HPP
+#define NEXUSMINER_CPU_WORKER_HASH_HPP
 //a software hash channel miner for demo and test purposes
 
 #include <memory>
@@ -17,15 +17,16 @@ namespace nexusminer {
 namespace config{ class Worker_config; }
 namespace stats { class Collector; }
 
-
-class Worker_software_hash : public Worker, public std::enable_shared_from_this<Worker_software_hash>
+namespace cpu
+{
+class Worker_hash : public Worker, public std::enable_shared_from_this<Worker_hash>
 {
 public:
 
     using Worker_config = config::Worker_config;
 
-    Worker_software_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
-    ~Worker_software_hash();
+    Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
+    ~Worker_hash();
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
@@ -62,6 +63,7 @@ private:
     std::uint32_t m_pool_nbits;
 
 };
+}
 
 }
 

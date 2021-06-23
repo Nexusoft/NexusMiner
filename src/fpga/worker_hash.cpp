@@ -1,4 +1,4 @@
-#include "worker_fpga.hpp"
+#include "worker_hash.hpp"
 #include "stats/stats_collector.hpp"
 #include "LLP/block.hpp"
 #include "nexus_hash_utils.hpp"
@@ -6,8 +6,9 @@
 
 namespace nexusminer
 {
-
-Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_config& config)
+namespace fpga
+{
+Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config)
 	: m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
 	, m_config{config}
@@ -35,12 +36,12 @@ Worker_fpga::Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_co
 	}
 }
 
-Worker_fpga::~Worker_fpga()
+Worker_hash::~Worker_hash()
 {
 	m_serial.close();
 }
 
-void Worker_fpga::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
+void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
 	//send new block info to the device
 	std::scoped_lock<std::mutex> lck(m_mtx);
@@ -93,11 +94,11 @@ void Worker_fpga::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
     
 }
 
-void Worker_fpga::start_read()
+void Worker_hash::start_read()
 {	
 	// start the asynchronous read to wait for the next nonce to come across the serial port
 	try {
-		asio::async_read(m_serial, asio::buffer(m_receive_nonce_buffer), std::bind(&Worker_fpga::handle_read, this,
+		asio::async_read(m_serial, asio::buffer(m_receive_nonce_buffer), std::bind(&Worker_hash::handle_read, this,
 			std::placeholders::_1, std::placeholders::_2));
 	}
 	catch (asio::system_error& e)
@@ -106,7 +107,7 @@ void Worker_fpga::start_read()
 	}
 }
 
-void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t bytes_transferred)
+void Worker_hash::handle_read(const asio::error_code& error_code, std::size_t bytes_transferred)
 {
 	if (!error_code && bytes_transferred == m_receive_nonce_buffer.size())
 	{
@@ -170,7 +171,7 @@ void Worker_fpga::handle_read(const asio::error_code& error_code, std::size_t by
 
 }
 
-void Worker_fpga::update_statistics(stats::Collector& stats_collector)
+void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
@@ -178,7 +179,7 @@ void Worker_fpga::update_statistics(stats::Collector& stats_collector)
 		stats::Hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count, m_nonce_candidates_recieved });
 }
 
-bool Worker_fpga::difficulty_check()
+bool Worker_hash::difficulty_check()
 {
 	//perform additional difficulty filtering prior to submitting the nonce 
 	
@@ -210,7 +211,7 @@ bool Worker_fpga::difficulty_check()
 	}
 }
 
-void Worker_fpga::set_test_block()
+void Worker_hash::set_test_block()
 {
 	// use a sample Nexus block as a test vector
 	// hashing this block should result in a number with 49 leading zeros
@@ -228,11 +229,12 @@ void Worker_fpga::set_test_block()
 
 }
 
-void Worker_fpga::reset_statistics()
+void Worker_hash::reset_statistics()
 {
 	m_nonce_candidates_recieved = 0;
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
 }
 
+}
 }

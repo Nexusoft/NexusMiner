@@ -1,5 +1,5 @@
-#ifndef NEXUSMINER_WORKER_FPGA_HPP
-#define NEXUSMINER_WORKER_FPGA_HPP
+#ifndef NEXUSMINER_FPGA_WORKER_HASH_HPP
+#define NEXUSMINER_FPGA_WORKER_HASH_HPP
 
 #include <memory>
 #include <mutex>
@@ -13,15 +13,17 @@
 namespace nexusminer {
 namespace config { class Worker_config; }
 namespace stats { class Collector; }
+namespace fpga 
+{
 
-class Worker_fpga : public Worker, public std::enable_shared_from_this<Worker_fpga>
+class Worker_hash : public Worker, public std::enable_shared_from_this<Worker_hash>
 {
 public:
 
     using Worker_config = config::Worker_config;
 
-    Worker_fpga(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
-    ~Worker_fpga();
+    Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config);
+    ~Worker_hash();
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
@@ -62,6 +64,7 @@ private:
     std::uint32_t m_pool_nbits;
 };
 
+}
 }
 
 

@@ -1,6 +1,6 @@
 #include "worker_manager.hpp"
-#include "cpu/worker_software_hash.hpp"
-#include "fpga/worker_fpga.hpp"
+#include "cpu/worker_hash.hpp"
+#include "fpga/worker_hash.hpp"
 #include "packet.hpp"
 #include "config/config.hpp"
 #include "config/types.hpp"
@@ -87,7 +87,7 @@ void Worker_manager::create_workers()
         {
             case config::Worker_mode::FPGA:
             {
-                m_workers.push_back(std::make_shared<Worker_fpga>(m_io_context, worker_config));
+                m_workers.push_back(std::make_shared<fpga::Worker_hash>(m_io_context, worker_config));
                 break;
             }
             case config::Worker_mode::GPU:
@@ -97,7 +97,7 @@ void Worker_manager::create_workers()
             case config::Worker_mode::CPU:    // falltrough
             default:
             {
-                m_workers.push_back(std::make_shared<Worker_software_hash>(m_io_context, worker_config));
+                m_workers.push_back(std::make_shared<cpu::Worker_hash>(m_io_context, worker_config));
                 break;
             }
         }

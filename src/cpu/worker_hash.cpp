@@ -1,4 +1,4 @@
-#include "worker_software_hash.hpp"
+#include "worker_hash.hpp"
 #include "config/config.hpp"
 #include "stats/stats_collector.hpp"
 #include "LLP/block.hpp"
@@ -7,8 +7,10 @@
 
 namespace nexusminer
 {
+namespace cpu
+{
 
-Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config) 
+Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_config& config) 
 : m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
 , m_config{config}
@@ -22,7 +24,7 @@ Worker_software_hash::Worker_software_hash(std::shared_ptr<asio::io_context> io_
 	
 }
 
-Worker_software_hash::~Worker_software_hash() 
+Worker_hash::~Worker_hash() 
 { 
 	//make sure the run thread exits the loop
 	m_stop = true;  
@@ -30,7 +32,7 @@ Worker_software_hash::~Worker_software_hash()
 		m_run_thread.join(); 
 }
 
-void Worker_software_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
+void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
 	//stop the existing mining loop if it is running
 	m_stop = true;
@@ -55,10 +57,10 @@ void Worker_software_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Wor
 	}
 	//restart the mining loop
 	m_stop = false;
-	m_run_thread = std::thread(&Worker_software_hash::run, this);
+	m_run_thread = std::thread(&Worker_hash::run, this);
 }
 
-void Worker_software_hash::run()
+void Worker_hash::run()
 {
 	while (!m_stop)
 	{
@@ -102,7 +104,7 @@ void Worker_software_hash::run()
 	}
 }
 
-void Worker_software_hash::update_statistics(stats::Collector& stats_collector)
+void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
@@ -112,7 +114,7 @@ void Worker_software_hash::update_statistics(stats::Collector& stats_collector)
 }
 
 
-bool Worker_software_hash::difficulty_check()
+bool Worker_hash::difficulty_check()
 {
 	//perform additional difficulty filtering prior to submitting the nonce 
 
@@ -144,15 +146,17 @@ bool Worker_software_hash::difficulty_check()
 	}
 }
 
-uint64_t Worker_software_hash::leading_zero_mask()
+uint64_t Worker_hash::leading_zero_mask()
 {
 	return ((1ull << leading_zeros_required) - 1) << (64 - leading_zeros_required);
 }
 
-void Worker_software_hash::reset_statistics()
+void Worker_hash::reset_statistics()
 {
 	m_hash_count = 0;
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
+}
+
 }
 }
