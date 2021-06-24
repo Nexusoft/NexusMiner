@@ -20,7 +20,6 @@ public:
 	Config();
 
 	bool read_config(std::string const& miner_config_file);
-	void print_config() const;
 
 	std::string const& get_wallet_ip() const { return m_wallet_ip; }
 	std::uint16_t get_port() const { return m_port; }

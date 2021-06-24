@@ -29,7 +29,6 @@ public:
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
     void set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result) override;
     void update_statistics(stats::Collector& stats_collector) override;
-    void set_test_block();
 
 private:
 

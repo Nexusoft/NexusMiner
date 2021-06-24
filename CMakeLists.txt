@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include_directories(${CMAKE_SOURCE_DIR}/include/)
 
-option(WITH_GPU "Build with gpu workers, CUDA needed" OFF)
+option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
 
 find_package(Threads REQUIRED)
 
@@ -35,7 +35,7 @@ if(MSVC)
 endif()
 
 #GPU
-if(WITH_GPU)
+if(WITH_GPU_CUDA)
     include(CheckLanguage)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)
@@ -58,7 +58,7 @@ add_subdirectory(src/protocol)
 add_subdirectory(src/cpu)
 add_subdirectory(src/fpga)
 
-if(WITH_GPU)
+if(WITH_GPU_CUDA)
     add_subdirectory(src/gpu)
 endif()
 
@@ -69,7 +69,7 @@ add_executable(NexusMiner
                 src/timer_manager.cpp)
 
 target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga)
-if(WITH_GPU)
+if(WITH_GPU_CUDA)
     set_target_properties(NexusMiner PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     target_link_libraries(NexusMiner gpu)
 endif()

@@ -24,28 +24,6 @@ namespace config
 	{
 	}
 
-	void Config::print_config() const
-	{
-		std::cout << "Configuration: " << std::endl;
-		std::cout << "-------------" << std::endl;
-		std::cout << "Wallet IP: " << m_wallet_ip << std::endl;
-		std::cout << "Port: " << m_port << std::endl;
-		std::cout << "Local IP: " << m_local_ip << std::endl;
-
-		std::cout << "Mining Mode: " << ((m_mining_mode == Mining_mode::HASH) ? "HASH" : "PRIME") << std::endl;
-
-		std::cout << "Connection Retry Interval: " << m_connection_retry_interval << std::endl;
-		std::cout << "Print Statistics Interval: " << m_print_statistics_interval << std::endl;		
-		std::cout << "Get Height Interval: " << m_get_height_interval << std::endl;		
-
-		std::cout << "Pool: " << m_use_pool << std::endl;;
-
-		std::cout << "Logfile: " << m_logfile << std::endl;
-
-		std::cout << "-------------" << std::endl;
-
-	}
-
 	bool Config::read_config(std::string const& miner_config_file)
 	{
 		std::cout << "Reading config file " << miner_config_file << std::endl;
@@ -112,8 +90,6 @@ namespace config
 		}
 
 		j.at("logfile").get_to(m_logfile);
-
-		print_config();
 		// TODO Need to add exception handling here and set return value appropriately
 		return true;
 	}

@@ -211,24 +211,6 @@ bool Worker_hash::difficulty_check()
 	}
 }
 
-void Worker_hash::set_test_block()
-{
-	// use a sample Nexus block as a test vector
-	// hashing this block should result in a number with 49 leading zeros
-	std::string merkleStr = "31f5a458fc4207cd30fd1c4f43c26a3140193ed088f75004aa5b07beebf6be905fd49a412294c73850b422437c414429a6160df514b8ec919ea8a2346d3a3025";
-	std::string hashPrevBlockStr = "00000902546301d2a29b00cad593cf05c798469b0e3f39fe623e6762111d6f9eed3a6a18e0e5453e81da8d0db5e89808e68e96c8df13005b714b1e63d7fa44a5025d1370f6f255af2d5121c4f65624489f1b401f651b5bd505002d3a5efc098aa6fa762d270433a51697d7d8d3252d56bbbfbe62f487f258c757690d31e493a7";
-	m_block.nBits = 0x7b032ed8;
-	m_block.nChannel = 2;
-	m_block.nHeight = 2023276;
-	m_block.nVersion = 4;
-	m_block.nNonce = 21155560019;
-	m_block.merkle_root.SetHex(merkleStr);
-	m_block.previous_hash.SetHex(hashPrevBlockStr);
-	m_starting_nonce = m_block.nNonce;
-	
-
-}
-
 void Worker_hash::reset_statistics()
 {
 	m_nonce_candidates_recieved = 0;
