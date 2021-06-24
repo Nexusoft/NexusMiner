@@ -31,7 +31,7 @@ void Collector::update_worker_stats(std::uint16_t internal_worker_id, Hash const
 {
     assert(m_config.get_mining_mode() == config::Mining_mode::HASH);
 
-    std::scoped_lock(m_worker_mutex);
+    std::scoped_lock lock(m_worker_mutex);
 
     auto& hash_stats = std::get<Hash>(m_workers[internal_worker_id]);
     hash_stats += stats;
@@ -41,7 +41,7 @@ void Collector::update_worker_stats(std::uint16_t internal_worker_id, Prime cons
 {
     assert(m_config.get_mining_mode() == config::Mining_mode::PRIME);
 
-    std::scoped_lock(m_worker_mutex);
+    std::scoped_lock lock(m_worker_mutex);
     
     auto& prime_stats = std::get<Prime>(m_workers[internal_worker_id]);
     prime_stats += stats;
