@@ -36,6 +36,9 @@ public:
     //  Transmit payload on the connection
     //  If the connection is in state connected, transmit() asynchronously initiates a transmission of the payload over this connection.
     virtual void transmit(Shared_payload tx_buffer) = 0;
+
+    // Closes the connection
+    virtual void close() = 0;
 };
 
 

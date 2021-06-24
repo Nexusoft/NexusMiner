@@ -28,8 +28,6 @@ public:
     Connection_impl(std::shared_ptr<::asio::io_context> io_context,
                     std::shared_ptr<Protocol_socket> asio_socket, Endpoint remote_endpoint);
 
-    ~Connection_impl() override;
-
     // no copies
     Connection_impl(const Connection_impl&) = delete;
     Connection_impl& operator=(const Connection_impl&) = delete;
@@ -41,6 +39,7 @@ public:
     Endpoint const& remote_endpoint() const override { return m_remote_endpoint; }
     Endpoint const& local_endpoint() const override { return m_local_endpoint; }
     void transmit(Shared_payload tx_buffer) override;
+    void close() override;
 
     // interface towards socket
     Result::Code connect();
@@ -51,7 +50,8 @@ private:
     Result::Code initialise_socket();
     void transmit_trigger();
     void receive();
-    void close();
+    void change(Result::Code code);
+    void close_internal(Result::Code code);
 
     std::shared_ptr<::asio::io_context> m_io_context;
     std::shared_ptr<Protocol_socket> m_asio_socket;
@@ -86,12 +86,6 @@ inline Connection_impl<ProtocolDescriptionType>::Connection_impl(
     , m_tx_queue{}
 	, m_connection_handler{} // will be set later, this constructor is called in accept/listen case
 {
-}
-
-template<typename ProtocolDescriptionType>
-inline Connection_impl<ProtocolDescriptionType>::~Connection_impl()
-{
-    close();
 }
 
 template<typename ProtocolDescriptionType>
@@ -138,15 +132,16 @@ inline Result::Code Connection_impl<ProtocolDescriptionType>::connect()
                                        [weak_self](::asio::error_code const& error)
 	{
 		auto self = weak_self.lock();
-		if (self) 
+		if (self && self->m_connection_handler)
 		{
-			Result::Code const result =	(!error) ? Result::connection_ok : Result::connection_declined;
-			self->m_connection_handler(result, Shared_payload{});
-
-			if(!error)
-			{
-				self->receive();
-			}
+            if (!error) 
+            {
+                self->change(Result::Code::connection_ok);
+            }
+            else 
+            {
+                self->change(Result::Code::connection_declined);
+            }
 		}
 	});
 
@@ -159,47 +154,61 @@ inline void Connection_impl<ProtocolDescriptionType>::receive()
     m_asio_socket->async_receive(asio::null_buffers(), [weak_self = get_weak_self()](auto error, auto) 
 	{
         auto self = weak_self.lock();
-        if (self) 
+        if (self && self->m_connection_handler) 
 		{
-            if (!error) {
+            if (!error) 
+            {
                 // read length of received message;
                 auto const length = self->m_asio_socket->available();
 
-                if (length == 0) 
-				{
-					self->m_connection_handler(Result::connection_closed, Shared_payload{});
+                if (length == 0)
+                {
+                    self->change(Result::Code::connection_closed);
                     return;
                 }
 
-				Shared_payload receive_buffer = std::make_shared<std::vector<uint8_t>>(length);
+                Shared_payload receive_buffer = std::make_shared<std::vector<std::uint8_t>>(length);
                 receive_buffer->resize(length);
 
                 self->m_asio_socket->receive(asio::buffer(*receive_buffer, receive_buffer->size()), 0, error);
-                if (!error) 
-				{
-					self->m_connection_handler(Result::receive_ok, std::move(receive_buffer));
+                if (!error)
+                {
+                    self->m_connection_handler(Result::receive_ok, std::move(receive_buffer));
                     self->receive();
                 }
-                else 
-				{
+                else
+                {
                     // established connection fails for any other reason
-					self->m_connection_handler(Result::connection_aborted, Shared_payload{});
+                    self->change(Result::Code::connection_aborted);
                 }
             }
-            else if (error == asio::error::eof || error == asio::error::connection_reset) 
-			{
+            else if ((error == ::asio::error::eof) || (error == ::asio::error::connection_reset))
+            {
                 // established connection closed by remote
-				self->m_connection_handler(Result::connection_closed, Shared_payload{});
+                self->change(Result::Code::connection_closed);
             }
-            else 
-			{
+            else
+            {
                 // established connection fails for any other reason
-				self->m_connection_handler(Result::connection_aborted, Shared_payload{});
+                self->change(Result::Code::connection_aborted);
             }
         }
     });
 }
 
+template<typename ProtocolDescriptionType>
+inline void Connection_impl<ProtocolDescriptionType>::change(Result::Code code)
+{
+    if (code == Result::Code::connection_ok) 
+    {
+        m_connection_handler(code, Shared_payload{});
+        receive();
+    }
+    else 
+    {
+        close_internal(code);
+    }
+}
 
 template<typename ProtocolDescriptionType>
 inline void Connection_impl<ProtocolDescriptionType>::handle_accept(Connection::Handler connection_handler)
@@ -207,9 +216,7 @@ inline void Connection_impl<ProtocolDescriptionType>::handle_accept(Connection::
     assert(connection_handler);
     m_connection_handler = std::move(connection_handler);
     m_local_endpoint = Endpoint(m_asio_socket->local_endpoint());
-	m_connection_handler(Result::connection_ok, Shared_payload{});
-
-	receive();
+    change(Result::Code::connection_ok);
 }
 
 
@@ -250,11 +257,24 @@ void Connection_impl<ProtocolDescriptionType>::transmit_trigger()
 template<typename ProtocolDescriptionType>
 inline void Connection_impl<ProtocolDescriptionType>::close()
 {
-    if (this->m_asio_socket->is_open())
-	{
-        asio::error_code error;
-        this->m_asio_socket->shutdown(::asio::ip::tcp::socket::shutdown_both, error);
-        this->m_asio_socket->close(error);
+    close_internal(Result::Code::connection_closed);
+}
+
+template<typename ProtocolDescriptionType>
+inline void Connection_impl<ProtocolDescriptionType>::close_internal(Result::Code code)
+{
+    if (m_connection_handler) 
+    {
+        if (m_asio_socket->is_open()) 
+        {
+            ::asio::error_code error;
+            (void)m_asio_socket->shutdown(::asio::socket_base::shutdown_both, error);
+            (void)m_asio_socket->close(error);
+        }
+
+        auto const connection_handler = std::move(m_connection_handler);
+        m_connection_handler = nullptr;
+        connection_handler(code, Shared_payload{});
     }
 }
 
