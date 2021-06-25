@@ -1,5 +1,6 @@
 # NexusMiner
 
+Miner for Nexus Hash channel with FPGA. Pool (currently hashpool.com, pool.blackminer.com) or Solo mining
 
 
 ## Wallet Setup
@@ -19,9 +20,10 @@ Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet h
 
 ```
     <miner_config_file> Default=miner.conf
+    -c --check          run config file check before miner startup
 ```
 
-  ./NexusMiner ../../myownminer.conf
+  ./NexusMiner ../../myownminer.conf -c
 
 ## DEPENDENCIES
 
