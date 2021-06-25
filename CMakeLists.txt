@@ -45,13 +45,12 @@ if(WITH_GPU_CUDA)
     endif()
 endif()
 
-include_directories(src/include/)
-include_directories(src/hash/)
-
 # add submodules
 add_subdirectory(src/chrono)
 add_subdirectory(src/network)
+add_subdirectory(src/LLP)
 add_subdirectory(src/hash)
+add_subdirectory(src/worker)
 add_subdirectory(src/config)
 add_subdirectory(src/stats)
 add_subdirectory(src/protocol)
@@ -68,7 +67,7 @@ add_executable(NexusMiner
                 src/worker_manager.cpp 
                 src/timer_manager.cpp)
 
-target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga)
+target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker)
 if(WITH_GPU_CUDA)
     set_target_properties(NexusMiner PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     target_link_libraries(NexusMiner gpu)

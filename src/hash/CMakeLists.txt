@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.19)
 
-add_library(hash STATIC ${CMAKE_CURRENT_SOURCE_DIR}/nexus_keccak.cpp 
-                ${CMAKE_CURRENT_SOURCE_DIR}/nexus_skein.cpp)
+add_library(hash STATIC src/hash/nexus_keccak.cpp
+                        src/hash/nexus_skein.cpp)
                     
 target_include_directories(hash
     PUBLIC 
-        $<INSTALL_INTERFACE:.>    
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/.>
+        $<INSTALL_INTERFACE:inc>    
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+    PRIVATE src
 )
