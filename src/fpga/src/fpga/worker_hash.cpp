@@ -40,6 +40,13 @@ Worker_hash::~Worker_hash()
 	m_serial.close();
 }
 
+static uint64_t SwapBinary(std::uint64_t value) {
+    value = ((value & 0x00000000FFFFFFFFull) << 32) | ((value & 0xFFFFFFFF00000000ull) >> 32);
+    value = ((value & 0x0000FFFF0000FFFFull) << 16) | ((value & 0xFFFF0000FFFF0000ull) >> 16);
+    value = ((value & 0x00FF00FF00FF00FFull) << 8)  | ((value & 0xFF00FF00FF00FF00ull) >> 8);
+    return value;
+}
+
 void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
 	//send new block info to the device
@@ -75,12 +82,22 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 	//TODO: remove when wolf and I have the same interface
 	if (m_config.m_id == "wolf")
 	{
+		for(int i = 0; i < 10; ++i)
+		{
+			m2[i] = SwapBinary(m2[i]);
+		}
+		
+		for(int i = 0; i < 17; ++i)
+		{
+			key2[i] = SwapBinary(key2[i]);
+		}
+		
+		message2Str = m2.toHexString(true);
+		key2Str = key2.toHexString(true);
+		
 		message2Str.resize(80 * 2); //drop the nonce from the message.  keep the first 80 bytes.
 		workPackageStr = message2Str + key2Str;  //put the message first
 		fpgaWorkPackage = HexStringToBytes(workPackageStr);
-		//check the byte order.  if backwards use std::reverse
-		//std::reverse(fpgaWorkPackage.begin(), fpgaWorkPackage.end());
-
 	}
 
 	//send new work package over the serial port
