@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <vector>
+#include <cstdint>
 
 namespace nexusminer {
 namespace network {
