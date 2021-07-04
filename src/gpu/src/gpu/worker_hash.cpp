@@ -78,11 +78,11 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
     /* Get the target difficulty. */
     auto const nbits_cuda = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
     uint1024_t target;
-    target.SetCompact(block.nbits_cuda);
+    target.SetCompact(nbits_cuda);
     
-
+    uint64_t pt = target.Get64();
     // Set the target hash on this device for the difficulty.
-    cuda_sk1024_set_Target(target.get64(0));
+    cuda_sk1024_set_Target(&pt);
 
     //restart the mining loop
     m_stop = false;

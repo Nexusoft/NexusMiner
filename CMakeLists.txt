@@ -9,7 +9,7 @@ configure_file(src/version.h.in version.h)
 
 include_directories(${CMAKE_SOURCE_DIR}/include/)
 
-option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
+option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" ON)
 
 if(UNIX)
     add_definitions(-DUNIX)
