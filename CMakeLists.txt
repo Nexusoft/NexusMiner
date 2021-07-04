@@ -9,6 +9,14 @@ include_directories(${CMAKE_SOURCE_DIR}/include/)
 
 option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
 
+if(UNIX)
+    add_definitions(-DUNIX)
+endif()
+
+if(WIN32)
+    add_definitions(-D_WIN32_WINT=0x0601 -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 find_package(Threads REQUIRED)
 
 # OpenSSL
@@ -18,21 +26,6 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 #ASIO
 add_definitions(-DASIO_STANDALONE)
 include_directories(${CMAKE_SOURCE_DIR}/include/asio-1.18.1/include)
-
-if(UNIX)
-    add_definitions(-DUNIX)
-endif()
-
-if(WIN32)
-    add_definitions(-D_WIN32_WINT=0x0601 -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
-endif()
-
-if(MSVC)
-    # enable mt build
-    add_definitions(/MP)     
-    #enable C++ standard conformance       
-    add_definitions(/permissive-)
-endif()
 
 #GPU
 if(WITH_GPU_CUDA)
@@ -49,6 +42,7 @@ endif()
 add_subdirectory(src/chrono)
 add_subdirectory(src/network)
 add_subdirectory(src/LLP)
+add_subdirectory(src/LLC)
 add_subdirectory(src/hash)
 add_subdirectory(src/worker)
 add_subdirectory(src/config)
@@ -69,7 +63,6 @@ add_executable(NexusMiner
 
 target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker)
 if(WITH_GPU_CUDA)
-    set_target_properties(NexusMiner PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     target_link_libraries(NexusMiner gpu)
 endif()
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
