@@ -2,6 +2,9 @@
 #define NEXUSMINER_GPU_WORKER_HASH_HPP
 
 #include <memory>
+#include <atomic>
+#include <string>
+#include <thread>
 #include "worker.hpp"
 #include "LLC/types/uint1024.h"
 #include <spdlog/spdlog.h>
@@ -30,11 +33,16 @@ public:
 
 private:
 
+    void run();
+
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
     Worker_config& m_config;
     Worker::Block_found_handler m_found_nonce_callback;
+    std::atomic<bool> m_stop;
+    std::thread m_run_thread;
 
+    std::string m_log_leader;
     Block_data m_block;
     std::uint32_t m_pool_nbits;
     uint1024_t m_target;
