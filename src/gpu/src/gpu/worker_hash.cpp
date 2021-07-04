@@ -15,7 +15,9 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
 : m_io_context{std::move(io_context)}
 , m_logger{spdlog::get("logger")}
 , m_config{config}
-, threads_per_block{896}
+, m_found_nonce_callback{}
+, m_pool_nbits{0}
+, m_threads_per_block{896}
 {	
     // Initialize the cuda device associated with this ID
     cuda_init(m_config.m_internal_id);
@@ -24,11 +26,11 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
     cuda_sk1024_init(m_config.m_internal_id);
 
     // Compute the intensity by determining number of multiprocessors
-    intensity = 2 * cuda_device_multiprocessors(m_config.m_internal_id);
-    m_logger->debug("{} intensity set to {}", cuda_devicename(m_config.m_internal_id), intensity);
+    m_intensity = 2 * cuda_device_multiprocessors(m_config.m_internal_id);
+    m_logger->debug("{} intensity set to {}", cuda_devicename(m_config.m_internal_id), m_intensity);
 
     // Calcluate the throughput for the cuda hash mining
-    throughput = 256 * threads_per_block * intensity;
+    m_throughput = 256 * m_threads_per_block * m_intensity;
 }
 
 Worker_hash::~Worker_hash() 
@@ -42,6 +44,25 @@ Worker_hash::~Worker_hash()
 
 void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
+    m_found_nonce_callback = result;
+    m_block = Block_data{block};
+    if (nbits != 0)
+    {
+        // take nbits provided by pool
+        m_pool_nbits = nbits;
+    }
+
+    // Set the block for this device
+    cuda_sk1024_setBlock(&m_block.nVersion, m_block.nHeight);
+
+    /* Get the target difficulty. */
+    //CBigNum target;
+   // target.SetCompact(block.nBits);
+  //  m_target = target.getuint1024();
+    auto const nbits_cuda = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
+
+    // Set the target hash on this device for the difficulty.
+    cuda_sk1024_set_Target((uint64_t*)nbits_cuda);
 }
 
 

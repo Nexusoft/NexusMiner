@@ -33,12 +33,15 @@ private:
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
     Worker_config& m_config;
+    Worker::Block_found_handler m_found_nonce_callback;
 
-    uint1024_t target;
-    std::uint64_t hashes;
-    std::uint32_t intensity;
-    std::uint32_t throughput;
-    std::uint32_t threads_per_block;
+    Block_data m_block;
+    std::uint32_t m_pool_nbits;
+    uint1024_t m_target;
+    std::uint64_t m_hashes;
+    std::uint32_t m_intensity;
+    std::uint32_t m_throughput;
+    std::uint32_t m_threads_per_block;
 
 };
 }
