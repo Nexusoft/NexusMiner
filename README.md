@@ -21,6 +21,7 @@ Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet h
 ```
     <miner_config_file> Default=miner.conf
     -c --check          run config file check before miner startup
+    -v --version        Show NexusMiner version
 ```
 
   ./NexusMiner ../../myownminer.conf -c

@@ -1,5 +1,6 @@
 #include <string>
 #include <iostream>
+#include "version.h"
 #include "miner.hpp"
 
 void show_usage(std::string const& name)
@@ -7,7 +8,8 @@ void show_usage(std::string const& name)
     std::cerr << "Usage: " << name << " <option(s)> CONFIG_FILE"
               << "Options:\n"
               << "\t-h,--help\tShow this help message\n"
-              << "\t-c,--check\tCheck for valid miner config file"
+              << "\t-c,--check\tCheck for valid miner config file\n"
+              << "\t-v,--version\tVersion of NexusMiner"
               << std::endl;
 }
 
@@ -28,6 +30,11 @@ int main(int argc, char **argv)
         else if ((arg == "-c") || (arg == "--check")) 
         {
             run_check = true;
+        }
+        else if ((arg == "-v") || (arg == "--version"))
+        {
+            std::cout << "NexusMiner version: " << NexusMiner_VERSION_MAJOR << "."
+                << NexusMiner_VERSION_MINOR << std::endl;
         }
         else 
         {

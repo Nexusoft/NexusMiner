@@ -1,0 +1,2 @@
+#define NexusMiner_VERSION_MAJOR @NexusMiner_VERSION_MAJOR@
+#define NexusMiner_VERSION_MINOR @NexusMiner_VERSION_MINOR@
