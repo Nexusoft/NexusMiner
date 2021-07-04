@@ -1,6 +1,9 @@
 #include "worker_manager.hpp"
 #include "cpu/worker_hash.hpp"
 #include "fpga/worker_hash.hpp"
+#ifdef GPU_ENABLED
+#include "gpu/worker_hash.hpp"
+#endif
 #include "packet.hpp"
 #include "config/config.hpp"
 #include "config/types.hpp"
@@ -92,6 +95,9 @@ void Worker_manager::create_workers()
             }
             case config::Worker_mode::GPU:
             {
+#ifdef GPU_ENABLED
+                m_workers.push_back(std::make_shared<gpu::Worker_hash>(m_io_context, worker_config));
+#endif
                 break;
             }
             case config::Worker_mode::CPU:    // falltrough
