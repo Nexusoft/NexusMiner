@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <functional>
-#include "hash/uint1024.h"
+#include "LLC/types/uint1024.h"
 #include "block.hpp"
 #include "hash/byte_utils.hpp"
 
@@ -53,8 +53,8 @@ public:
 
 	}
 
-	uint512 merkle_root;
-    uint1024 previous_hash;
+	uint512_t merkle_root;
+    uint1024_t previous_hash;
 	uint32_t nHeight = 2023276;
 	uint32_t nVersion = 4;
 	uint32_t nChannel = 2;

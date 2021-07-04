@@ -1,8 +1,7 @@
 #ifndef NEXUS_LLP_BLOCK_H
 #define NEXUS_LLP_BLOCK_H
 
-#include "hash/uint1024.h"
-//#include "../hash/templates.h"
+#include "LLC/types/uint1024.h"
 #include <memory>
 
 #define BEGIN(a)            ((char*)&(a))
@@ -19,12 +18,12 @@ public:
 
 	/** Begin of Header.   BEGIN(nVersion) **/
 	unsigned int  nVersion;
-	uint1024 hashPrevBlock;
-	uint512 hashMerkleRoot;
+	uint1024_t hashPrevBlock;
+	uint512_t hashMerkleRoot;
 	unsigned int  nChannel;
 	unsigned int   nHeight;
 	unsigned int     nBits;
-	uint64          nNonce;
+	std::uint64_t      nNonce;
 	/** End of Header.     END(nNonce).
 		All the components to build an SK1024 Block Hash. **/
 

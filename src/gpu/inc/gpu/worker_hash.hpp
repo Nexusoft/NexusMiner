@@ -3,6 +3,7 @@
 
 #include <memory>
 #include "worker.hpp"
+#include "LLC/types/uint1024.h"
 #include <spdlog/spdlog.h>
 
 namespace asio { class io_context; }
@@ -28,6 +29,16 @@ public:
     void update_statistics(stats::Collector& stats_collector) override;
 
 private:
+
+    std::shared_ptr<asio::io_context> m_io_context;
+    std::shared_ptr<spdlog::logger> m_logger;
+    Worker_config& m_config;
+
+    uint1024_t target;
+    std::uint64_t hashes;
+    std::uint32_t intensity;
+    std::uint32_t throughput;
+    std::uint32_t threads_per_block;
 
 };
 }
