@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <iomanip>
+#include <iostream>
 
 #define ROL64(x, n) (((x) << (n)) | ((x) >> (64 - (n))))
 
@@ -786,9 +787,9 @@ extern bool cuda_sk1024_hash(
 		}
 		else
 		{
-		//	debug::error("GPU #", thr_id, ": result for nonce ", foundNonce, " does not validate on CPU!");
+			std::cout << "GPU # " << thr_id << ": result for nonce " <<  foundNonce << " does not validate on CPU!" << std::endl;
 
-			//debug::log(0, std::hex, std::setw(16), std::setfill('0'), keccak[15], " > ", std::setw(16), std::setfill('0'), Htarg);
+			std::cout << std::hex << std::setw(16) << std::setfill('0') << keccak[15] << " > " << std::setw(16) << std::setfill('0') << Htarg << std::endl;
 		}
 
 

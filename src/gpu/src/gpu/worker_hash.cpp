@@ -7,6 +7,7 @@
 #include "cuda/sk1024.h"
 #include "LLC/hash/SK.h"
 #include "LLC/types/uint1024.h"
+#include "LLC/types/bignum.h"
 
 namespace nexusminer
 {
@@ -77,12 +78,14 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 
     /* Get the target difficulty. */
     auto const nbits_cuda = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
-    uint1024_t target;
+
+    /* Get the target difficulty. */
+    LLC::CBigNum target;
     target.SetCompact(nbits_cuda);
-    
-    uint64_t pt = target.Get64();
+    m_target = target.getuint1024();
+
     // Set the target hash on this device for the difficulty.
-    cuda_sk1024_set_Target(&pt);
+    cuda_sk1024_set_Target((uint64_t*)m_target.begin());
 
     //restart the mining loop
     m_stop = false;
