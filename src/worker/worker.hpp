@@ -52,12 +52,12 @@ public:
 		return headerB;
 
 	}
-
-	uint512_t merkle_root;
-    uint1024_t previous_hash;
-	uint32_t nHeight = 2023276;
+	//The order of the block header data below matters for the cuda miner.  Be careful.
 	uint32_t nVersion = 4;
+    uint1024_t previous_hash;
+	uint512_t merkle_root;
 	uint32_t nChannel = 2;
+	uint32_t nHeight = 2023276;
 	uint32_t nBits = 0x7b032ed8;
 	uint64_t nNonce = 21155560019;
 
