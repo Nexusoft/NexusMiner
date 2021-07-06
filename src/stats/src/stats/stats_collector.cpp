@@ -7,12 +7,9 @@ namespace nexusminer
 namespace stats
 {
 
-Collector::Collector(Config& config)
+Collector::Collector(config::Config& config)
 : m_config{config}
 , m_start_time{std::chrono::steady_clock::now()}
-, m_accepted_blocks{0}
-, m_rejected_blocks{0}
-, m_connection_retries{0}
 {
     for(auto& worker_config : m_config.get_worker_config())
     {
@@ -25,6 +22,11 @@ Collector::Collector(Config& config)
             m_workers.push_back(Prime{});
         }
     }
+}
+
+void Collector::update_global_stats(Global const& stats)
+{
+    m_global_stats += stats;
 }
 
 void Collector::update_worker_stats(std::uint16_t internal_worker_id, Hash const& stats)

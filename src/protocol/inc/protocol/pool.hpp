@@ -7,13 +7,14 @@
 
 namespace nexusminer {
 namespace network { class Connection; }
+namespace stats { class Collector; }
 namespace protocol
 {
 
 class Pool : public Protocol {
 public:
 
-	Pool();
+	Pool(std::shared_ptr<stats::Collector> stats_collector);
 
     void reset() override;
     network::Shared_payload login(std::string const& account_name, Login_handler handler) override;
@@ -33,6 +34,7 @@ private:
     Set_block_handler m_set_block_handler;
     Login_handler m_login_handler;
     std::uint32_t m_current_height;
+    std::shared_ptr<stats::Collector> m_stats_collector;
 };
 
 }

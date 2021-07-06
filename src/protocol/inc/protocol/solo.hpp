@@ -6,13 +6,14 @@
 
 namespace nexusminer {
 namespace network { class Connection; }
+namespace stats { class Collector; }
 namespace protocol
 {
 
 class Solo : public Protocol {
 public:
 
-    Solo(std::uint8_t channel);
+    Solo(std::uint8_t channel, std::shared_ptr<stats::Collector> stats_collector);
 
     void reset() override;
     network::Shared_payload login(std::string const& account_name, Login_handler handler) override;
@@ -29,6 +30,7 @@ private:
     std::shared_ptr<spdlog::logger> m_logger;
     std::uint32_t m_current_height;
     Set_block_handler m_set_block_handler;
+    std::shared_ptr<stats::Collector> m_stats_collector;
 };
 
 }

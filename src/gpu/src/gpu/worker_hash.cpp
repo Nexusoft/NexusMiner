@@ -140,8 +140,7 @@ void Worker_hash::run()
 
 void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
-  //  stats_collector.update_worker_stats(m_config.m_internal_id,
-   //     stats::Hash{ m_hashes, m_best_leading_zeros, m_met_difficulty_count });
+    stats_collector.update_worker_stats(m_config.m_internal_id, stats::Hash{ m_hashes, m_best_leading_zeros, m_met_difficulty_count });
 }
 
 }

@@ -1,17 +1,19 @@
 #include "protocol/solo.hpp"
 #include "packet.hpp"
 #include "network/connection.hpp"
+#include "stats/stats_collector.hpp"
 
 namespace nexusminer
 {
 namespace protocol
 {
 
-Solo::Solo(std::uint8_t channel)
+Solo::Solo(std::uint8_t channel, std::shared_ptr<stats::Collector> stats_collector)
 : m_channel{channel}
 , m_logger{spdlog::get("logger")}
 , m_current_height{0}
 , m_set_block_handler{}
+, m_stats_collector{std::move(stats_collector)}
 {
 }
 
@@ -92,18 +94,22 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     }
     else if(packet.m_header == Packet::ACCEPT)
     {
+        stats::Global global_stats{};
+        global_stats.m_accepted_blocks = 1;
+        m_stats_collector->update_global_stats(global_stats);
         m_logger->info("Block Accepted By Nexus Network.");
-       //m_stats_collector->block_accepted();
     }
     else if(packet.m_header == Packet::REJECT)
     {
+        stats::Global global_stats{};
+        global_stats.m_rejected_blocks = 1;
+        m_stats_collector->update_global_stats(global_stats);
         m_logger->warn("Block Rejected by Nexus Network.");
         connection->transmit(get_work());
-      //  m_stats_collector->block_rejected();
     }
     else
     {
-        m_logger->error("Invalid header received.");
+        m_logger->debug("Invalid header received.");
     } 
 }
 

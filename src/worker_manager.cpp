@@ -28,11 +28,11 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 {
     if(m_config.get_use_bool())
     {
-        m_miner_protocol = std::make_shared<protocol::Pool>();
+        m_miner_protocol = std::make_shared<protocol::Pool>(m_stats_collector);
     }
     else
     {
-      m_miner_protocol = std::make_shared<protocol::Solo>(m_config.get_mining_mode() == config::Mining_mode::PRIME ? 1U : 2U); 
+      m_miner_protocol = std::make_shared<protocol::Solo>(m_config.get_mining_mode() == config::Mining_mode::PRIME ? 1U : 2U, m_stats_collector);
     } 
   
     create_stats_printers();
@@ -53,10 +53,17 @@ void Worker_manager::create_stats_printers()
                 {
                     printer_file_created = true;
                     auto& stats_printer_config_file = std::get<config::Stats_printer_config_file>(stats_printer_config.m_printer_mode);
-                    m_stats_printers.push_back(std::make_shared<stats::Printer_file>(stats_printer_config_file.file_name, 
-                        m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
+                    if (m_config.get_use_bool())
+                    {
+                        m_stats_printers.push_back(std::make_shared<stats::Printer_file<stats::Printer_pool>>(stats_printer_config_file.file_name,
+                            m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
+                    }
+                    else
+                    {
+                        m_stats_printers.push_back(std::make_shared<stats::Printer_file<stats::Printer_solo>>(stats_printer_config_file.file_name,
+                            m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
+                    }
                 }
-
                 break;
             }
             case config::Stats_printer_mode::CONSOLE:    // falltrough
@@ -65,8 +72,17 @@ void Worker_manager::create_stats_printers()
                 if(!printer_console_created)
                 {
                     printer_console_created = true;
-                    m_stats_printers.push_back(std::make_shared<stats::Printer_console>(m_config.get_mining_mode(), 
-                        m_config.get_worker_config(), *m_stats_collector));
+                    if (m_config.get_use_bool())
+                    {
+                        m_stats_printers.push_back(std::make_shared<stats::Printer_console<stats::Printer_pool>>(m_config.get_mining_mode(),
+                            m_config.get_worker_config(), *m_stats_collector));
+                    }
+                    else
+                    {
+                        m_stats_printers.push_back(std::make_shared<stats::Printer_console<stats::Printer_solo>>(m_config.get_mining_mode(),
+                            m_config.get_worker_config(), *m_stats_collector));
+                    }
+
                 }
 
                 break;
@@ -129,7 +145,9 @@ void Worker_manager::retry_connect(network::Endpoint const& wallet_endpoint)
 {           
     m_connection = nullptr;		// close connection (socket etc)
     m_miner_protocol->reset();
-    m_stats_collector->connection_retry_attempt();
+    stats::Global global_stats{};
+    global_stats.m_connection_retries = 1;
+    m_stats_collector->update_global_stats(global_stats);
 
     // retry connect
     auto const connection_retry_interval = m_config.get_connection_retry_interval();
@@ -214,8 +232,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
     Packet packet{ std::move(receive_buffer) };
     if (!packet.is_valid())
     {
-        // log invalid packet
-        m_logger->error("Received packet is invalid. Header: {0}", packet.m_header);
+        m_logger->debug("Received packet is invalid. Header: {0}", packet.m_header);
         return;
     }
 

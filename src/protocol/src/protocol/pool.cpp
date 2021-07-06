@@ -1,17 +1,19 @@
 #include "protocol/pool.hpp"
 #include "packet.hpp"
 #include "network/connection.hpp"
+#include "stats/stats_collector.hpp"
 
 namespace nexusminer
 {
 namespace protocol
 {
 
-Pool::Pool()
+Pool::Pool(std::shared_ptr<stats::Collector> stats_collector)
 : m_logger{spdlog::get("logger")}
 , m_set_block_handler{}
 , m_login_handler{}
 , m_current_height{0}
+, m_stats_collector{ std::move(stats_collector) }
 {
 }
 
@@ -97,13 +99,17 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     }
     else if(packet.m_header == Packet::ACCEPT)
     {
+        stats::Global global_stats{};
+        global_stats.m_accepted_shares = 1;
+        m_stats_collector->update_global_stats(global_stats);
         m_logger->info("Share Accepted By Pool.");
-       //m_stats_collector->block_accepted();
     }
     else if(packet.m_header == Packet::REJECT)
     {
+        stats::Global global_stats{};
+        global_stats.m_rejected_shares = 1;
+        m_stats_collector->update_global_stats(global_stats);
         m_logger->warn("Share Rejected by Pool.");
-      //  m_stats_collector->block_rejected();
     }
 }
 

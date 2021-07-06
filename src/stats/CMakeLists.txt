@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 
-add_library(stats STATIC "src/stats/stats_collector.cpp"
-                         "src/stats/stats_printer_console.cpp"
-                         "src/stats/stats_printer_file.cpp")
+add_library(stats STATIC src/stats/stats_collector.cpp)
                     
 target_include_directories(stats
     PUBLIC 
