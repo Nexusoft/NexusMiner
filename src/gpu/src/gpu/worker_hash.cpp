@@ -23,6 +23,8 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
 , m_log_leader{ "GPU Worker " + m_config.m_id + ": " }
 , m_pool_nbits{0}
 , m_threads_per_block{896}
+, m_best_leading_zeros{0}
+, m_met_difficulty_count{0}
 {	
     // Initialize the cuda device associated with this ID
     cuda_init(m_config.m_internal_id);
@@ -96,7 +98,7 @@ void Worker_hash::run()
 {
     while (!m_stop)
     {
-        m_hashes = 0;
+        std::uint64_t hashes = 0;
 
         // Do hashing on a CUDA device
         bool found = cuda_sk1024_hash(
@@ -104,7 +106,7 @@ void Worker_hash::run()
             reinterpret_cast<uint32_t*>(&m_block.nVersion),
             m_target,
             m_block.nNonce,
-            &m_hashes,
+            &hashes,
             m_throughput,
             m_threads_per_block,
             m_block.nHeight);
@@ -112,10 +114,15 @@ void Worker_hash::run()
         /* If a nonce with the right diffulty was found, return true and submit block. */
         if (found && !m_stop.load())
         {
-            /* Calculate the number of leading zero-bits and display. */
-            uint1024_t hashProof = LLC::SK1024(BEGIN(m_block.nVersion), END(m_block.nNonce));
-            uint32_t nBits = hashProof.BitCount();
-            uint32_t nLeadingZeroes = 1024 - nBits;
+            ++m_met_difficulty_count;
+            m_hashes += hashes;
+            // Calculate the number of leading zero-bits
+            uint1024_t hash_proof = LLC::SK1024(BEGIN(m_block.nVersion), END(m_block.nNonce));
+            std::uint32_t leading_zeros = 1024 - hash_proof.BitCount();
+            if (leading_zeros > m_best_leading_zeros)
+            {
+                m_best_leading_zeros = leading_zeros;
+            }
            // debug::log(0, "[MASTER] Found Hash Block ");
            // block.print();
 
@@ -141,6 +148,7 @@ void Worker_hash::run()
 void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
     stats_collector.update_worker_stats(m_config.m_internal_id, stats::Hash{ m_hashes, m_best_leading_zeros, m_met_difficulty_count });
+    m_hashes = 0;
 }
 
 }

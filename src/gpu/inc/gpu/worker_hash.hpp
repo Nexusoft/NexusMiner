@@ -50,6 +50,8 @@ private:
     std::uint32_t m_intensity;
     std::uint32_t m_throughput;
     std::uint32_t m_threads_per_block;
+    int m_best_leading_zeros;
+    int m_met_difficulty_count;
 
 };
 }
