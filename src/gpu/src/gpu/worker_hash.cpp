@@ -139,7 +139,7 @@ void Worker_hash::run()
                 m_logger->debug(m_log_leader + "Miner callback function not set.");
             }
 
-          //  m_stop = true;
+            m_stop = true;
         }
 
     }
