@@ -70,7 +70,7 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 	//calculate midstate
 	m_skein.setMessage(headerB);
 	//assemble the work package
-	NexusSkein::stateType BlkHdrTail = m_skein.getMessage2();
+	NexusSkein::stateType m2 = m_skein.getMessage2();
 	NexusSkein::keyType key2 = m_skein.getKey2();
 	std::vector<unsigned char> BlkHdrTail = m2.toBytes();
 	BlkHdrTail.resize(88);
