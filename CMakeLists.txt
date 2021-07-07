@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 project(NexusMiner VERSION 1.0 LANGUAGES CXX)
 
@@ -9,7 +10,8 @@ configure_file(src/version.h.in version.h)
 
 include_directories(${CMAKE_SOURCE_DIR}/include/)
 
-option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" ON)
+option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
+option(WITH_PRIME "Build with PRIME mining support, GMP needed" OFF)
 
 if(UNIX)
     add_definitions(-DUNIX)
@@ -41,6 +43,12 @@ if(WITH_GPU_CUDA)
     endif()
 endif()
 
+#PRIME
+if(WITH_PRIME)
+    find_package(GMP REQUIRED)
+endif()
+
+
 # add submodules
 add_subdirectory(src/chrono)
 add_subdirectory(src/network)
@@ -69,5 +77,11 @@ target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga L
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()
+if(WITH_PRIME)
+    target_link_libraries(NexusMiner gmp libgmp)
+endif()
+
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)
+
+
