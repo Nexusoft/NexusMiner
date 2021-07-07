@@ -70,43 +70,16 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 	//calculate midstate
 	m_skein.setMessage(headerB);
 	//assemble the work package
-	NexusSkein::stateType m2 = m_skein.getMessage2();
+	NexusSkein::stateType BlkHdrTail = m_skein.getMessage2();
 	NexusSkein::keyType key2 = m_skein.getKey2();
-	std::vector<unsigned char> m2_bytes = m2.toBytes();
-	m2_bytes.resize(88); //crop to first 88 bytes
-	std::vector<unsigned char> key2_bytes = key2.toBytes();
+	std::vector<unsigned char> BlkHdrTail = m2.toBytes();
+	BlkHdrTail.resize(88);
+	std::vector<unsigned char> Midstate = key2.toBytes();
 
-	//std::cout << "Key 2" << std::endl << key2.toHexString() << std::endl;
-	//std::string key2Str = key2.toHexString(true);
-	//std::string message2Str = m2.toHexString(true);
-	//message2Str.resize(88 * 2);  //crop to first 88 bytes
-	//std::string workPackageStr = key2Str + message2Str;
-	//std::vector<unsigned char> fpgaWorkPackage = HexStringToBytes(workPackageStr);
-	std::vector<unsigned char> fpgaWorkPackage = key2_bytes;
-	fpgaWorkPackage.insert(fpgaWorkPackage.end(), m2_bytes.begin(), m2_bytes.end());
-
-	//TODO: remove when wolf and I have the same interface
-	if (m_config.m_id == "wolf")
-	{
-		
-		for(int i = 0; i < 10; ++i)
-		{
-			m2[i] = SwapBinary(m2[i]);
-		}
-		
-
-		for(int i = 0; i < 17; ++i)
-		{
-			key2[i] = SwapBinary(key2[i]);
-		}
-		
-		std::string message2Str = m2.toHexString(true);
-		std::string key2Str = key2.toHexString(true);
-		
-		message2Str.resize(80 * 2); //drop the nonce from the message.  keep the first 80 bytes.
-		std::string workPackageStr = message2Str + key2Str;  //put the message first
-		fpgaWorkPackage = HexStringToBytes(workPackageStr);
-	}
+	// Place into vector - first the key (or midstate), then the rest
+	// of the block header (block header tail.)
+	std::vector<unsigned char> fpgaWorkPackage = Midstate;
+	fpgaWorkPackage.insert(fpgaWorkPackage.end(), BlkHdrTail.begin(), BlkHdrTail.end());
 
 	//send new work package over the serial port
 	if (m_serial.is_open())
@@ -135,17 +108,10 @@ void Worker_hash::handle_read(const asio::error_code& error_code, std::size_t by
 {
 	if (!error_code && bytes_transferred == m_receive_nonce_buffer.size())
 	{
-		//std::reverse(m_receive_nonce_buffer.begin(), m_receive_nonce_buffer.end());  //nonce byte order is sent big endian over the serial port
-		//TODO: delete wolf mode
-		if (m_config.m_id == "wolf")
-		{
-			//wolf byte order may be reversed for the nonces.  
-			//std::reverse(m_receive_nonce_buffer.begin(), m_receive_nonce_buffer.end());  //nonce byte order is sent big endian over the serial port
-		}
-			uint64_t nonce = bytesToInt<uint64_t>(m_receive_nonce_buffer);
+		uint64_t nonce = bytesToInt<uint64_t>(m_receive_nonce_buffer);
 		if (m_starting_nonce - nonce == 1)
 		{
-			//the fpga will respond with starting nonce - 1 to acknowledge receipt of the work package.
+			//the fpga MAY respond with starting nonce - 1 to acknowledge receipt of the work package.
 			m_logger->info(m_log_leader + "New block receipt acknowledged by FPGA.");
 		}
 		else
