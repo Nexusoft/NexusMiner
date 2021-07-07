@@ -111,11 +111,12 @@ void Worker_hash::run()
             m_threads_per_block,
             m_block.nHeight);
 
-        /* If a nonce with the right diffulty was found, return true and submit block. */
+        m_hashes += hashes;
+
+        // If a nonce with the right diffulty was found submit block.
         if (found && !m_stop.load())
         {
             ++m_met_difficulty_count;
-            m_hashes += hashes;
             // Calculate the number of leading zero-bits
             uint1024_t hash_proof = LLC::SK1024(BEGIN(m_block.nVersion), END(m_block.nNonce));
             std::uint32_t leading_zeros = 1024 - hash_proof.BitCount();
@@ -138,7 +139,7 @@ void Worker_hash::run()
                 m_logger->debug(m_log_leader + "Miner callback function not set.");
             }
 
-            m_stop = true;
+          //  m_stop = true;
         }
 
     }
@@ -147,7 +148,12 @@ void Worker_hash::run()
 
 void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
-    stats_collector.update_worker_stats(m_config.m_internal_id, stats::Hash{ m_hashes, m_best_leading_zeros, m_met_difficulty_count });
+    auto hash_stats = std::get<stats::Hash>(stats_collector.get_worker_stats(m_config.m_internal_id));
+    hash_stats.m_hash_count += m_hashes;
+    hash_stats.m_best_leading_zeros = m_best_leading_zeros;
+    hash_stats.m_met_difficulty_count = m_met_difficulty_count;
+
+    stats_collector.update_worker_stats(m_config.m_internal_id, hash_stats);
     m_hashes = 0;
 }
 

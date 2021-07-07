@@ -23,6 +23,7 @@ public:
     void update_worker_stats(std::uint16_t internal_worker_id, Prime const& stats);
     // copy of workers stats
     std::vector<std::variant<Hash, Prime>> get_workers_stats() const { return m_workers; }
+    std::variant<Hash, Prime> get_worker_stats(std::uint32_t internal_worker_id) { return m_workers[internal_worker_id]; }
     std::chrono::duration<double> get_elapsed_time_seconds() const { return 
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - m_start_time); }
 

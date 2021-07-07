@@ -36,7 +36,7 @@ void Collector::update_worker_stats(std::uint16_t internal_worker_id, Hash const
     std::scoped_lock lock(m_worker_mutex);
 
     auto& hash_stats = std::get<Hash>(m_workers[internal_worker_id]);
-    hash_stats += stats;
+    hash_stats = stats;
 }
 
 void Collector::update_worker_stats(std::uint16_t internal_worker_id, Prime const& stats)

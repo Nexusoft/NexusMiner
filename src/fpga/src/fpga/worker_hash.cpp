@@ -199,8 +199,13 @@ void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
-	stats_collector.update_worker_stats(m_config.m_internal_id, 
-		stats::Hash{m_nonce_candidates_recieved * nonce_difficulty_filter, m_best_leading_zeros, m_met_difficulty_count, m_nonce_candidates_recieved });
+	auto hash_stats = std::get<stats::Hash>(stats_collector.get_worker_stats(m_config.m_internal_id));
+	hash_stats.m_hash_count += m_nonce_candidates_recieved * nonce_difficulty_filter;
+	hash_stats.m_best_leading_zeros = m_best_leading_zeros;
+	hash_stats.m_met_difficulty_count = m_met_difficulty_count;
+	hash_stats.m_nonce_candidates_recieved = m_nonce_candidates_recieved;
+
+	stats_collector.update_worker_stats(m_config.m_internal_id, hash_stats);
 }
 
 bool Worker_hash::difficulty_check()
