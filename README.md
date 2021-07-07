@@ -1,11 +1,11 @@
 # NexusMiner
 
-Miner for Nexus Hash channel with FPGA. Pool (currently hashpool.com, pool.blackminer.com) or Solo mining
+Miner for Nexus Hash channel with FPGA and (optional) CUDA GPU. Pool (currently hashpool.com, pool.blackminer.com) or Solo mining
 
 
 ## Wallet Setup
 
-Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet has been unlocked for mining.
+Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet has been unlocked for mining.
 
 ```
     -llpallowip=<ip-port>   ex: -llpallowip=192.168.0.1:9325 
@@ -26,16 +26,18 @@ Ensure you are on latest wallet daemon release 3.0.x or greater. Ensure wallet h
 
   ./NexusMiner ../../myownminer.conf -c
 
-## DEPENDENCIES
+## BUILDING
 
-### General
+Optional cmake build options are
+* WITH_GPU_CUDA       to enable HASH channel gpu mining. CUDA Toolkit required
+* WITH_PRIME          to enable PRIME channel mining. GMP required
 
+### Windows
 
-### Windows (Not yet supported)
-
-* MPIR: Windows GMP equivalent
+* GMP(required for WITH_PRIME):
+* OpenSSL: 
 
 ### Ubuntu/Debian
 
-* GMP:          sudo apt-get install libgmp3-dev
-* OpenSSL:      sudo apt-get install libssl-dev
+* GMP(required for WITH_PRIME):     sudo apt-get install libgmp3-dev
+* OpenSSL:                          sudo apt-get install libssl-dev

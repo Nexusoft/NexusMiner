@@ -78,7 +78,7 @@ if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()
 if(WITH_PRIME)
-    target_link_libraries(NexusMiner gmp libgmp)
+    target_link_libraries(NexusMiner gmp gmpxx)
 endif()
 
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
