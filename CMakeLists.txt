@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
+set(CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/libs")
+
 project(NexusMiner VERSION 1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -8,7 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 configure_file(src/version.h.in version.h)
 
-include_directories(${CMAKE_SOURCE_DIR}/include/)
+include_directories(${CMAKE_SOURCE_DIR}/include)
+link_directories(${CMAKE_SOURCE_DIR}/libs)
 
 option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
 option(WITH_PRIME "Build with PRIME mining support, GMP needed" OFF)
