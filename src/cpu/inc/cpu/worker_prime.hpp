@@ -50,9 +50,9 @@ private:
     std::string m_log_leader;
 
     void reset_statistics();
-    std::uint64_t m_hash_count;
-    int m_best_leading_zeros;
-    int m_met_difficulty_count;
+    std::uint32_t m_primes{ 0 };
+    std::uint32_t m_chains{ 0 };
+    std::uint32_t m_difficulty{ 0 };
 
     std::uint32_t m_pool_nbits;
 

@@ -66,6 +66,11 @@ inline void Printer_file<PrinterType>::print()
         }
         else
         {
+            auto& prime_stats = std::get<Prime>(worker);
+
+            ss << (prime_stats.m_primes / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " PPS ";
+            ss << (prime_stats.m_chains / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " CPS ";
+            ss << " Difficulty " << prime_stats.m_difficulty / 10000000.0;
 
         }
         worker_config_index++;

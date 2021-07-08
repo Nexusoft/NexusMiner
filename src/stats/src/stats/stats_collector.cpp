@@ -46,7 +46,7 @@ void Collector::update_worker_stats(std::uint16_t internal_worker_id, Prime cons
     std::scoped_lock lock(m_worker_mutex);
     
     auto& prime_stats = std::get<Prime>(m_workers[internal_worker_id]);
-    prime_stats += stats;
+    prime_stats = stats;
 }
 
 }

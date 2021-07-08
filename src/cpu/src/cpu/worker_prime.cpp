@@ -15,9 +15,9 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_config{ config }
 	, m_stop{ true }
 	, m_log_leader{ "CPU Worker " + m_config.m_id + ": " }
-	, m_hash_count{ 0 }
-	, m_best_leading_zeros{ 0 }
-	, m_met_difficulty_count{ 0 }
+	, m_primes{ 0 }
+	, m_chains{ 0 }
+	, m_difficulty{ 0 }
 	, m_pool_nbits{ 0 }
 {
 
@@ -44,6 +44,12 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 		std::scoped_lock<std::mutex> lck(m_mtx);
 		m_found_nonce_callback = result;
 		m_block = Block_data{ block };
+		if (nbits != 0)	// take nBits provided from pool
+		{
+			m_pool_nbits = nbits;
+		}
+
+		m_difficulty = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
 
 	}
 	//restart the mining loop
@@ -61,9 +67,15 @@ void Worker_prime::run()
 
 void Worker_prime::update_statistics(stats::Collector& stats_collector)
 {
-	std::scoped_lock<std::mutex> lck(m_mtx);
+	auto prime_stats = std::get<stats::Prime>(stats_collector.get_worker_stats(m_config.m_internal_id));
+	prime_stats.m_primes = m_primes;
+	prime_stats.m_chains = m_chains;
+	prime_stats.m_difficulty = m_difficulty;
 
+	stats_collector.update_worker_stats(m_config.m_internal_id, prime_stats);
 
+	m_primes = 0;
+	m_chains = 0;
 }
 
 

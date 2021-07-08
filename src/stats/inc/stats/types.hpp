@@ -61,6 +61,10 @@ struct Hash
 
 struct Prime
 {
+    std::uint32_t m_primes{ 0 };
+    std::uint32_t m_chains{ 0 };
+    std::uint32_t m_difficulty{ 0 };
+
     Prime& operator+=(Prime const& other)
     {
         return *this;
