@@ -80,9 +80,6 @@ target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga L
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()
-if(WITH_PRIME)
-    target_link_libraries(NexusMiner gmp gmpxx)
-endif()
 
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)
