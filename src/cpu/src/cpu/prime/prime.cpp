@@ -221,7 +221,8 @@ unsigned int Prime::GetFractionalDifficulty(LLC::CBigNum composite)
 /** bit_array_sieve of Eratosthenes for Divisor Tests. Used for Searching Primes. **/
 std::vector<unsigned int> Prime::Eratosthenes(int nSieveSize)
 {
-	bool TABLE[nSieveSize];
+	//bool TABLE[nSieveSize];  //msvc compiler doesn't like this, but this entire function seems unused.  the next line is bs.
+	bool TABLE[10];  
 
 	for (int nIndex = 0; nIndex < nSieveSize; nIndex++)
 		TABLE[nIndex] = false;
@@ -272,13 +273,13 @@ bool Prime::PrimeCheck(LLC::CBigNum test, int checks)
 	a = Base or 2... 2 + checks, n is the Prime Test. Used after Miller-Rabin and Divisor tests to verify primality. **/
 LLC::CBigNum Prime::FermatTest(LLC::CBigNum n, LLC::CBigNum a)
 {
-	//CAutoBN_CTX pctx;
-	//CBigNum e = n - 1;
-	//CBigNum r;
-	//BN_mod_exp(&r, &a, &e, &n, pctx);
+	LLC::CAutoBN_CTX pctx;
+	LLC::CBigNum e = n - 1;
+	LLC::CBigNum r;
+	BN_mod_exp(r.getBN(), a.getBN(), e.getBN(), n.getBN(), pctx);
 
-	//return r;
-	return LLC::CBigNum{  };
+	return r;
+	//return LLC::CBigNum{  };
 }
 
 /** Miller-Rabin Primality Test from the OpenSSL BN Library. **/

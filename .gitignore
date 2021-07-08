@@ -13,3 +13,6 @@ build/
 .vs/
 CMakeSettings.json
 out/
+*.lib
+include/gmp.h
+include/gmpxx.h
