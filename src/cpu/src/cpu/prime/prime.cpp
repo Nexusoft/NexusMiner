@@ -279,14 +279,12 @@ LLC::CBigNum Prime::FermatTest(LLC::CBigNum n, LLC::CBigNum a)
 	BN_mod_exp(r.getBN(), a.getBN(), e.getBN(), n.getBN(), pctx);
 
 	return r;
-	//return LLC::CBigNum{  };
 }
 
 /** Miller-Rabin Primality Test from the OpenSSL BN Library. **/
-bool Prime::Miller_Rabin(LLC::CBigNum n, int checks)
+bool Prime::Miller_Rabin(LLC::CBigNum n, std::uint32_t checks)
 {
-	//return (BN_is_prime(&n, checks, NULL, NULL, NULL) == 1);
-	return false;
+	return (BN_is_prime_ex(n.getBN(), checks, nullptr, nullptr) == 1);
 }
 
 

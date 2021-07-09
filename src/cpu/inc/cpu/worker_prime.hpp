@@ -17,6 +17,7 @@ namespace stats { class Collector; }
 
 namespace cpu
 {
+    class Prime;
 class Worker_prime : public Worker, public std::enable_shared_from_this<Worker_prime>
 {
 public:
@@ -40,6 +41,7 @@ private:
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
     config::Worker_config& m_config;
+    std::unique_ptr<Prime> m_prime_helper;
     std::atomic<bool> m_stop;
     std::thread m_run_thread;
     Worker::Block_found_handler m_found_nonce_callback;

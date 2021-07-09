@@ -13,6 +13,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	: m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
 	, m_config{ config }
+	, m_prime_helper{std::make_unique<Prime>()}
 	, m_stop{ true }
 	, m_log_leader{ "CPU Worker " + m_config.m_id + ": " }
 	, m_primes{ 0 }
@@ -20,7 +21,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_difficulty{ 0 }
 	, m_pool_nbits{ 0 }
 {
-
+	m_prime_helper->InitializePrimes();
 }
 
 Worker_prime::~Worker_prime() noexcept

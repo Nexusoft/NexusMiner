@@ -48,7 +48,12 @@ endif()
 
 #PRIME
 if(WITH_PRIME)
-    find_package(GMP REQUIRED)
+    if(WIN32)
+        find_package(MPIR REQUIRED)
+    else()
+        find_package(GMP REQUIRED)
+    endif()
+add_definitions(-DPRIME_ENABLED)
 endif()
 
 

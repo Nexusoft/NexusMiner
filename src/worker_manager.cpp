@@ -4,6 +4,9 @@
 #ifdef GPU_ENABLED
 #include "gpu/worker_hash.hpp"
 #endif
+#ifdef PRIME_ENABLED
+#include "cpu/worker_prime.hpp"
+#endif
 #include "packet.hpp"
 #include "config/config.hpp"
 #include "config/types.hpp"
@@ -119,7 +122,18 @@ void Worker_manager::create_workers()
             case config::Worker_mode::CPU:    // falltrough
             default:
             {
-                m_workers.push_back(std::make_shared<cpu::Worker_hash>(m_io_context, worker_config));
+                if (m_config.get_mining_mode() == config::Mining_mode::PRIME)
+                {
+#ifdef PRIME_ENABLED
+                    m_workers.push_back(std::make_shared<cpu::Worker_prime>(m_io_context, worker_config));
+#else
+                    m_logger->error("NexusMiner not built 'WITH_PRIME' -> no worker created!"):
+#endif
+                }
+                else
+                {
+                    m_workers.push_back(std::make_shared<cpu::Worker_hash>(m_io_context, worker_config));
+                }
                 break;
             }
         }

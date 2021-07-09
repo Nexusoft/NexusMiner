@@ -30,7 +30,7 @@ public:
 	unsigned long PrimeSieve(LLC::CBigNum BaseHash, unsigned int nDifficulty, unsigned int nHeight);
 	bool PrimeCheck(LLC::CBigNum test, int checks);
 	LLC::CBigNum FermatTest(LLC::CBigNum n, LLC::CBigNum a);
-	bool Miller_Rabin(LLC::CBigNum n, int checks);
+	bool Miller_Rabin(LLC::CBigNum n, std::uint32_t checks);
 
 private:
 
