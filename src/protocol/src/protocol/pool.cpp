@@ -111,6 +111,13 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         m_stats_collector->update_global_stats(global_stats);
         m_logger->warn("Share Rejected by Pool.");
     }
+    else if (packet.m_header == Packet::BLOCK)
+    {
+        stats::Global global_stats{};
+        global_stats.m_accepted_shares = 1;
+        m_stats_collector->update_global_stats(global_stats);
+        m_logger->info("Share Accepted By Pool. Found Block!");
+    }
 }
 
 network::Shared_payload Pool::extract_nbits_from_block(network::Shared_payload data, std::uint32_t& nbits)

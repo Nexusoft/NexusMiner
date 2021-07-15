@@ -34,18 +34,9 @@ Optional cmake build options are
 
 ### Windows
 
-* GMP(required for WITH_PRIME):  \   
-    download gmp and extract.  \   
-    Open MSYS (MinGW) 64Bit.  \ 
-    cd to extracted GMP folder  \ 
-    execute the following commands  \ 
-    ./configure --enable-cxx  \
-    make  \
-    make install  \
-    make check  \
-    go to gmp/.libs folder and copy "libgmp.a" and "libgmpxx.a" to NexusMiner/libs folder  \ 
-    rename "libgmp.a" to "gmp.lib" and "libgmpxx.a" to "gmpxx.lib"  \
-    go to gmp folder and copy "gmp.h" and "gmpxx.h" to NexusMiner/include folder  \
+* MPIR(required for WITH_PRIME):  \   
+    build x64 static mpir lib and copy mpir.lib to NexusMiner/libs  \
+    copy gmp.h from mpir to NexusMiner/include
 * OpenSSL: 
 
 ### Ubuntu/Debian
