@@ -103,19 +103,46 @@ void NexusKeccak::calculateHash()
 	{
 		s = keccak_round(s, i);
 	}
+	//this containts the lower bits of the hash
+	hash1 = s;
 
 	//3rd set of 24 rounds of keccak
 	for (int i = 0; i < numRounds; i++)
 	{
 		s = keccak_round(s, i);
 	}
-	hash = s;
+	//upper bits of the hash
+	hash2 = s;
 }
 
 uint64_t NexusKeccak::getResult()
 {
 	//we really only care about the most siginificant bits. return the top 64 bits only.
-	return hash[1][1];
+	return hash2[1][1];
+}
+
+NexusKeccak::k_1024 NexusKeccak::getHashResult()
+{
+	k_1024 hash_result;
+	//the full hash is 9 words from hash1 plus 7 words from hash2
+	//return the full hash result as an array of integers
+	int j = 0;
+	int k = 0;
+	for (auto i=0; i<9; i++)
+	{
+		j = i / 5;
+		hash_result[i] = hash1[j][k];
+		k = (k + 1) % 5;
+	}
+	k = 0;
+	for (auto i = 0; i < 7; i++)
+	{
+		j = i / 5;
+		hash_result[9+i] = hash2[j][k];
+		k = (k + 1) % 5;
+	}
+
+	return hash_result;
 }
 
 

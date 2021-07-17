@@ -8,12 +8,14 @@
 #include <mutex>
 #include <gmp.h>
 #include <spdlog/spdlog.h>
+#include <boost/multiprecision/cpp_int.hpp>
 #include "LLC/types/bignum.h"
 
 
 namespace nexusminer {
 namespace cpu
 {
+using uint1k = boost::multiprecision::uint1024_t;
 class Prime
 {
 public:
@@ -30,7 +32,7 @@ public:
 	unsigned long PrimeSieve(LLC::CBigNum BaseHash, unsigned int nDifficulty, unsigned int nHeight);
 	bool PrimeCheck(LLC::CBigNum test, int checks);
 	LLC::CBigNum FermatTest(LLC::CBigNum n, LLC::CBigNum a);
-	bool Miller_Rabin(LLC::CBigNum n, std::uint32_t checks);
+	//bool Miller_Rabin(LLC::CBigNum n, std::uint32_t checks);
 
 private:
 
@@ -39,7 +41,7 @@ private:
 	unsigned int* inverses;
 
 	unsigned int nBitArray_Size;
-	mpz_t  zPrimorial;
+	boost::multiprecision::cpp_int zPrimorial;
 
 	unsigned int prime_limit;
 	unsigned int nPrimeLimit;

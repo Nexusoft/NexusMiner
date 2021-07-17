@@ -20,7 +20,8 @@ static std::vector<unsigned char> HexStringToBytes(const std::string& hexStr)
     return bytes;
 }
 
-static std::string BytesToHexString(const std::vector<unsigned char>& bytes)
+template <typename T>
+static std::string BytesToHexString(const std::vector<T>& bytes)
 {
     //like python hex()
     std::ostringstream ss;

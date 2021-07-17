@@ -6,6 +6,8 @@
 
 class NexusKeccak
 {
+public:
+    using k_1024 = Int_array<uint64_t, 16>;
 
 private:
     static constexpr int numPlane = 5;
@@ -45,13 +47,14 @@ private:
     k_state theta(const k_state& s);
 
     k_message message1, message2;
-    k_state hash;
+    k_state hash1, hash2;
 
 public:
     NexusKeccak();
     NexusKeccak(const Int_array<uint64_t, 16>& m);
     void calculateHash();
     uint64_t getResult();
+    k_1024 getHashResult();
     void setMessage(const Int_array<uint64_t, 16>& m);
 
 

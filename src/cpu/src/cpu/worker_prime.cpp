@@ -51,6 +51,22 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 		}
 
 		m_difficulty = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
+		bool excludeNonce = true;  //prime block hash excludes the nonce
+		std::vector<unsigned char> headerB = m_block.GetHeaderBytes(excludeNonce);
+		//calculate the block hash
+		NexusSkein skein;
+		skein.setMessage(headerB);
+		skein.calculateHash();
+		NexusSkein::stateType hash = skein.getHash();
+
+		//keccak
+		NexusKeccak keccak(hash);
+		keccak.calculateHash();
+		NexusKeccak::k_1024 keccakFullHash_i = keccak.getHashResult();
+		keccakFullHash_i.isBigInt = true;
+		uint1k keccakFullHash("0x" + keccakFullHash_i.toHexString(true));
+
+		//Now we have the hash of the block header.  We use this to feed the miner. 
 
 	}
 	//restart the mining loop

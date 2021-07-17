@@ -104,8 +104,9 @@ void NexusSkein::setMessage(std::vector<unsigned char> m)
     //Take a header input as a byte array and process as much of thge hash as possible prior to involving the nonce.
     //This generates the midstate value used in mining.
     //The input message must match the nexus header length (216 bytes)
-    if (m.size() == headerLength)
+    if (m.size() == headerLength || m.size() == headerLengthPrime)
     {
+        primeMode = m.size() == headerLengthPrime;
         //break the message into 2 128 byte chunks
         std::vector<unsigned char> m1(m.begin(), m.begin() + 128);
         std::vector<unsigned char> m2(m.begin() + 128, m.end());
@@ -133,7 +134,11 @@ void NexusSkein::calculateKey2()
     threefish1Out = tf1 ^ message1;
     //generate the key for the next round.  this is used as input to the mining stage
     key2 = makeKeyFromState(threefish1Out);
-    makeSubkeys(threefish1Out, t2, subkey2);
+    if (primeMode)
+        makeSubkeys(threefish1Out, t2_prime, subkey2);
+    else
+        makeSubkeys(threefish1Out, t2, subkey2);
+
 }
 
 void NexusSkein::calculateHash()

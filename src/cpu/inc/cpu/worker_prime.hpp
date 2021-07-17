@@ -7,6 +7,9 @@
 #include <atomic>
 #include <mutex>
 #include "worker.hpp"
+#include "hash/nexus_skein.hpp"
+#include "hash/nexus_keccak.hpp"
+#include <boost/multiprecision/cpp_int.hpp>
 #include <spdlog/spdlog.h>
 
 namespace asio { class io_context; }
@@ -17,6 +20,7 @@ namespace stats { class Collector; }
 
 namespace cpu
 {
+    using uint1k = boost::multiprecision::uint1024_t;
     class Prime;
 class Worker_prime : public Worker, public std::enable_shared_from_this<Worker_prime>
 {

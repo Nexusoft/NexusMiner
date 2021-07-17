@@ -23,7 +23,7 @@
 #ifndef NEXUS_SKEIN_HPP
 #define NEXUS_SKEIN_HPP
 
-#include "hash/int_array.hpp"
+#include "int_array.hpp"
 
 class NexusSkein
 {
@@ -36,7 +36,8 @@ private:
     static constexpr int numRounds = 80;  //rounds within threefish
     static constexpr int numWords = 16;  //number of 64 bit words (1024 bits / 64)
     static constexpr int subkeyCount = numRounds / 4 + 1;  //21 subkeys
-    static constexpr int headerLength = 216;  //bytes
+    static constexpr int headerLength = 216;  //bytes (hashing mode)
+    static constexpr int headerLengthPrime = 208; 
         
      
 public:
@@ -61,6 +62,10 @@ private:
     static constexpr tweakType t1 { 0x00000000000080, 0x7000000000000000, 0x7000000000000080 };
     static constexpr tweakType t2 { 0x000000000000D8, 0xB000000000000000, 0xB0000000000000D8 };
     static constexpr tweakType t3 { 0x00000000000008, 0xFF00000000000000, 0xFF00000000000008 };
+
+    //for prime the message length is shorter so we need a different tweak
+    static constexpr tweakType t2_prime{ 0x000000000000D0, 0xB000000000000000, 0xB0000000000000D0 };
+
 
     // Rotate left : 0b1001 -- > 0b0011
     inline uint64_t rol(uint64_t val, int r_bits)
@@ -110,6 +115,7 @@ private:
     stateType hashInitState;
     //the final output of the skein hash function after three rounds of threefish
     stateType hash;
+    bool primeMode = false;
 
 public:
     void setMessage(std::vector<unsigned char>);

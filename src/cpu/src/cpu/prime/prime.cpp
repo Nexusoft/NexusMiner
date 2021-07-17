@@ -1,5 +1,7 @@
 #include "prime.hpp"
-#include <openssl/bn.h>
+#include <boost/integer/mod_inverse.hpp>
+
+//#include <openssl/bn.h>
 
 
 namespace nexusminer {
@@ -102,47 +104,53 @@ void Prime::InitializePrimes()
 
 	printf("\n%d primes generated\n", primes[0]);
 
-	mpz_init(zPrimorial);
-
-	mpz_set_ui(zPrimorial, 1);
+	//mpz_init(zPrimorial);
+	zPrimorial = 1;
+	//mpz_set_ui(zPrimorial, 1);
 
 	for (int i = 1; i < nPrimorialEndPrime; i++)
 	{
-		mpz_mul_ui(zPrimorial, zPrimorial, primes[i]);
+		//mpz_mul_ui(zPrimorial, zPrimorial, primes[i]);
+		zPrimorial *= primes[i];
 	}
 
-	m_logger->debug("Primorial:");
-	printf("\n"); mpz_out_str(stdout, 10, zPrimorial); printf("\n");
+	m_logger->debug("Primorial: " + zPrimorial.str());
+	//printf("\n"); mpz_out_str(stdout, 10, zPrimorial); printf("\n");
 
 	m_logger->debug("Last Primorial Prime = {}", primes[nPrimorialEndPrime - 1]);
 	m_logger->debug("First Sieving Prime = {}", primes[nPrimorialEndPrime]);
 
 
-	int nSize = mpz_sizeinbase(zPrimorial, 2);
+	//int nSize = mpz_sizeinbase(zPrimorial, 2);
+	int nSize = boost::multiprecision::msb(zPrimorial) + 1;
 	m_logger->debug("Primorial Size = {}-bit", nSize);
 
 	inverses = (unsigned int*)malloc((nPrimeLimit + 1) * sizeof(unsigned int));
 	memset(inverses, 0, (nPrimeLimit + 1) * sizeof(unsigned int));
 
-	mpz_t zPrime, zInverse, zResult;
+	//mpz_t zPrime, zInverse, zResult;
 
-	mpz_init(zPrime);
-	mpz_init(zInverse);
-	mpz_init(zResult);
+	//mpz_init(zPrime);
+	//mpz_init(zInverse);
+	//mpz_init(zResult);
+	boost::multiprecision::cpp_int zPrime, zInverse, zResult;
+	
 
 	for (unsigned int i = nPrimorialEndPrime; i <= nPrimeLimit; i++)
 	{
-		mpz_set_ui(zPrime, primes[i]);
+		//mpz_set_ui(zPrime, primes[i]);
+		zPrime = primes[i];
+		//int	inv = mpz_invert(zResult, zPrimorial, zPrime);
+		zResult = boost::integer::mod_inverse(zPrimorial, zPrime);
 
-		int	inv = mpz_invert(zResult, zPrimorial, zPrime);
-		if (inv <= 0)
+		if (zResult == 0)
 		{
 			m_logger->critical("No Inverse at position {}", i);
 			exit(1);
 		}
 		else
 		{
-			inverses[i] = mpz_get_ui(zResult);
+			inverses[i] = zResult.convert_to<unsigned int>();
 		}
 	}
 }
@@ -273,19 +281,14 @@ bool Prime::PrimeCheck(LLC::CBigNum test, int checks)
 	a = Base or 2... 2 + checks, n is the Prime Test. Used after Miller-Rabin and Divisor tests to verify primality. **/
 LLC::CBigNum Prime::FermatTest(LLC::CBigNum n, LLC::CBigNum a)
 {
-	LLC::CAutoBN_CTX pctx;
-	LLC::CBigNum e = n - 1;
-	LLC::CBigNum r;
-	BN_mod_exp(r.getBN(), a.getBN(), e.getBN(), n.getBN(), pctx);
-
-	return r;
+	uint1k base("0x" + a.GetHex());
+	uint1k result;
+	uint1k p("0x" + n.GetHex());
+	result = boost::multiprecision::powm(base, p - 1, p);
+	return (result == 1);
+	
 }
 
-/** Miller-Rabin Primality Test from the OpenSSL BN Library. **/
-bool Prime::Miller_Rabin(LLC::CBigNum n, std::uint32_t checks)
-{
-	return (BN_is_prime_ex(n.getBN(), checks, nullptr, nullptr) == 1);
-}
 
 
 }

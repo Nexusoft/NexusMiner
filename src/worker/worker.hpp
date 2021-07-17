@@ -25,7 +25,7 @@ public:
 
 	Block_data() {}
 
-	std::vector<unsigned char> GetHeaderBytes()
+	std::vector<unsigned char> GetHeaderBytes(bool excludeNonce = false)
 	{
 		//convert header data to byte strings
 		std::vector<unsigned char> blockHeightB = IntToBytes(nHeight, 4);
@@ -47,7 +47,10 @@ public:
 		headerB.insert(headerB.end(), channelB.begin(), channelB.end());
 		headerB.insert(headerB.end(), blockHeightB.begin(), blockHeightB.end());
 		headerB.insert(headerB.end(), bitsB.begin(), bitsB.end());
-		headerB.insert(headerB.end(), nonceB.begin(), nonceB.end());
+		if (!excludeNonce)
+		{
+			headerB.insert(headerB.end(), nonceB.begin(), nonceB.end());
+		}
 
 		return headerB;
 
