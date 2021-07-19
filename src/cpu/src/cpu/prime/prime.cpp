@@ -285,7 +285,14 @@ LLC::CBigNum Prime::FermatTest(LLC::CBigNum n, LLC::CBigNum a)
 	uint1k result;
 	uint1k p("0x" + n.GetHex());
 	result = boost::multiprecision::powm(base, p - 1, p);
-	return (result == 1);
+	//convert to hex and return as llc::cbignum
+	LLC::CBigNum r;
+	std::stringstream ss;
+	ss << std::hex << result;
+	std::string r_str = ss.str();
+	LLC::CBigNum prime_to_test;
+	r.SetHex(r_str);
+	return (r);
 	
 }
 

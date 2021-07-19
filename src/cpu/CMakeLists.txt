@@ -16,6 +16,7 @@ target_include_directories(cpu
 # TODO reduce dependencies
 target_link_libraries(cpu hash worker LLP LLC stats config)
 if(WITH_PRIME)
+    target_link_libraries(cpu primesieve::primesieve)
     # if(WIN32)
     #     target_link_libraries(cpu mpir OpenSSL::Crypto OpenSSL::applink)
     # else()

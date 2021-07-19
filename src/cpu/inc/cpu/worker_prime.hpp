@@ -36,8 +36,8 @@ private:
 
     void run();
     bool difficulty_check();
-    std::uint64_t leading_zero_mask();
-
+    //std::uint64_t leading_zero_mask();
+    bool isPrime(uint1k p);
 
     //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
     static constexpr int leading_zeros_required = 20;    //set lower to find more nonce candidates
@@ -52,7 +52,7 @@ private:
 
     Block_data m_block;
     std::mutex m_mtx;
-    uint64_t m_starting_nonce = 0;
+    std::uint64_t m_starting_nonce = 0;
     std::string m_log_leader;
 
     void reset_statistics();
@@ -61,6 +61,36 @@ private:
     std::uint32_t m_difficulty{ 0 };
 
     std::uint32_t m_pool_nbits;
+
+    std::uint64_t m_nonce = 0;
+    uint1k m_base_hash;
+
+
+    void generate_seive(uint1k);
+    void analyze_chains();
+    void mine_region(uint1k);
+
+
+    std::vector<bool>m_sieve;
+    static constexpr int m_primorialEndPrime = 3000000;
+    static constexpr int m_minChainLength = 8;  //min chain length
+    static constexpr int m_maxGap = 12 / 2;  //the largest allowable prime gap.Divide by two because the sieve excludes all even numbers.
+
+    //we have finite memory so we have to limit the sieve to some reasonable size
+    static constexpr int m_maxSieveLength = 30000000;
+    static constexpr int m_sieveLength = m_maxSieveLength;
+    static constexpr int m_sieveRange = m_sieveLength * 2;
+
+    //Vectors containing information about chains we find
+    //int chainListLength = std::min(sieveLength, 10000000);
+    std::vector<uint64_t> m_chainStartPosArray;
+    std::vector<int> m_chainLengthArray;
+    std::vector<std::vector<int>> m_chainOffsets;
+    int m_chainCount = 0;  //number of chains found
+    int m_candidateCount = 0;  //number of possible primes in the sieve
+
+    //stats
+    std::vector<int> m_chain_histogram;
 
 };
 }

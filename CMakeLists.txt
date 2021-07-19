@@ -14,7 +14,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 link_directories(${CMAKE_SOURCE_DIR}/libs)
 
 option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
-option(WITH_PRIME "Build with PRIME mining support, BOOST needed" OFF)
+option(WITH_PRIME "Build with PRIME mining support, BOOST and Primesieve needed" OFF)
 
 if(UNIX)
     add_definitions(-DUNIX)
@@ -50,12 +50,13 @@ endif()
 if(WITH_PRIME)
     find_package(Boost)
     include_directories(${Boost_INCLUDE_DIRS}) 
+    find_package(primesieve REQUIRED)
     # if(WIN32)
     #    find_package(MPIR REQUIRED)
     # else()
     #    find_package(GMP REQUIRED)
     # endif()
-add_definitions(-DPRIME_ENABLED)
+    add_definitions(-DPRIME_ENABLED)
 endif()
 
 
