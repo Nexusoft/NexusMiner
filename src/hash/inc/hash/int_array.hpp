@@ -23,7 +23,6 @@ public:
 
     size_t size() const { return SIZE; }
     int intSize() const { return sizeof(T); }
-    int type() const { return T; }
     bool isBigInt = false;  //Treat the intArray as a bigint.  For example when printing start at the highest index instead of zero. Use carries when adding.
 
     T& operator[] (int index) { return intArray[index]; }
