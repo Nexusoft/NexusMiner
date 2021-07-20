@@ -69,9 +69,14 @@ inline void Printer_console<PrinterType>::print()
         else
         {
             auto& prime_stats = std::get<Prime>(worker);
-
+            ss << std::setprecision(2) << std::fixed;
             ss << (prime_stats.m_primes / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " PPS ";
             ss << (prime_stats.m_chains / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " CPS ";
+            ss << "Chain Count: ";
+            for (auto i=2; i< prime_stats.m_chain_histogram.size(); i++)
+            {
+                ss << i << ":" << prime_stats.m_chain_histogram[i] << " ";
+            }
             ss << " Difficulty " << prime_stats.m_difficulty / 10000000.0;
         }
         worker_config_index++;

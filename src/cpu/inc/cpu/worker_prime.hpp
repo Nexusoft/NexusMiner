@@ -11,6 +11,7 @@
 #include "hash/nexus_keccak.hpp"
 #include <boost/multiprecision/cpp_int.hpp>
 #include <spdlog/spdlog.h>
+#include "LLC/types/bignum.h"
 
 namespace asio { class io_context; }
 
@@ -35,7 +36,9 @@ public:
 private:
 
     void run();
-    bool difficulty_check();
+    double getDifficulty(uint1k p);
+    double getNetworkDifficulty();
+    bool difficulty_check(uint1k p);
     //std::uint64_t leading_zero_mask();
     bool isPrime(uint1k p);
 
@@ -69,6 +72,7 @@ private:
     void generate_seive(uint1k);
     void analyze_chains();
     void mine_region(uint1k);
+    static LLC::CBigNum boost_uint1024_t_to_CBignum(uint1k);
 
 
     std::vector<bool>m_sieve;
@@ -90,7 +94,7 @@ private:
     int m_candidateCount = 0;  //number of possible primes in the sieve
 
     //stats
-    std::vector<int> m_chain_histogram;
+    std::vector<std::uint32_t> m_chain_histogram;
 
 };
 }

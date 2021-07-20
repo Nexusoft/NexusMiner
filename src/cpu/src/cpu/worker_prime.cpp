@@ -1,3 +1,6 @@
+#include "..\..\inc\cpu\worker_prime.hpp"
+#include "..\..\inc\cpu\worker_prime.hpp"
+#include "..\..\inc\cpu\worker_prime.hpp"
 #include "cpu/worker_prime.hpp"
 #include "config/config.hpp"
 #include "stats/stats_collector.hpp"
@@ -24,7 +27,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_pool_nbits{ 0 }
 {
 	//m_prime_helper->InitializePrimes();
-	m_chain_histogram = std::vector<int>(10, 0);
+	m_chain_histogram = std::vector<std::uint32_t>(10, 0);
 }
 
 Worker_prime::~Worker_prime() noexcept
@@ -85,7 +88,6 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 
 void Worker_prime::run()
 {
-	auto start = std::chrono::steady_clock::now();  //this needs to be removed and replaced with the stats.  its broken.  it should not restart every block.
 	std::uint64_t i = 0;
 	while (!m_stop)
 	{
@@ -95,12 +97,6 @@ void Worker_prime::run()
 		generate_seive(startprime);
 		analyze_chains();
 		mine_region(startprime);
-		auto end = std::chrono::steady_clock::now();
-		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-		//TODO: move to stats 
-		std::cout << std::fixed << std::setprecision(2) << m_sieveRange * (i + 1.0) / 1000.0 / elapsed.count() << " million integers/second. ";
-		std::cout << std::fixed << std::setprecision(2) << m_chain_histogram[2] * 1000.0 * 60 / elapsed.count() << " double chains per minute. ";
-		std::cout << std::fixed << std::setprecision(2) << m_chain_histogram[3] * 1000.0 * 60 / elapsed.count() << " triple chains per minute." << std::endl;
 		i++;
 	}
 
@@ -110,9 +106,22 @@ void Worker_prime::run()
 	
 }
 
-bool Worker_prime::difficulty_check()
+double Worker_prime::getDifficulty(uint1k p)
 {
-	return true;
+	std::vector<unsigned int> offsets_to_test;
+	LLC::CBigNum prime_to_test = boost_uint1024_t_to_CBignum(p);
+	double difficulty = m_prime_helper->GetPrimeDifficulty(prime_to_test, 1, offsets_to_test);
+	return difficulty;
+}
+
+double Worker_prime::getNetworkDifficulty()
+{
+	return m_difficulty / 10000000.0;
+}
+
+bool Worker_prime::difficulty_check(uint1k p)
+{
+	return getDifficulty(p) >= getNetworkDifficulty();
 }
 
 bool Worker_prime::isPrime(uint1k p)
@@ -311,6 +320,7 @@ void Worker_prime::mine_region(uint1k start_here)
 		if (isPrime(prime_candidate))
 		{
 			//std::cout << "found a prime" << std::endl;
+			m_primes++;
 			if (chain_length == 0)
 			{
 				chain_start_offset_index = offset_index;
@@ -339,24 +349,17 @@ void Worker_prime::mine_region(uint1k start_here)
 		{
 			if (chain_length >= 2)
 			{
+				m_chains++;
 				offset_from_start = m_chainStartPosArray[chain_index] * 2;
-				std::cout << "found a chain of length " << chain_length << " at offset " << offset_from_start << std::endl;
+				m_logger->debug("found a chain of length {} at offset {}", chain_length, offset_from_start);
 				m_chain_histogram[chain_length]++;
 				if (chain_length >= target_length)
 				{
 					uint1k chain_start = start_here + offset_from_start + m_chainOffsets[chain_index][chain_start_offset_index]*2;
 					uint1k bigNonce = chain_start - m_base_hash;
-					std::vector<unsigned int> offsets_to_test;
-					std::stringstream ss;
-					ss << std::hex << chain_start;
-					std::string prime_to_test_str = ss.str();
-					LLC::CBigNum prime_to_test;
-					prime_to_test.SetHex(prime_to_test_str);
 					m_block.nNonce = bigNonce.convert_to<uint64_t>();
-					double difficulty = m_prime_helper->GetPrimeDifficulty(prime_to_test, 1, offsets_to_test);
-					double network_difficulty = m_difficulty / 10000000.0;
-					std::cout << "actual difficulty " << difficulty << " required " << network_difficulty << std::endl;
-					if (difficulty >= network_difficulty)
+					m_logger->debug("actual difficulty {} required {}", getDifficulty(chain_start), getNetworkDifficulty());
+					if (difficulty_check(chain_start))
 					{
 						//++m_met_difficulty_count;
 						//update the block with the nonce and call the callback function;
@@ -391,12 +394,24 @@ void Worker_prime::mine_region(uint1k start_here)
 	}
 }
 
+LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
+{
+	std::stringstream ss;
+	ss << std::hex << p;
+	std::string p_hex_str = ss.str();
+	LLC::CBigNum p_CBignum;
+	p_CBignum.SetHex(p_hex_str);
+	return p_CBignum;
+}
+
 void Worker_prime::update_statistics(stats::Collector& stats_collector)
 {
 	auto prime_stats = std::get<stats::Prime>(stats_collector.get_worker_stats(m_config.m_internal_id));
 	prime_stats.m_primes = m_primes;
 	prime_stats.m_chains = m_chains;
 	prime_stats.m_difficulty = m_difficulty;
+	prime_stats.m_chain_histogram = m_chain_histogram;
+
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, prime_stats);
 
