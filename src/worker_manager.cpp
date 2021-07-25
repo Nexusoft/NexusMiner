@@ -109,13 +109,29 @@ void Worker_manager::create_workers()
         {
             case config::Worker_mode::FPGA:
             {
-                m_workers.push_back(std::make_shared<fpga::Worker_hash>(m_io_context, worker_config));
+                if (m_config.get_mining_mode() == config::Mining_mode::PRIME)
+                {
+                    m_logger->error("FPGA worker is not supported for PRIME mining!");
+                }
+                else
+                {
+                    m_workers.push_back(std::make_shared<fpga::Worker_hash>(m_io_context, worker_config));
+                }
                 break;
             }
             case config::Worker_mode::GPU:
             {
 #ifdef GPU_ENABLED
-                m_workers.push_back(std::make_shared<gpu::Worker_hash>(m_io_context, worker_config));
+                if (m_config.get_mining_mode() == config::Mining_mode::PRIME)
+                {
+                    m_logger->error("GPU worker is currently not supported for PRIME mining!");
+                }
+                else
+                {
+                    m_workers.push_back(std::make_shared<gpu::Worker_hash>(m_io_context, worker_config));
+                }                
+#else
+                m_logger->error("NexusMiner not built 'WITH_GPU_CUDA' -> no worker created!");
 #endif
                 break;
             }

@@ -131,6 +131,19 @@ bool Validator::check(std::string const& config_file)
                             m_mandatory_fields.push_back(Validator_error{"workers/worker/mode/serial_port", ""});
                             break;
                         }
+
+                        if (mining_mode == "prime")
+                        {
+                            m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/hardware", "FPGA is not supported for PRIME mining" });
+                        }
+                    }
+
+                    if (worker_mode_json["hardware"] == "gpu")
+                    {
+                        if (mining_mode == "prime")
+                        {
+                            m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/hardware", "GPU is currently not supported for PRIME mining" });
+                        }
                     }
                 }
             }
