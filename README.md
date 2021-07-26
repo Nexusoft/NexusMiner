@@ -1,6 +1,6 @@
 # NexusMiner
 
-Miner for Nexus Hash channel with FPGA and (optional) CUDA GPU. Pool (currently hashpool.com, pool.blackminer.com) or Solo mining
+Miner for Nexus Hash channel with FPGA and (optional) CUDA GPU. Pool (currently hashpool.com, pool.blackminer.com) or Solo mining.  
 
 
 ## Wallet Setup
@@ -30,16 +30,18 @@ Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet h
 
 Optional cmake build options are
 * WITH_GPU_CUDA       to enable HASH channel gpu mining. CUDA Toolkit required
-* WITH_PRIME          to enable PRIME channel mining. GMP required
+* WITH_PRIME          to enable PRIME channel mining (currently CPU only). primesieve required
 
 ### Windows
-
-* MPIR(required for WITH_PRIME):  \   
-    build x64 static mpir lib and copy mpir.lib to NexusMiner/libs  \
-    copy gmp.h from mpir to NexusMiner/include
+* [primesieve](https://github.com/kimwalisch/primesieve) (required for WITH_PRIME): 
+    * Follow detailed [build instructions](https://github.com/kimwalisch/primesieve/blob/master/doc/BUILD.md) for Windows/Microsoft Visual C++.
+    * You may need to add the location of primesieve.dll to your system path.  Try C:\Program Files (x86)\primesieve\bin
 * OpenSSL: 
+    * Download and run OpenSSL [installer](https://slproweb.com/products/Win32OpenSSL.html)
 
 ### Ubuntu/Debian
 
-* GMP(required for WITH_PRIME):     sudo apt-get install libgmp3-dev
-* OpenSSL:                          sudo apt-get install libssl-dev
+* primesieve (required for WITH_PRIME):  
+    * sudo apt-get install libprimesieve-dev
+* OpenSSL:
+    * sudo apt-get install libssl-dev
