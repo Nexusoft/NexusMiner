@@ -30,6 +30,7 @@ bool Validator::check(std::string const& config_file)
     try
     {
         json j = json::parse(config);
+        std::string mining_mode = "hash";
         // check mandatory fields;
         if (j.count("wallet_ip") == 0)
         {
@@ -55,7 +56,7 @@ bool Validator::check(std::string const& config_file)
         else
         {
             // check content of mining_mode
-            std::string mining_mode = j["mining_mode"];
+            mining_mode = j["mining_mode"];
             std::for_each(mining_mode.begin(), mining_mode.end(), [](char & c) {
                 c = ::tolower(c);
     	    });

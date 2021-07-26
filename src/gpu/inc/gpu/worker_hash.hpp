@@ -46,7 +46,7 @@ private:
     Block_data m_block;
     std::uint32_t m_pool_nbits;
     uint1024_t m_target;
-    std::uint64_t m_hashes;
+    std::uint64_t m_hashes = 0;
     std::uint32_t m_intensity;
     std::uint32_t m_throughput;
     std::uint32_t m_threads_per_block;

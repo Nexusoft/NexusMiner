@@ -1,6 +1,3 @@
-#include "..\..\inc\cpu\worker_prime.hpp"
-#include "..\..\inc\cpu\worker_prime.hpp"
-#include "..\..\inc\cpu\worker_prime.hpp"
 #include "cpu/worker_prime.hpp"
 #include "config/config.hpp"
 #include "stats/stats_collector.hpp"
@@ -91,7 +88,7 @@ void Worker_prime::run()
 	std::uint64_t i = 0;
 	while (!m_stop)
 	{
-		uint1k startprime = m_base_hash + m_sieveRange * i;
+		uint1k startprime = m_base_hash + m_nonce + m_sieveRange * i;
 		startprime = startprime + 1 - (startprime % 2);  //ensure odd start
 		//std::cout << "Sieving range " << m_sieveRange * i << " to " << m_sieveRange * (i + 1) - 1 << std::endl;
 		generate_seive(startprime);
@@ -308,7 +305,7 @@ void Worker_prime::mine_region(uint1k start_here)
 	uint1k first_prime_candidate = start_here + offset_from_start;
 	uint1k prime_candidate = first_prime_candidate;
 	int chain_length = 0;
-	int target_length = 2;
+	int target_length = 3;
 	int chain_start_offset_index = 0;
 
 	//int primorial_index = 0;
