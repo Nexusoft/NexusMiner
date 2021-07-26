@@ -30,18 +30,21 @@ Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet h
 
 Optional cmake build options are
 * WITH_GPU_CUDA       to enable HASH channel gpu mining. CUDA Toolkit required
-* WITH_PRIME          to enable PRIME channel mining (currently CPU only). primesieve required
+* WITH_PRIME          to enable PRIME channel mining (currently CPU only). primesieve and boost required
 
 ### Windows
+* OpenSSL: 
+    * Download and run OpenSSL [installer](https://slproweb.com/products/Win32OpenSSL.html)
 * [primesieve](https://github.com/kimwalisch/primesieve) (required for WITH_PRIME): 
     * Follow detailed [build instructions](https://github.com/kimwalisch/primesieve/blob/master/doc/BUILD.md) for Windows/Microsoft Visual C++.
     * You may need to add the location of primesieve.dll to your system path.  Try C:\Program Files (x86)\primesieve\bin
-* OpenSSL: 
-    * Download and run OpenSSL [installer](https://slproweb.com/products/Win32OpenSSL.html)
+* [boost](https://www.boost.org/users/download/) (required for WITH_PRIME):
+    * Download and extract to C:\boost
 
 ### Ubuntu/Debian
-
-* primesieve (required for WITH_PRIME):  
-    * sudo apt-get install libprimesieve-dev
 * OpenSSL:
     * sudo apt-get install libssl-dev
+* primesieve (required for WITH_PRIME):  
+    * sudo apt-get install libprimesieve-dev
+* boost (required for WITH_PRIME):
+    * sudo apt-get install libboost-all-dev
