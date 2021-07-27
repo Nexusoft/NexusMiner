@@ -5,4 +5,14 @@ log
 *.zip
 nexusminer
 miner_profile
-
+*.cache
+*.make
+*.vscode
+Makefile
+build/
+.vs/
+CMakeSettings.json
+out/
+*.lib
+include/gmp.h
+include/gmpxx.h
