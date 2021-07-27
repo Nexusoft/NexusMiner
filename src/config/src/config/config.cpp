@@ -1,8 +1,9 @@
 
 #include "config/config.hpp"
-
+#include <spdlog/spdlog.h>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 using json = nlohmann::json;
 
@@ -10,8 +11,9 @@ namespace nexusminer
 {
 namespace config
 {
-	Config::Config()
-		: m_wallet_ip{ "127.0.0.1" }
+	Config::Config(std::shared_ptr<spdlog::logger> logger)
+		: m_logger{std::move(logger)}
+		, m_wallet_ip{ "127.0.0.1" }
 		, m_port{ 9323 }
 		, m_local_ip{"127.0.0.1"}
 		, m_mining_mode{ Mining_mode::HASH}
@@ -26,12 +28,12 @@ namespace config
 
 	bool Config::read_config(std::string const& miner_config_file)
 	{
-		std::cout << "Reading config file " << miner_config_file << std::endl;
+		m_logger->info("Reading config file {}", miner_config_file);
 
 		std::ifstream config_file(miner_config_file);
 		if (!config_file.is_open())
 		{
-			std::cerr << "Unable to read " << miner_config_file << std::endl;
+			m_logger->critical("Unable to read {}", miner_config_file);
 			return false;
 		}
 
@@ -90,6 +92,7 @@ namespace config
 		}
 
 		j.at("logfile").get_to(m_logfile);
+		print_worker_config();
 		// TODO Need to add exception handling here and set return value appropriately
 		return true;
 	}
@@ -161,6 +164,25 @@ namespace config
 			}
 		}
 		return true;	
+	}
+
+	void Config::print_worker_config() const
+	{
+		std::stringstream ss;
+		ss << m_worker_config.size() << " workers configured" << std::endl;
+		for (auto const& worker : m_worker_config)
+		{
+			std::string mode{};
+			switch (worker.m_mode)
+			{
+			case Worker_mode::CPU: mode = "CPU"; break;
+			case Worker_mode::GPU: mode = "GPU"; break;
+			case Worker_mode::FPGA: mode = "FPGA"; break;
+			}
+			ss << worker.m_id << " mode: " << mode << std::endl;
+		}
+
+		m_logger->info(ss.str());
 	}
 }
 }

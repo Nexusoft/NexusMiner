@@ -9,6 +9,7 @@
 #include "config/pool.hpp"
 #include "config/types.hpp"
 
+namespace spdlog { class logger; }
 namespace nexusminer
 {
 namespace config
@@ -17,7 +18,7 @@ class Config
 {
 public:
 
-	Config();
+	explicit Config(std::shared_ptr<spdlog::logger> logger);
 
 	bool read_config(std::string const& miner_config_file);
 
@@ -38,7 +39,9 @@ private:
 
 	bool read_stats_printer_config(nlohmann::json& j);
 	bool read_worker_config(nlohmann::json& j);
+	void print_worker_config() const;
 
+	std::shared_ptr<spdlog::logger> m_logger;
 	std::string  m_wallet_ip;
 	std::uint16_t m_port;
 	std::string m_local_ip;

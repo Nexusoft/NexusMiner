@@ -21,8 +21,10 @@ namespace nexusminer
 	Miner::Miner() 
 	: m_io_context{std::make_shared<::asio::io_context>()}
 	, m_signals{std::make_shared<::asio::signal_set>(*m_io_context)}
+	, m_logger{ spdlog::stdout_color_mt("logger") }
+	, m_config{ m_logger }
 	{
-		m_logger = spdlog::stdout_color_mt("logger");
+		
 		m_logger->set_level(spdlog::level::debug);
 		m_logger->set_pattern("[%D %H:%M:%S.%e][%^%l%$] %v");
 
