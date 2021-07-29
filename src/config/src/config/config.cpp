@@ -37,64 +37,71 @@ namespace config
 			return false;
 		}
 
-		json j = json::parse(config_file);
-		j.at("wallet_ip").get_to(m_wallet_ip);
-		j.at("port").get_to(m_port);
-		if (j.count("local_ip") != 0)
+		try
 		{
-			j.at("local_ip").get_to(m_local_ip);
-		}
+			json j = json::parse(config_file);
+			j.at("wallet_ip").get_to(m_wallet_ip);
+			j.at("port").get_to(m_port);
+			if (j.count("local_ip") != 0)
+			{
+				j.at("local_ip").get_to(m_local_ip);
+			}
 
-		std::string mining_mode = j["mining_mode"];
-		std::for_each(mining_mode.begin(), mining_mode.end(), [](char & c) {
-        	c = ::tolower(c);
-    	});
+			std::string mining_mode = j["mining_mode"];
+			std::for_each(mining_mode.begin(), mining_mode.end(), [](char& c) {
+				c = ::tolower(c);
+				});
 
-		if(mining_mode == "prime")
-		{
-			m_mining_mode = Mining_mode::PRIME;
-		}
-		else
-		{
-			m_mining_mode = Mining_mode::HASH;
-		}
+			if (mining_mode == "prime")
+			{
+				m_mining_mode = Mining_mode::PRIME;
+			}
+			else
+			{
+				m_mining_mode = Mining_mode::HASH;
+			}
 
-		j.at("use_pool").get_to(m_use_pool);
-		if(m_use_pool)
-		{
-			m_pool_config.m_username = j.at("pool")["username"];
-		}
+			j.at("use_pool").get_to(m_use_pool);
+			if (m_use_pool)
+			{
+				m_pool_config.m_username = j.at("pool")["username"];
+			}
 
-		// read stats printer config
-		if(!read_stats_printer_config(j))
+			// read stats printer config
+			if (!read_stats_printer_config(j))
+			{
+				return false;
+			}
+
+			// read worker config
+			if (!read_worker_config(j))
+			{
+				return false;
+			}
+
+			// advanced configs
+			if (j.count("connection_retry_interval") != 0)
+			{
+				j.at("connection_retry_interval").get_to(m_connection_retry_interval);
+			}
+			if (j.count("print_statistics_interval") != 0)
+			{
+				j.at("print_statistics_interval").get_to(m_print_statistics_interval);
+			}
+			if (j.count("get_height_interval") != 0)
+			{
+				j.at("get_height_interval").get_to(m_get_height_interval);
+			}
+
+			j.at("logfile").get_to(m_logfile);
+			print_worker_config();
+			return true;
+		}
+		catch (std::exception& e)
 		{
+			m_logger->critical("Failed to parse logfile. Exception: {}", e.what());
 			return false;
 		}
-
-		// read worker config
-		if(!read_worker_config(j))
-		{
-			return false;
-		}
-
-		// advanced configs
-		if (j.count("connection_retry_interval") != 0)
-		{
-			j.at("connection_retry_interval").get_to(m_connection_retry_interval);
-		}
-		if (j.count("print_statistics_interval") != 0)
-		{
-			j.at("print_statistics_interval").get_to(m_print_statistics_interval);
-		}
-		if (j.count("get_height_interval") != 0)
-		{
-			j.at("get_height_interval").get_to(m_get_height_interval);
-		}
-
-		j.at("logfile").get_to(m_logfile);
-		print_worker_config();
-		// TODO Need to add exception handling here and set return value appropriately
-		return true;
 	}
 
 	bool Config::read_stats_printer_config(nlohmann::json& j)
