@@ -136,6 +136,7 @@ bool Validator::check(std::string const& config_file)
                         if (mining_mode == "prime")
                         {
                             m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/hardware", "FPGA is not supported for PRIME mining" });
+                            break;
                         }
                     }
 
@@ -144,6 +145,19 @@ bool Validator::check(std::string const& config_file)
                         if (mining_mode == "prime")
                         {
                             m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/hardware", "GPU is currently not supported for PRIME mining" });
+                            break;
+                        }
+
+                        if (worker_mode_json.count("device") == 0)
+                        {
+                            m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/device", "" });
+                        }
+                        else
+                        {
+                            if (!worker_mode_json["device"].is_number())
+                            {
+                                m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/device", "Not a number" });
+                            }
                         }
                     }
                 }

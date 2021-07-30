@@ -154,7 +154,7 @@ namespace config
 				else if(worker_mode_json["hardware"] == "gpu")
 				{
 					worker_config.m_mode = Worker_mode::GPU;
-					worker_config.m_worker_mode = Worker_config_gpu{};
+					worker_config.m_worker_mode = Worker_config_gpu{ worker_mode_json["device"] };
 				}
 				else if(worker_mode_json["hardware"] == "fpga")
 				{

@@ -22,7 +22,7 @@ struct Worker_config_fpga
 
 struct Worker_config_gpu
 {
-
+	std::uint16_t m_device;
 };
 
 class Worker_config

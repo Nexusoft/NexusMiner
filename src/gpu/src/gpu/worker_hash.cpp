@@ -1,5 +1,5 @@
 #include "gpu/worker_hash.hpp"
-#include "config/config.hpp"
+#include "config/worker_config.hpp"
 #include "stats/stats_collector.hpp"
 #include "block.hpp"
 #include <asio/io_context.hpp>
@@ -26,15 +26,15 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
 , m_best_leading_zeros{0}
 , m_met_difficulty_count{0}
 {	
-    // Initialize the cuda device associated with this ID
-    cuda_init(m_config.m_internal_id);
+    auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
+    cuda_init(worker_config_gpu.m_device);
 
     // Allocate memory associated with Device Hashing
-    cuda_sk1024_init(m_config.m_internal_id);
+    cuda_sk1024_init(worker_config_gpu.m_device);
 
     // Compute the intensity by determining number of multiprocessors
-    m_intensity = 2 * cuda_device_multiprocessors(m_config.m_internal_id);
-    m_logger->debug("{} intensity set to {}", cuda_devicename(m_config.m_internal_id), m_intensity);
+    m_intensity = 2 * cuda_device_multiprocessors(worker_config_gpu.m_device);
+    m_logger->debug("{} intensity set to {}", cuda_devicename(worker_config_gpu.m_device), m_intensity);
 
     // Calcluate the throughput for the cuda hash mining
     m_throughput = 256 * m_threads_per_block * m_intensity;
