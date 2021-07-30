@@ -16,3 +16,6 @@ target_include_directories(LLC
 )
 
 target_link_libraries(LLC OpenSSL::Crypto OpenSSL::applink)
+if(WIN32)
+    target_link_libraries(LLC crypt32.lib)
+endif()
