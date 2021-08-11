@@ -38,6 +38,7 @@ struct Hash
     int m_best_leading_zeros{0};
     int m_met_difficulty_count{0};
     int m_nonce_candidates_recieved{0};
+    int m_hash_error_count{0};
 
     Hash() = default;
 
@@ -47,6 +48,7 @@ struct Hash
         m_best_leading_zeros = other.m_best_leading_zeros;
         m_met_difficulty_count = other.m_met_difficulty_count;
         m_nonce_candidates_recieved = other.m_nonce_candidates_recieved;
+        m_hash_error_count = other.m_hash_error_count;
     }
 
     Hash& operator+=(Hash const& other)
@@ -55,7 +57,7 @@ struct Hash
         m_best_leading_zeros += std::max(m_best_leading_zeros, other.m_best_leading_zeros);
         m_met_difficulty_count += other.m_met_difficulty_count;
         m_nonce_candidates_recieved += other.m_nonce_candidates_recieved;
-
+        m_hash_error_count += m_hash_error_count;
         return *this;
     }
 };

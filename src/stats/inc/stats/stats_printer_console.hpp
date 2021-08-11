@@ -64,6 +64,8 @@ inline void Printer_console<PrinterType>::print()
             ss << std::setprecision(2) << std::fixed << (hash_stats.m_hash_count / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) / 1.0e6 << "MH/s. ";
             ss << (m_worker_config[worker_config_index].m_mode == config::Worker_mode::FPGA ? hash_stats.m_nonce_candidates_recieved : hash_stats.m_met_difficulty_count)
                 << " candidates found. Most difficult: " << hash_stats.m_best_leading_zeros;
+            if (m_worker_config[worker_config_index].m_mode == config::Worker_mode::FPGA)
+                ss << " Hash Errors: " << hash_stats.m_hash_error_count;
 
         }
         else

@@ -15,6 +15,7 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
 	, m_nonce_candidates_recieved{ 0 }
 	, m_best_leading_zeros{ 0 }
 	, m_met_difficulty_count{ 0 }
+	, m_hash_error_count{ 0 }
 	, m_pool_nbits{0}
 {
 	auto& worker_config_fpga = std::get<config::Worker_config_fpga>(m_config.m_worker_mode);
@@ -160,10 +161,11 @@ void Worker_hash::update_statistics(stats::Collector& stats_collector)
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
 	auto hash_stats = std::get<stats::Hash>(stats_collector.get_worker_stats(m_config.m_internal_id));
-	hash_stats.m_hash_count = m_nonce_candidates_recieved * nonce_difficulty_filter;
+	hash_stats.m_hash_count = (m_nonce_candidates_recieved - m_hash_error_count) * nonce_difficulty_filter;
 	hash_stats.m_best_leading_zeros = m_best_leading_zeros;
 	hash_stats.m_met_difficulty_count = m_met_difficulty_count;
 	hash_stats.m_nonce_candidates_recieved = m_nonce_candidates_recieved;
+	hash_stats.m_hash_error_count = m_hash_error_count;
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, hash_stats);
 }
@@ -196,6 +198,12 @@ bool Worker_hash::difficulty_check()
 	else
 	{
 		//m_logger->warn(m_log_leader + "Nonce fails difficulty check.");
+		//check if the hash is less than the fixed difficulty.  This indicates a possible bad hash (hardware error) from the fpga.
+		if (hashActualLeadingZeros > fpga_leading_zero_threshold)
+		{
+			m_logger->info(m_log_leader + "FPGA hash error detected.  Got {} leading zeros.  Expected {}.",hashActualLeadingZeros, fpga_leading_zero_threshold);
+			m_hash_error_count++;
+		}
 		return false;
 	}
 }
@@ -205,6 +213,7 @@ void Worker_hash::reset_statistics()
 	m_nonce_candidates_recieved = 0;
 	m_best_leading_zeros = 0;
 	m_met_difficulty_count = 0;
+	m_hash_error_count = 0;
 }
 
 }
