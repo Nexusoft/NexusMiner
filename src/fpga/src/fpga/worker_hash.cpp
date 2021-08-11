@@ -199,7 +199,7 @@ bool Worker_hash::difficulty_check()
 	{
 		//m_logger->warn(m_log_leader + "Nonce fails difficulty check.");
 		//check if the hash is less than the fixed difficulty.  This indicates a possible bad hash (hardware error) from the fpga.
-		if (hashActualLeadingZeros > fpga_leading_zero_threshold)
+		if (hashActualLeadingZeros < fpga_leading_zero_threshold)
 		{
 			m_logger->info(m_log_leader + "FPGA hash error detected.  Got {} leading zeros.  Expected {}.",hashActualLeadingZeros, fpga_leading_zero_threshold);
 			m_hash_error_count++;

@@ -27,7 +27,7 @@ endif()
 find_package(Threads REQUIRED)
 
 # OpenSSL
-set(OPENSSL_USE_STATIC_LIBS TRUE)
+#set(OPENSSL_USE_STATIC_LIBS TRUE)
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
