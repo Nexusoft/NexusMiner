@@ -15,6 +15,7 @@ link_directories(${CMAKE_SOURCE_DIR}/libs)
 
 option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
 option(WITH_PRIME "Build with PRIME mining support, BOOST and Primesieve needed" OFF)
+option(STATIC_OPENSSL "Build with static OpenSSL" ON)
 
 if(UNIX)
     add_definitions(-DUNIX)
@@ -27,7 +28,9 @@ endif()
 find_package(Threads REQUIRED)
 
 # OpenSSL
-#set(OPENSSL_USE_STATIC_LIBS TRUE)
+if(STATIC_OPENSSL)
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+endif()
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
