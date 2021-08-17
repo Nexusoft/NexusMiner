@@ -72,8 +72,10 @@ inline void Printer_console<PrinterType>::print()
         {
             auto& prime_stats = std::get<Prime>(worker);
             ss << std::setprecision(2) << std::fixed;
-            ss << (prime_stats.m_primes / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " PPS ";
-            ss << (prime_stats.m_chains / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " CPS ";
+            //ss << (prime_stats.m_primes / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " PPS ";
+            //ss << (prime_stats.m_chains / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " CPS ";
+            //MISPS = million integers searched per second
+            ss << (prime_stats.m_range_searched / (1.0e6 * static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count()))) << " MISPS ";
             ss << "Chain Count: ";
             for (auto i=2; i< prime_stats.m_chain_histogram.size(); i++)
             {

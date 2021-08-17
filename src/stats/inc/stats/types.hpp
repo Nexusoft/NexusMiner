@@ -67,6 +67,7 @@ struct Prime
     std::uint32_t m_primes{ 0 };
     std::uint32_t m_chains{ 0 };
     std::uint32_t m_difficulty{ 0 };
+    std::uint64_t m_range_searched { 0 };
     std::vector<std::uint32_t> m_chain_histogram{0,0,0,0,0,0,0,0,0,0};
 
     Prime& operator+=(Prime const& other)
