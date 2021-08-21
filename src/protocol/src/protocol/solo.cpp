@@ -89,7 +89,8 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         }
         else
         {
-            m_logger->warn("Block Obsolete Height = {}, Skipping over.", block.nHeight);
+            m_logger->warn("Block Obsolete Height = {} current_height = {}, Skipping over.", block.nHeight, m_current_height);
+            connection->transmit(get_work());
         }
     }
     else if(packet.m_header == Packet::ACCEPT)
