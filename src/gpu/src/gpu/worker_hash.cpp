@@ -3,8 +3,8 @@
 #include "stats/stats_collector.hpp"
 #include "block.hpp"
 #include <asio/io_context.hpp>
-#include "cuda/util.h"
-#include "cuda/sk1024.h"
+#include "cuda_hash/util.h"
+#include "cuda_hash/sk1024.h"
 #include "LLC/hash/SK.h"
 #include "LLC/types/uint1024.h"
 #include "LLC/types/bignum.h"

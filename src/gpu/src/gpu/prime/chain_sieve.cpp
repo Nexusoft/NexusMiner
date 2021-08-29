@@ -5,9 +5,10 @@
 #include <bitset>
 #include <sstream>
 #include <boost/integer/mod_inverse.hpp>
+#include "../cuda_prime/fermat_test.cuh"
 
 namespace nexusminer {
-    namespace cpu
+    namespace gpu
     {
         using namespace boost::multiprecision;
         Chain::Chain()
@@ -457,21 +458,44 @@ namespace nexusminer {
         void Sieve::primality_batch_test()
         {
 
-            for (auto& chain : m_chain)
+            if (m_chain.size() < m_fermat_test_batch_size || m_chain.size() > m_fermat_test_array_size)
+            {
+                m_logger->debug("Primality test batch size {} must be between {} and {}.", m_chain.size(),
+                    m_fermat_test_batch_size, m_fermat_test_array_size);
+                return;
+            }
+
+            int prime_test_actual_batch_size = m_chain.size();
+
+            uint64_t offsets[m_fermat_test_array_size] = { 0 };
+            for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
                 uint64_t base_offset;
                 int offset;
-                bool success = chain.get_next_fermat_candidate(base_offset, offset);
-                boost::multiprecision::uint1024_t candidate = m_sieve_start + base_offset + offset;
-                bool is_prime = primality_test(candidate);
-                /*uint1024_t T("0x0000005ff320ec9f9599b9cb0156c793f61060c8a8c49185df9d25603e37259c2f0213d6d96745bbbbe7ea1e4e9da371aeeb5d20c204c22a038b10957b53c67d9eb3a00acfaeb6ccd4c231a8088d5a5745e19f70387a7d91463d9b318a1f0503819a32f5fa32cf3579c7d6a3546cbdceaa364cfa2e989defeb4f5fe29de687cc");
-                uint64_t nNonce = 4933493377870005061;
-                if (candidate >= T + nNonce && candidate <= T + nNonce + 100)
-                {
-                    std::cout << "base offset: " << base_offset << " offset: " << offset << " is prime: " << is_prime << std::endl;
-                }*/
-                chain.update_fermat_status(is_prime);
+                bool success = m_chain[i].get_next_fermat_candidate(base_offset, offset);
+                if (!success)
+                    m_logger->debug("error getting next fermat candidate.");
+                offsets[i] = base_offset + offset;
             }
+
+            mpz_int base_as_mpz_int = static_cast<mpz_int>(m_sieve_start);
+            mpz_t base_as_mpz_t;
+            mpz_init(base_as_mpz_t);
+            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
+            bool primality_test_results[m_fermat_test_array_size];
+
+
+            run_primality_test(base_as_mpz_t, offsets, prime_test_actual_batch_size, primality_test_results);
+
+            for (auto i = 0; i < prime_test_actual_batch_size; i++)
+            {
+                if (primality_test_results[i])
+                    ++m_fermat_prime_count;
+                m_chain[i].update_fermat_status(primality_test_results[i]);
+            }
+            m_fermat_test_count += prime_test_actual_batch_size;
+
+
 
         }
 

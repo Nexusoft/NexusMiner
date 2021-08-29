@@ -7,6 +7,7 @@ set_property(TARGET gpu_prime PROPERTY CUDA_ARCHITECTURES 75)
 
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
 include_directories(/usr/local/cuda/include) 
+include_directories(${CMAKE_SOURCE_DIR}/gpu_include)
                     
 target_include_directories(gpu_prime
     PUBLIC 

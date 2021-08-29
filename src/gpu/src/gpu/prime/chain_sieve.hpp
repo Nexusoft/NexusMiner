@@ -9,7 +9,7 @@
 #include "sieve_utils.hpp"
 
 namespace nexusminer {
-	namespace cpu
+	namespace gpu
 	{
 		enum class Fermat_test_status {
 			untested,

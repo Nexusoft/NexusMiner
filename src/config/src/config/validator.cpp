@@ -142,11 +142,7 @@ bool Validator::check(std::string const& config_file)
 
                     if (worker_mode_json["hardware"] == "gpu")
                     {
-                        if (mining_mode == "prime")
-                        {
-                            m_mandatory_fields.push_back(Validator_error{ "workers/worker/mode/hardware", "GPU is currently not supported for PRIME mining" });
-                            break;
-                        }
+                       
 
                         if (worker_mode_json.count("device") == 0)
                         {

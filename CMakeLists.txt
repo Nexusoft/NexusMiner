@@ -14,7 +14,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 link_directories(${CMAKE_SOURCE_DIR}/libs)
 
 option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
-option(WITH_PRIME "Build with PRIME mining support, BOOST and Primesieve needed" OFF)
+option(WITH_PRIME "Build with PRIME mining support, BOOST and GMP or MPIR needed" OFF)
 option(STATIC_OPENSSL "Build with static OpenSSL" ON)
 
 if(UNIX)
@@ -85,10 +85,6 @@ add_subdirectory(src/fpga)
 
 if(WITH_GPU_CUDA)
     add_subdirectory(src/gpu)
-    include_directories(${CMAKE_SOURCE_DIR}/gpu_include)
-    if(WITH_PRIME)
-        add_subdirectory(src/prime_gpu)
-    endif()
 endif()
 
 add_executable(NexusMiner 
@@ -101,9 +97,6 @@ target_include_directories(NexusMiner PUBLIC "${PROJECT_BINARY_DIR}")
 target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker)
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
-    if (WITH_PRIME)
-        target_link_libraries(NexusMiner gpu_prime)
-    endif()
 endif()
 
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})

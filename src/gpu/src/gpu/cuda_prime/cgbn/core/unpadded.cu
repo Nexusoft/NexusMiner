@@ -34,7 +34,7 @@ class unpadded_t {
   static const uint32_t        PADDING=0;
   static const uint32_t        MAX_ROTATION=params::MAX_ROTATION;
   static const uint32_t        SHM_LIMIT=params::SHM_LIMIT;
-  static const bool            CONSTANT_TIME=params::CONSTANT_TIME;
+  static const bool            CONSTANT_TIME = false;// params::CONSTANT_TIME;
   static const cgbn_syncable_t SYNCABLE=params::SYNCABLE;  
 };
 

@@ -99,7 +99,7 @@ namespace config
 		}
 		catch (std::exception& e)
 		{
-			m_logger->critical("Failed to parse logfile. Exception: {}", e.what());
+			m_logger->critical("Failed to parse config file. Exception: {}", e.what());
 			return false;
 		}
 	}

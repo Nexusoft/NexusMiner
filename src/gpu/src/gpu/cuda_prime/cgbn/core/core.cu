@@ -56,7 +56,7 @@ class core_t {
   static const uint32_t        PADDING=env::PADDING;
   static const uint32_t        MAX_ROTATION=env::MAX_ROTATION;
   static const uint32_t        SHM_LIMIT=env::SHM_LIMIT;
-  static const bool            CONSTANT_TIME=env::CONSTANT_TIME;
+  static const bool            CONSTANT_TIME = false;// env::CONSTANT_TIME;
   static const cgbn_syncable_t SYNCABLE=env::SYNCABLE;  
 
   static const uint32_t        TPI_ONES=(1ull<<TPI)-1;
