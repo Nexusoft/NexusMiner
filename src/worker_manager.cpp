@@ -128,7 +128,11 @@ void Worker_manager::create_workers()
 #ifdef GPU_ENABLED
                 if (m_config.get_mining_mode() == config::Mining_mode::PRIME)
                 {
+#ifdef PRIME_ENABLED
                     m_workers.push_back(std::make_shared<gpu::Worker_prime>(m_io_context, worker_config));
+#else
+                    m_logger->error("NexusMiner not built 'WITH_PRIME' -> no worker created!");
+#endif
                 }
                 else
                 {
