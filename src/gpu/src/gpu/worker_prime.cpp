@@ -103,6 +103,7 @@ void Worker_prime::run()
 	uint64_t elapsed_ms = 0;
 	uint64_t high = 0;
 	uint64_t low = 0;
+	bool print_debug = false;
 
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
@@ -170,7 +171,7 @@ void Worker_prime::run()
 		auto end = std::chrono::steady_clock::now();
 		auto interval_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - interval_start); 
 		
-		if (interval_elapsed.count() > 10000)
+		if (print_debug && interval_elapsed.count() > 10000)
 		{
 			std::cout << std::endl << "--debug--" << std::endl;
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -179,8 +180,8 @@ void Worker_prime::run()
 			double chains_per_sec = 1.0e3 * m_segmented_sieve->m_chain_count / elapsed_ms;
 			double fermat_positive_rate = 1.0 * m_segmented_sieve->m_fermat_prime_count / m_segmented_sieve->m_fermat_test_count;
 			double fermat_tests_per_chain = 1.0 * m_segmented_sieve->m_fermat_test_count / m_segmented_sieve->m_chain_count;
-			std::cout << std::fixed << std::setprecision(2) << m_range_searched/1.0e9 << "billion integers searched." << 
-				"Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
+			std::cout << std::fixed << std::setprecision(2) << m_range_searched/1.0e9 << " billion integers searched." << 
+				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
 			std::cout << "Fermat Tests: " << m_segmented_sieve->m_fermat_test_count << " Fermat Primes: " << m_segmented_sieve->m_fermat_prime_count <<
 				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
@@ -255,6 +256,7 @@ void Worker_prime::fermat_performance_test()
 	using namespace boost::multiprecision;
 	using namespace boost::random;
 
+	bool cpu_verify = false;
 	typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
 	generator1024_type gen1024;
 	gen1024.seed(time(0));
@@ -267,7 +269,8 @@ void Worker_prime::fermat_performance_test()
 	//uint64_t offsets[primality_test_batch_size];
 	std::vector<uint64_t> offsets;
 	//generate an array of offsets for batch prime testing
-	for (auto i = 0; i < primality_test_batch_size; i++)
+	uint64_t offset_start = 0xFFFFFFFFFFFFFE;
+	for (uint64_t i = offset_start; i < offset_start + primality_test_batch_size; i++)
 	{
 		offsets.push_back(i * 2);
 	}
@@ -290,6 +293,14 @@ void Worker_prime::fermat_performance_test()
 	{
 		if (primality_test_results[i] == 1)
 			primes_found++;
+		if (cpu_verify)
+		{
+			bool is_prime_cpu = m_segmented_sieve->primality_test(pp + offsets[i]);
+			if (is_prime_cpu != (primality_test_results[i] == 1))
+			{
+				m_logger->debug("GPU/CPU primality test mismatch at offset {} {}", i, offsets[i]);
+			}
+		}
 	}
 
 	double expected_primes = primality_test_batch_size * 2 / (1024 * 0.693147);

@@ -137,7 +137,7 @@ namespace nexusminer {
 			Chain m_current_chain;
 
 			static constexpr int m_fermat_test_batch_size = 5000;
-			static constexpr int m_fermat_test_array_size = m_fermat_test_batch_size * 3/2;
+			//static constexpr int m_fermat_test_array_size = m_fermat_test_batch_size * 3/2;
 
 			void close_chain();
 			void open_chain(uint64_t base_offset);
@@ -151,6 +151,7 @@ namespace nexusminer {
 			bool primality_test(boost::multiprecision::uint1024_t p);
 			void test_chains();
 			void primality_batch_test();
+			void primality_batch_test_cpu();
 			void clean_chains();
 			uint64_t get_current_chain_list_length();
 			int get_fermat_test_batch_size() { return m_fermat_test_batch_size; }

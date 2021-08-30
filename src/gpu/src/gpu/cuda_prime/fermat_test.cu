@@ -195,15 +195,21 @@ class fermat_t {
     instance_t *instances=(instance_t *)malloc(sizeof(instance_t)*count);
     int         index;
     
-    mpz_t p;
+    mpz_t p, o;
     mpz_init(p);
+    mpz_init(o);
+    
 
     for(index=0;index<count;index++) {
-        mpz_add_ui(p,base_big_int,offsets[index]);
+        //mpz doesn't deal with 64 bit ints in windows.  need to use import function.
+        uint64_t off = offsets[index];
+        mpz_import(o, 1, 1, sizeof(off), 0, 0, &off);
+        mpz_add(p,base_big_int,o);
         from_mpz(p, instances[index].candidate._limbs, params::BITS/32);
         instances[index].passed=0;
     }
     mpz_clear(p);
+    mpz_clear(o);
 
     return instances;
   }
