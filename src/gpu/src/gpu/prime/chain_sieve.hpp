@@ -55,34 +55,15 @@ namespace nexusminer {
 			int m_min_chain_report_length = 4;
 			Chain_state m_chain_state = Chain_state::open;
 			uint64_t m_base_offset = 0;
-			//std::map<int, size_t> m_offset_map;  //map offsets to vector index
 			std::vector<Chain_offset> m_offsets; //offsets including 0
 			int m_gap_in_process = 0;
 			int m_next_fermat_test_offset_index = 0;
 			int m_prime_count = 0;
 			int m_untested_count = 0;
 
-			//state of primality testing inside the chain. 
-			//int m_fermat_gap_in_process = 0;
-
-			/*bool operator <(const Chain& c) {
-				if (m_base_offset < c.m_base_offset) {
-					return true;
-				}
-			}
-
-			bool operator ==(const Chain& c) {
-				if (m_base_offset == c.m_base_offset) {
-					return true;
-				}
-			}*/
-
 		private:
 
-
 		};
-
-
 
 		class Sieve
 		{
@@ -96,9 +77,8 @@ namespace nexusminer {
 			std::uint32_t get_segment_size();
 			void reset_sieve();
 			std::vector<std::uint64_t> get_valid_chain_starting_offsets();
-			//void set_chain_length_threshold(int min_chain_length);
 			void reset_stats();
-
+			std::vector<std::uint64_t> m_long_chain_starts;
 
 		private:
 			class Fermat_test_candidate {
@@ -117,15 +97,12 @@ namespace nexusminer {
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
 			static constexpr int L1_CACHE_SIZE = 32768;
 			static constexpr int L2_CACHE_SIZE = 262144;
-			//upper limit of the sieving range
-			static constexpr uint64_t sieve_range = 3e9;//3e9;
+			
 			//upper limit of the sieving primes. 
-			static constexpr uint32_t sieving_prime_limit = 3e6; //3e8;
+			static constexpr uint32_t sieving_prime_limit = 3e7; //3e8;
 			static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;
 			//each segment byte covers a range of 30 sieving primes 
 			static constexpr uint32_t m_segment_size = sieve_size * 30;
-			//number of segments needed to cover the sieving range
-			static constexpr int segments = sieve_range / m_segment_size + (sieve_range % m_segment_size != 0);
 			//we start sieving at 7
 			static constexpr int sieving_start_prime = 7;
 
@@ -155,16 +132,12 @@ namespace nexusminer {
 			//static constexpr int maxGap = 12;  //the largest allowable prime gap.
 
 			std::vector<Chain> m_chain;
-			//std::vector<Fermat_test_candidate> m_fermat_candidates;
-			std::vector<std::uint64_t> m_long_chain_starts;
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
-			//int m_gap_in_process = 0;
 
-			//int m_min_chain_length_threshold = 3;
-			static constexpr int m_fermat_test_batch_size = 30000;
-			static constexpr int m_fermat_test_array_size = m_fermat_test_batch_size * 2;
+			static constexpr int m_fermat_test_batch_size = 5000;
+			static constexpr int m_fermat_test_array_size = m_fermat_test_batch_size * 3/2;
 
 			void close_chain();
 			void open_chain(uint64_t base_offset);

@@ -123,21 +123,21 @@ void Worker_prime::run()
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
-		if (m_segmented_sieve->get_current_chain_list_length() >= m_segmented_sieve->get_fermat_test_batch_size())
-		{
-			//std::cout << "Batch Primality Testing." << std::endl;
-			auto test_chains_start = std::chrono::steady_clock::now();
-			m_segmented_sieve->primality_batch_test();
-			auto test_chains_stop = std::chrono::steady_clock::now();
-			auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
-			test_chains_ms += test_chains_elapsed.count();
-			m_segmented_sieve->clean_chains();
-		}
-		//auto test_chains_start = std::chrono::steady_clock::now();
-		//m_segmented_sieve->test_chains();
-		//auto test_chains_stop = std::chrono::steady_clock::now();
-		//auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
-		//test_chains_ms += test_chains_elapsed.count();
+		//if (m_segmented_sieve->get_current_chain_list_length() >= m_segmented_sieve->get_fermat_test_batch_size())
+		//{
+		//	//std::cout << "Batch Primality Testing." << std::endl;
+		//	auto test_chains_start = std::chrono::steady_clock::now();
+		//	m_segmented_sieve->primality_batch_test();
+		//	auto test_chains_stop = std::chrono::steady_clock::now();
+		//	auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
+		//	test_chains_ms += test_chains_elapsed.count();
+		//	m_segmented_sieve->clean_chains();
+		//}
+		auto test_chains_start = std::chrono::steady_clock::now();
+		m_segmented_sieve->test_chains();
+		auto test_chains_stop = std::chrono::steady_clock::now();
+		auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
+		test_chains_ms += test_chains_elapsed.count();
 		//check difficulty of any chains that passed through the filter
 		std::vector<std::uint64_t> good_chains = m_segmented_sieve->get_valid_chain_starting_offsets();
 		for (auto x : good_chains)
@@ -249,8 +249,8 @@ void Worker_prime::fermat_performance_test()
 	gen1024.seed(time(0));
 	// Generate some random 1024-bit unsigned values:
 	std::vector<boost::multiprecision::uint1024_t> big_uints;
-	int nn = 1000;
-	for (unsigned i = 0; i < nn; ++i)
+	int sample_size = 2000;
+	for (unsigned i = 0; i < sample_size; ++i)
 	{
 		boost::multiprecision::uint1024_t pp = gen1024();
 		//make it odd
@@ -260,14 +260,16 @@ void Worker_prime::fermat_performance_test()
 
 	int p_count = 0;
 	auto start = std::chrono::steady_clock::now();
-	for (unsigned i = 0; i < nn; ++i)
+	for (unsigned i = 0; i < sample_size; ++i)
 	{
 		p_count += 1 ? m_segmented_sieve->primality_test(big_uints[i]) : 0;
 	}
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+	double expected_primes = sample_size * 2 / (1024 * 0.693147);
 	std::stringstream ss;
-	ss << std::fixed << std::setprecision(2) << 1000.0*nn/elapsed.count()<< " primality tests/second. (" << 1.0*elapsed.count()/nn << "ms)";
+	ss << "Found " << p_count << " primes out of " << sample_size << " tested. Expected about " << expected_primes << ". ";
+	ss << std::fixed << std::setprecision(2) << 1000.0* sample_size /elapsed.count()<< " primality tests/second. (" << 1.0*elapsed.count()/ sample_size << "ms)";
 	m_logger->info(ss.str());
 	
 }

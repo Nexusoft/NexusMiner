@@ -55,30 +55,13 @@ namespace nexusminer {
 			int m_min_chain_report_length = 4;
 			Chain_state m_chain_state = Chain_state::open;
 			uint64_t m_base_offset = 0;
-			//std::map<int, size_t> m_offset_map;  //map offsets to vector index
 			std::vector<Chain_offset> m_offsets; //offsets including 0
 			int m_gap_in_process = 0;
 			int m_next_fermat_test_offset_index = 0;
 			int m_prime_count = 0;
 			int m_untested_count = 0;
 
-			//state of primality testing inside the chain. 
-			//int m_fermat_gap_in_process = 0;
-
-			/*bool operator <(const Chain& c) {
-				if (m_base_offset < c.m_base_offset) {
-					return true;
-				}
-			}
-
-			bool operator ==(const Chain& c) {
-				if (m_base_offset == c.m_base_offset) {
-					return true;
-				}
-			}*/
-
 		private:
-
 
 		};
 
@@ -96,7 +79,6 @@ namespace nexusminer {
 			std::uint32_t get_segment_size();
 			void reset_sieve();
 			std::vector<std::uint64_t> get_valid_chain_starting_offsets();
-			//void set_chain_length_threshold(int min_chain_length);
 			void reset_stats();
 
 
@@ -120,7 +102,7 @@ namespace nexusminer {
 			//upper limit of the sieving range
 			static constexpr uint64_t sieve_range = 3e9;//3e9;
 			//upper limit of the sieving primes. 
-			static constexpr uint32_t sieving_prime_limit = 3e6; //3e8;
+			static constexpr uint32_t sieving_prime_limit = 3e8; //3e8;
 			static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;
 			//each segment byte covers a range of 30 sieving primes 
 			static constexpr uint32_t m_segment_size = sieve_size * 30;
@@ -148,11 +130,6 @@ namespace nexusminer {
 			std::vector<uint32_t> m_sieving_primes;
 			std::vector<uint32_t> m_multiples;
 			std::vector<int> m_wheel_indices;
-			//
-			//std::vector<uint64_t> m_multiples;
-
-			//static constexpr int minChainLength = 8;  //min chain length
-			//static constexpr int maxGap = 12;  //the largest allowable prime gap.
 
 			std::vector<Chain> m_chain;
 			//std::vector<Fermat_test_candidate> m_fermat_candidates;

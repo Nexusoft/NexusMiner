@@ -6,7 +6,7 @@
 
 
 
-void run_primality_test(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, bool results[]);
+void run_primality_test(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[]);
 
 
 

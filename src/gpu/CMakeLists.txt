@@ -7,9 +7,19 @@ if(WITH_PRIME)
 endif()
 
 set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-#set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES 61 72)
-set(CMAKE_CUDA_FLAGS_RELEASE "-arch=sm_62 -arch=sm_75")
+set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES 62 75)
+#set(CMAKE_CUDA_FLAGS "-arch=sm_62")
+#set(CMAKE_CUDA_FLAGS "-gencode arch=compute_62,code=sm_62 -gencode arch=compute_75,code=sm_75")
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
+
+#-DNDEBUG causes nvcc build errors for some architectures
+foreach(flag_var
+    CMAKE_CUDA_FLAGS CMAKE_CUDA_FLAGS_RELEASE CMAKE_CUDA_FLAGS_RELWITHDEBINFO CMAKE_CUDA_FLAGS_MINSIZEREL)
+  if(${flag_var} MATCHES "-DNDEBUG")
+    string(REGEX REPLACE "-DNDEBUG" "" ${flag_var} "${${flag_var}}")
+  endif()
+endforeach()
+
                     
 target_include_directories(gpu
     PUBLIC 

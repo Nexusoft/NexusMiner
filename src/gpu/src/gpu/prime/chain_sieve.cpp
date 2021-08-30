@@ -46,9 +46,9 @@ namespace nexusminer {
             auto previous_offset = m_offsets[0].m_offset;
             for (int i = 0; i < m_offsets.size(); i++)
             {
-                auto o = m_offsets[i];
+                m_offsets[i];
                 if (chain_length > 0)
-                    gap += o.m_offset - previous_offset;
+                    gap += m_offsets[i].m_offset - previous_offset;
                 if (gap > maxGap)
                 {
                     //end of the fermat chain
@@ -60,18 +60,18 @@ namespace nexusminer {
                     }
                 }
                 //quit if there are not enough candidates remaining to make a full fermat chain
-                if (m_offsets.size() - i < m_min_chain_length - chain_length)
+                if (m_offsets.size() - i < (m_min_chain_length - chain_length))
                     return;
-                if (o.m_fermat_test_status == Fermat_test_status::pass)
+                if (m_offsets[i].m_fermat_test_status == Fermat_test_status::pass)
                 {
                     chain_length++;
                     gap = 0;
                     if (chain_length == 1)
                     {
-                        starting_offset = o.m_offset;
+                        starting_offset = m_offsets[i].m_offset;
                     }
                 }
-                previous_offset = o.m_offset;
+                previous_offset = m_offsets[i].m_offset;
 
             }
             return;
@@ -277,15 +277,14 @@ namespace nexusminer {
             std::fill(m_sieve.begin(), m_sieve.end(), sieve30);
             //clear the list of chains
             //m_chain = {};
-            //m_fermat_candidates = {};
             m_long_chain_starts = {};
 
         }
 
-        std::vector<std::uint64_t> Sieve::get_valid_chain_starting_offsets()
+        /*std::vector<std::uint64_t> Sieve::get_valid_chain_starting_offsets()
         {
             return m_long_chain_starts;
-        }
+        }*/
 
         //void Sieve::set_chain_length_threshold(int min_chain_length)
         //{
@@ -301,10 +300,8 @@ namespace nexusminer {
             m_chain_candidate_max_length = 0;
             m_chain_candidate_total_length = 0;
 
+
         }
-
-
-
 
         //search the sieve for chains.  Chains can cross segment boundaries.
         void Sieve::find_chains(uint64_t sieve_size, uint64_t low)
@@ -467,7 +464,7 @@ namespace nexusminer {
 
             int prime_test_actual_batch_size = m_chain.size();
 
-            uint64_t offsets[m_fermat_test_array_size] = { 0 };
+            std::vector<uint64_t> offsets;
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
                 uint64_t base_offset;
@@ -475,17 +472,17 @@ namespace nexusminer {
                 bool success = m_chain[i].get_next_fermat_candidate(base_offset, offset);
                 if (!success)
                     m_logger->debug("error getting next fermat candidate.");
-                offsets[i] = base_offset + offset;
+                offsets.push_back(base_offset + static_cast<uint64_t>(offset));
             }
 
             mpz_int base_as_mpz_int = static_cast<mpz_int>(m_sieve_start);
             mpz_t base_as_mpz_t;
             mpz_init(base_as_mpz_t);
             mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
-            bool primality_test_results[m_fermat_test_array_size];
+            std::vector<uint8_t> primality_test_results;
+            primality_test_results.resize(prime_test_actual_batch_size);
 
-
-            run_primality_test(base_as_mpz_t, offsets, prime_test_actual_batch_size, primality_test_results);
+            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data());
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
@@ -494,8 +491,6 @@ namespace nexusminer {
                 m_chain[i].update_fermat_status(primality_test_results[i]);
             }
             m_fermat_test_count += prime_test_actual_batch_size;
-
-
 
         }
 

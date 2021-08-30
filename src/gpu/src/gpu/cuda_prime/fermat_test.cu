@@ -259,7 +259,7 @@ __global__ void kernel_fermat(cgbn_error_report_t *report, typename fermat_t<par
 
 
 template<class params>
-void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, bool results[]) {
+void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, uint8_t results[]) {
   typedef typename fermat_t<params>::instance_t instance_t;
   
   instance_t          *instances, *gpuInstances;
@@ -297,7 +297,7 @@ void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, b
 
   for (auto i=0; i<instance_count; i++)
   {
-    results[i] = instances[i].passed;
+    results[i] = instances[i].passed?1:0;
   }
   
   // clean up
@@ -309,7 +309,7 @@ void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, b
 }
 
 
-void run_primality_test(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, bool results[])
+void run_primality_test(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[])
 {
     //printf("Testing %i prime candidates\n", offset_count);
 	typedef fermat_params_t<8, 1024, 5> params;
