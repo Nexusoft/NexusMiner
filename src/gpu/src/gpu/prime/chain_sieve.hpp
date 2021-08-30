@@ -50,6 +50,7 @@ namespace nexusminer {
 			bool get_next_fermat_candidate(uint64_t& base_offset, int& offset);
 			bool update_fermat_status(bool is_prime);
 			void push_back(int offset);
+			const std::string str();
 
 			int m_min_chain_length = 8;
 			int m_min_chain_report_length = 4;
@@ -76,6 +77,7 @@ namespace nexusminer {
 			void sieve_segment();
 			std::uint32_t get_segment_size();
 			void reset_sieve();
+			void clear_chains();
 			std::vector<std::uint64_t> get_valid_chain_starting_offsets();
 			void reset_stats();
 			std::vector<std::uint64_t> m_long_chain_starts;

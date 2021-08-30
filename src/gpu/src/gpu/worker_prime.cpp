@@ -86,6 +86,8 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 		//update the starting nonce to reflect the actual sieve start used
 		m_nonce = static_cast<uint64_t>(m_segmented_sieve->get_sieve_start() - m_base_hash);
 		//m_logger->debug("starting nonce: {}", m_nonce);
+		//clear out any old chains from the last block
+		m_segmented_sieve->clear_chains();
 	}
 	//restart the mining loop
 	m_stop = false;
@@ -103,7 +105,8 @@ void Worker_prime::run()
 	uint64_t elapsed_ms = 0;
 	uint64_t high = 0;
 	uint64_t low = 0;
-	bool print_debug = false;
+	uint64_t range_searched_this_cycle = 0;
+	
 
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
@@ -115,6 +118,7 @@ void Worker_prime::run()
 		high = low + segment_size - 1;
 		uint64_t sieve_size = (high - low) / 30 + 1;
 		m_range_searched += segment_size;
+		range_searched_this_cycle += segment_size;
 
 		auto sieve_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->sieve_segment();
@@ -170,7 +174,7 @@ void Worker_prime::run()
 		
 		auto end = std::chrono::steady_clock::now();
 		auto interval_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - interval_start); 
-		
+		bool print_debug = false;
 		if (print_debug && interval_elapsed.count() > 10000)
 		{
 			std::cout << std::endl << "--debug--" << std::endl;
@@ -180,14 +184,14 @@ void Worker_prime::run()
 			double chains_per_sec = 1.0e3 * m_segmented_sieve->m_chain_count / elapsed_ms;
 			double fermat_positive_rate = 1.0 * m_segmented_sieve->m_fermat_prime_count / m_segmented_sieve->m_fermat_test_count;
 			double fermat_tests_per_chain = 1.0 * m_segmented_sieve->m_fermat_test_count / m_segmented_sieve->m_chain_count;
-			std::cout << std::fixed << std::setprecision(2) << m_range_searched/1.0e9 << " billion integers searched." << 
+			std::cout << std::fixed << std::setprecision(2) << m_range_searched /1.0e9 << " billion integers searched." <<
 				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
 			std::cout << "Fermat Tests: " << m_segmented_sieve->m_fermat_test_count << " Fermat Primes: " << m_segmented_sieve->m_fermat_prime_count <<
 				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
 				1.0e6 * m_segmented_sieve->m_fermat_test_count / m_range_searched << std::endl;
 
-			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << m_range_searched / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
+			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << range_searched_this_cycle / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
 			double predicted_8chain_positivity_rate = std::pow(fermat_positive_rate, 8);
 			//std::cout << "Predicted chains tested to find one Fermat 8-chains: " << 1 / predicted_8chain_positivity_rate << std::endl;
 			//double predicted_days_between_8chains = 1.0 / (predicted_8chain_positivity_rate * chains_per_sec * 3600 * 24);

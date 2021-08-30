@@ -74,26 +74,28 @@ namespace nexusminer {
                 previous_offset = m_offsets[i].m_offset;
 
             }
+            if (chain_length > best_length)
+            {
+                best_length = chain_length;
+                offset = starting_offset;
+            }
             return;
         }
 
 
-        //is it still possible for this chain to produce a fermat chain greater than the minimum length?  
-        //use this to determine if we should give up on this chain or keep testing
+        //return true if there is more testing we can do. returns false if we should give up.
         bool Chain::is_there_still_hope()
         {
-
-
-            if ((m_prime_count + m_untested_count) < m_min_chain_length)
+            //nothing left to test
+            if (m_untested_count == 0)
+            {
                 return false;
-            else
-                return true;
+            }
 
-            //if (m_untested_count == length())
-            //{
-            //    //only should happen on a brand new chain. 
-            //    return true;
-            //}
+            return (m_prime_count + m_untested_count) >= m_min_chain_length;
+                
+
+            
 
 
             ////create a fake temporary chain where all untested candidates pass
@@ -178,6 +180,29 @@ namespace nexusminer {
             m_offsets.push_back(chain_offset);
             m_untested_count++;
             //m_offset_map[offset] = m_offsets.size();
+        }
+
+        const std::string Chain::str()
+        {
+            std::stringstream ss;
+            uint64_t base_offset;
+            int offset, best_length;
+            get_best_fermat_chain(base_offset, offset, best_length);
+            ss << "len " << best_length << "/" << length() << " " << m_prime_count << "p/" << m_untested_count
+                << "u best_start:" << offset << " test_next:" << m_next_fermat_test_offset_index << " ";
+            ss << m_base_offset << " + ";
+            for (const auto& x : m_offsets)
+            {
+                ss << x.m_offset;
+                std::string test_status = "?";
+                if (x.m_fermat_test_status == Fermat_test_status::pass)
+                    test_status = "*";
+                else if (x.m_fermat_test_status == Fermat_test_status::fail)
+                    test_status = "x";
+                ss << test_status << " ";
+            }
+            return ss.str();
+            
         }
 
 
@@ -279,6 +304,11 @@ namespace nexusminer {
             //m_chain = {};
             m_long_chain_starts = {};
 
+        }
+
+        void Sieve::clear_chains()
+        {
+            m_chain = {};
         }
 
         /*std::vector<std::uint64_t> Sieve::get_valid_chain_starting_offsets()
@@ -429,7 +459,10 @@ namespace nexusminer {
             m_fermat_prime_count += prime_count;
             m_fermat_test_count += prime_test_actual_batch_size;
             mpz_clear(base_as_mpz_t);
-            //std::cout << "GPU batch fermat test results: " << prime_count << "/" << prime_test_actual_batch_size << " (" << 100.0 * prime_count / prime_test_actual_batch_size << "%)" << std::endl;
+            double fermat_positive_rate = 100.0 * prime_count / prime_test_actual_batch_size;
+            //std::cout << "GPU batch fermat test results: " << prime_count << "/" << prime_test_actual_batch_size << " (" << fermat_positive_rate << "%)" << std::endl;
+           
+
 
         }
 
@@ -476,24 +509,23 @@ namespace nexusminer {
             {
                 uint64_t base_offset;
                 int offset, length;
-                chain.get_best_fermat_chain(base_offset, offset, length);
-                if (length > 0)
-                {
-                    //collect stats
-                    int count = std::min(static_cast<size_t>(length), m_chain_histogram.size());
-                    m_chain_histogram[count]++;
-                }
-                if (length >= chain.m_min_chain_report_length)
-                {
-                    //we found a long chain.  save it.
-                    m_logger->info("Found a fermat chain of length {}.", length);
-                    m_long_chain_starts.push_back(base_offset + offset);
-                    chain.m_chain_state = Chain::Chain_state::complete;
-                                    
-                }
-                else if (!chain.is_there_still_hope())
+
+                if (chain.m_untested_count <= 0)  
                 {
                     chain.m_chain_state = Chain::Chain_state::complete;
+                    chain.get_best_fermat_chain(base_offset, offset, length);
+                    if (length > 0)
+                    {
+                        //collect stats
+                        int count = std::min(static_cast<size_t>(length), m_chain_histogram.size());
+                        m_chain_histogram[count]++;
+                    }
+                    if (length >= chain.m_min_chain_report_length)
+                    {
+                        //we found a long chain.  save it.
+                        m_logger->info("Found a fermat chain of length {}.", length);
+                        m_long_chain_starts.push_back(base_offset + offset);
+                    }
                 }
             }
             //remove completed chains
@@ -501,6 +533,12 @@ namespace nexusminer {
                 [](Chain& c) {return c.m_chain_state == Chain::Chain_state::complete; }), m_chain.end());
             size_t chain_count_after = m_chain.size();
             //std::cout << "removed " << chain_count_before - chain_count_after << " chains" << std::endl;
+
+            /*for (Chain chain : m_chain)
+            {
+                if (chain.m_prime_count >= 5)
+                    std::cout << chain.str() << std::endl;
+            }*/
 
         }
 
