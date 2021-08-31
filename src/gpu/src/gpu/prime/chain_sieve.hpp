@@ -53,7 +53,7 @@ namespace nexusminer {
 			const std::string str();
 
 			int m_min_chain_length = 8;
-			int m_min_chain_report_length = 4;
+			int m_min_chain_report_length = 5;
 			Chain_state m_chain_state = Chain_state::open;
 			uint64_t m_base_offset = 0;
 			std::vector<Chain_offset> m_offsets; //offsets including 0

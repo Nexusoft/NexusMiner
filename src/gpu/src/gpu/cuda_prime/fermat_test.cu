@@ -244,9 +244,11 @@ class fermat_t {
 
 
 template<class params>
-__global__ void kernel_fermat(cgbn_error_report_t *report, typename fermat_t<params>::instance_t *instances, uint32_t instance_count) {
+__global__ void kernel_fermat(cgbn_error_report_t* report, typename fermat_t<params>::instance_t* instances, uint32_t instance_count) {
   int32_t instance=(blockIdx.x*blockDim.x + threadIdx.x)/params::TPI;
   
+
+
   if(instance>=instance_count)
     return;
 
@@ -276,23 +278,21 @@ void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, u
   
   //printf("Genereating instances ...\n");
   instances=fermat_t<params>::generate_instances(base_big_int, offsets, instance_count);
-  
   //printf("Copying instances to the GPU ...\n");
   CUDA_CHECK(cudaSetDevice(0));
   CUDA_CHECK(cudaMalloc((void **)&gpuInstances, sizeof(instance_t)*instance_count));
   CUDA_CHECK(cudaMemcpy(gpuInstances, instances, sizeof(instance_t)*instance_count, cudaMemcpyHostToDevice));
   
   // create a cgbn_error_report for CGBN to report back errors
-  CUDA_CHECK(cgbn_error_report_alloc(&report)); 
+  //CUDA_CHECK(cgbn_error_report_alloc(&report)); 
   
   //printf("Running GPU kernel ...\n");
-
   // launch kernel with blocks=ceil(instance_count/IPB) and threads=TPB
   kernel_fermat<params><<<(instance_count+IPB-1)/IPB, TPB>>>(report, gpuInstances, instance_count);
 
   // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
   CUDA_CHECK(cudaDeviceSynchronize());
-  CGBN_CHECK(report);
+  //CGBN_CHECK(report);
     
   // copy the instances back from gpuMemory
   //printf("Copying results back to CPU ...\n");
@@ -309,9 +309,8 @@ void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, u
   // clean up
   
   free(instances);
-  
   CUDA_CHECK(cudaFree(gpuInstances));
-  CUDA_CHECK(cgbn_error_report_free(report));
+  //CUDA_CHECK(cgbn_error_report_free(report));
 }
 
 
