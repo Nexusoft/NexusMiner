@@ -96,37 +96,39 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 
 void Worker_prime::run()
 {
-
 	m_segmented_sieve->calculate_starting_multiples();
 	uint32_t segment_size = m_segmented_sieve->get_segment_size();
+	uint32_t segment_batch_size = m_segmented_sieve->get_segment_batch_size();
+	uint32_t sieve_batch_range = segment_batch_size * segment_size;
 	uint64_t find_chains_ms = 0;
 	uint64_t sieving_ms = 0;
 	uint64_t test_chains_ms = 0;
 	uint64_t elapsed_ms = 0;
-	uint64_t high = 0;
+	//uint64_t high = 0;
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
-	
+	bool batch_sieve_mode = true;
 
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
 	{
-		m_segmented_sieve->reset_sieve();
-
+		//m_segmented_sieve->reset_sieve();
 		// current segment = [low, high]
-		high = low + segment_size - 1;
-		uint64_t sieve_size = (high - low) / 30 + 1;
-		m_range_searched += segment_size;
-		range_searched_this_cycle += segment_size;
+		//high = low + segment_size - 1;
+		//uint64_t sieve_size = (high - low) / 30 + 1;
+		m_range_searched += sieve_batch_range;
+		range_searched_this_cycle += sieve_batch_range;
 
 		auto sieve_start = std::chrono::steady_clock::now();
-		m_segmented_sieve->sieve_segment();
+		//m_segmented_sieve->sieve_segment();
+		m_segmented_sieve->sieve_batch_cpu(low);
+		//m_segmented_sieve->sieve_batch(low);
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
 		auto find_chains_start = std::chrono::steady_clock::now();
-		m_segmented_sieve->find_chains(sieve_size, low);
+		m_segmented_sieve->find_chains(low, batch_sieve_mode);
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
@@ -140,11 +142,7 @@ void Worker_prime::run()
 			test_chains_ms += test_chains_elapsed.count();
 			m_segmented_sieve->clean_chains();
 		}
-		//auto test_chains_start = std::chrono::steady_clock::now();
-		//m_segmented_sieve->test_chains();
-		//auto test_chains_stop = std::chrono::steady_clock::now();
-		//auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
-		//test_chains_ms += test_chains_elapsed.count();
+
 		//check difficulty of any chains that passed through the filter
 		for (auto x : m_segmented_sieve->m_long_chain_starts)
 		{
@@ -169,12 +167,12 @@ void Worker_prime::run()
 				}
 			}
 		}
-		low += segment_size;
+		low += sieve_batch_range;
+
 		//debug
-		
 		auto end = std::chrono::steady_clock::now();
 		auto interval_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - interval_start); 
-		bool print_debug = false;
+		bool print_debug = true;
 		if (print_debug && interval_elapsed.count() > 10000)
 		{
 			std::cout << std::endl << "--debug--" << std::endl;
@@ -203,9 +201,7 @@ void Worker_prime::run()
 			interval_start = std::chrono::steady_clock::now();
 			std::cout << std::endl;
 		}
-
 	}
-	
 }
 
 double Worker_prime::getDifficulty(uint1k p)
@@ -227,7 +223,6 @@ bool Worker_prime::difficulty_check(uint1k p)
 }
 
 
-
 LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
 {
 	std::stringstream ss;
@@ -246,7 +241,6 @@ void Worker_prime::update_statistics(stats::Collector& stats_collector)
 	prime_stats.m_difficulty = m_difficulty;
 	prime_stats.m_chain_histogram = m_segmented_sieve->m_chain_histogram;
 	prime_stats.m_range_searched = m_range_searched;
-
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, prime_stats);
 

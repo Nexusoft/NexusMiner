@@ -30,6 +30,8 @@ IN THE SOFTWARE.
 #include "cgbn/cgbn.h"
 #include "cgbn/utility/support.h"
 #include "fermat_test.cuh"
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 
 // For this example, there are quite a few template parameters that are used to generate the actual code.
 // In order to simplify passing many parameters, we use the same approach as the CGBN library, which is to

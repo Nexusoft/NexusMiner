@@ -1,11 +1,13 @@
 #include "chain_sieve.hpp"
 #include <primesieve.hpp>
 #include <vector>
+#include <queue>
 #include <chrono>
 #include <bitset>
 #include <sstream>
 #include <boost/integer/mod_inverse.hpp>
 #include "../cuda_prime/fermat_test.cuh"
+#include "../cuda_prime/sieve.cuh"
 
 namespace nexusminer {
     namespace gpu
@@ -18,6 +20,7 @@ namespace nexusminer {
         {
             open(base_offset);
         }
+
         void Chain::open(uint64_t base_offset)
         {
             m_base_offset = base_offset;
@@ -31,7 +34,8 @@ namespace nexusminer {
             m_chain_state = Chain_state::closed;
         }
 
-        //iterate through the chain and return the offset and length of the longest fermat chain that meets the mininmum gap requirement
+        //analyze the chain fermat test results.  
+        //return the starting offset and length of the longest fermat chain that meets the mininmum gap requirement
         void Chain::get_best_fermat_chain(uint64_t& base_offset, int& offset, int& best_length)
         {
             base_offset = m_base_offset;
@@ -59,9 +63,6 @@ namespace nexusminer {
                         gap = 0;
                     }
                 }
-                //quit if there are not enough candidates remaining to make a full fermat chain
-               /* if (static_cast<int>(m_offsets.size()) - i < (m_min_chain_length - chain_length))
-                    return;*/
                 if (m_offsets[i].m_fermat_test_status == Fermat_test_status::pass)
                 {
                     chain_length++;
@@ -82,7 +83,6 @@ namespace nexusminer {
             return;
         }
 
-
         //return true if there is more testing we can do. returns false if we should give up.
         bool Chain::is_there_still_hope()
         {
@@ -93,11 +93,8 @@ namespace nexusminer {
             }
 
             return (m_prime_count + m_untested_count) >= m_min_chain_length;
-                
 
-            
-
-
+            // a more complex method that screens out more chains   
             ////create a fake temporary chain where all untested candidates pass
             //Chain temp_chain(*this);
             //for (auto& offset : temp_chain.m_offsets)
@@ -117,7 +114,7 @@ namespace nexusminer {
         //get the next untested fermat candidate.  if there are none return false.
         bool Chain::get_next_fermat_candidate(uint64_t& base_offset, int& offset)
         {
-            //This finds the first untested prime candidate.
+            //This returns the next untested prime candidate.
             //There are other more complex ways to do this to minimize primality testing
             //like search for the first candidate that busts the chain if it fails
             for (auto i = 0; i < m_offsets.size(); i++)
@@ -134,8 +131,7 @@ namespace nexusminer {
             return false;
         }
 
-        //set the fermat test status of an offset.  if the offset is not found return false
-        //check if the chain meets the minimum requirement or should be discarded.
+        //set the fermat test status of an offset.  if the offset is not found return false.
         bool Chain::update_fermat_status(bool is_prime)
         {
             m_untested_count--;
@@ -151,37 +147,17 @@ namespace nexusminer {
 
             return true;
 
-            //chain offset vector must be sorted for this to work correctly
-            //std::pair<std::vector<Chain_offset>::iterator, std::vector<Chain_offset>::iterator>  candidate;
-            //Chain_offset co{ offset };
-            //candidate = std::equal_range(m_offsets.begin(), m_offsets.end(), offset);
-
-            //if (candidate.first == candidate.second)
-            //{
-            //    //offset was not found
-            //    return false;
-            //}
-            //else
-            //{
-            //    if (is_prime)
-            //    {
-            //        //std::cout << "found a prime at offset " << offset << " index " << candidate.first - m_offsets.begin() << " offset=" << candidate.first->m_offset << std::endl;
-            //    }
-            //    //offset was found.  set the primality test status
-            //    candidate.first->m_fermat_test_status = is_prime?Fermat_test_status::pass:Fermat_test_status::fail;   
-            //    return true;
-            //}
-
         }
 
+        //add a new offset to the chain
         void Chain::push_back(int offset)
         {
             Chain_offset chain_offset{ offset };
             m_offsets.push_back(chain_offset);
             m_untested_count++;
-            //m_offset_map[offset] = m_offsets.size();
         }
 
+        //create a string with information about the chain
         const std::string Chain::str()
         {
             std::stringstream ss;
@@ -202,17 +178,14 @@ namespace nexusminer {
                 ss << test_status << " ";
             }
             return ss.str();
-            
         }
-
-
-
 
         Sieve::Sieve()
             : m_logger{ spdlog::get("logger") }
         {
             m_sieve.resize(sieve_size);
             reset_stats();
+            reset_sieve_batch(0);
         }
 
         void Sieve::generate_sieving_primes()
@@ -230,7 +203,7 @@ namespace nexusminer {
 
         void Sieve::set_sieve_start(boost::multiprecision::uint1024_t sieve_start)
         {
-            //set the sieve start to a multiple of 30
+            //set the sieve start to the next highest multiple of 30
             if (sieve_start % 30 > 0)
             {
                 sieve_start += 30 - (sieve_start % 30);
@@ -243,10 +216,11 @@ namespace nexusminer {
             return m_sieve_start;
         }
 
-
         void Sieve::calculate_starting_multiples()
         {
-            //generate starting multiples of the sieving primes
+            //generate starting multiples of the sieving primes.  
+            //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
+            //do this once at the start of a new block to initialize the sieve.
             m_multiples = {};
             m_wheel_indices = {};
             m_logger->info("Calculating starting multiples.");
@@ -266,6 +240,7 @@ namespace nexusminer {
             //m_logger->info(ss.str());
         }
 
+        //run the sieve on one segment
         void Sieve::sieve_segment()
         {
             for (std::size_t i = 0; i < m_sieving_primes.size(); i++)
@@ -277,6 +252,7 @@ namespace nexusminer {
                 int next_wheel_gap = sieve30_gaps[wheel_index];
                 while (j < m_segment_size)
                 {
+                    //cross off a multiple of the sieving prime
                     m_sieve[j / 30] &= unset_bit_mask[j % 30];
                     //increment the next multiple of the current prime (rotate the wheel).
                     j += k * next_wheel_gap;
@@ -286,8 +262,43 @@ namespace nexusminer {
                 //save the starting multiple and wheel index for the next segment
                 m_multiples[i] = j - m_segment_size;
                 m_wheel_indices[i] = wheel_index;
-                //std::cout << "multiples[" << i << "]: " << j - segment_size << std::endl;
+            }
+        }
+        //run the sieve on the gpu
+        void Sieve::sieve_batch(uint64_t low)
+        {
+            reset_sieve_batch(low);
+            uint32_t sieve_results_size = m_sieve_batch_buffer_size;
+            m_sieve_results.resize(m_sieve_batch_buffer_size);
+            if (sieve_run_cout == 0)
+            {
+                std::cout << "a" << std::endl;
+            }
+            run_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
+                m_wheel_indices.data(), m_sieve_results.data(), sieve_results_size);
+            if (sieve_run_cout == 2)
+            {
+                std::cout << "b" << std::endl;
+            }
+            if (sieve_results_size != m_sieve_batch_buffer_size)
+            {
+                std::cout << "unexpected sieve results buffer size got "
+                    << sieve_results_size << " expected " << m_sieve_batch_buffer_size << std::endl;
+            }
+            sieve_run_cout++;
 
+        }
+
+        //batch sieve on the cpu for debug
+        void Sieve::sieve_batch_cpu(uint64_t low)
+        {
+            reset_sieve_batch(low);
+            for (auto i = 0; i < m_segment_batch_size; i++)
+            {
+                reset_sieve();
+                sieve_segment();
+                //save the results of the sieve
+                m_sieve_results.insert(m_sieve_results.end(), m_sieve.begin(), m_sieve.end());
             }
         }
 
@@ -296,30 +307,29 @@ namespace nexusminer {
             return m_segment_size;
         }
 
+        std::uint32_t Sieve::get_segment_batch_size()
+        {
+            return m_segment_batch_size;
+        }
+
         void Sieve::reset_sieve()
         {
             //fill the sieve with default values (all ones)
             std::fill(m_sieve.begin(), m_sieve.end(), sieve30);
-            //clear the list of chains
-            //m_chain = {};
+            //clear the list of long chains found. 
             m_long_chain_starts = {};
+        }
 
+        void Sieve::reset_sieve_batch(uint64_t low)
+        {
+            m_sieve_results = {};
+            m_sieve_batch_start_offset = low;
         }
 
         void Sieve::clear_chains()
         {
             m_chain = {};
         }
-
-        /*std::vector<std::uint64_t> Sieve::get_valid_chain_starting_offsets()
-        {
-            return m_long_chain_starts;
-        }*/
-
-        //void Sieve::set_chain_length_threshold(int min_chain_length)
-        //{
-        //    m_min_chain_length_threshold = min_chain_length;
-        //}
 
         void Sieve::reset_stats()
         {
@@ -329,16 +339,41 @@ namespace nexusminer {
             m_chain_count = 0;
             m_chain_candidate_max_length = 0;
             m_chain_candidate_total_length = 0;
-
-
         }
 
-        //search the sieve for chains.  Chains can cross segment boundaries.
-        void Sieve::find_chains(uint64_t sieve_size, uint64_t low)
+        //search the sieve for chains that meet the minimum length requirement.  Chains can cross segment boundaries.
+        void Sieve::find_chains(uint64_t low, bool batch_sieve_mode)
         {
+            std::vector<uint8_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
+            uint64_t sieve_size = sieve.size();
+
+            //get popcount of the first three bytes  
+            int hits_next_four_bytes = 0;
+            std::queue<int> pop_count;
+            pop_count.push(0);
+            for (int i = 0; i < 3; i++)
+            {
+                int pop_count_this_byte = popcnt[sieve[i]];
+                pop_count.push(pop_count_this_byte);
+                hits_next_four_bytes += pop_count_this_byte;
+            }
             for (uint64_t n = 0; n < sieve_size; n++)
             {
-                if (m_sieve[n] == 0)
+                //remove the oldest popcount from the running sum.
+                hits_next_four_bytes -= pop_count.front();
+                pop_count.pop();
+                //get popcount of the current byte
+                if (n + 3 < sieve_size)
+                {
+                    pop_count.push(popcnt[sieve[n + 3]]);
+                    hits_next_four_bytes += pop_count.back(); 
+                }
+                if (!m_chain_in_process && hits_next_four_bytes < m_min_chain_length)
+                {
+                    //not enough prime candidates in the next 120 numbers to make a long enough chain
+
+                }
+                else if (sieve[n] == 0)
                 {
                     //no primes in this group of 30.  end the current chain if it is open.
                     if (m_chain_in_process)
@@ -349,9 +384,9 @@ namespace nexusminer {
                     int index_of_highest_set_bit = 0;
                     int sieve_offset = 0;
                     int previous_sieve_offset = 0;
-                    for (uint8_t b = m_sieve[n]; b > 0; b &= b - 1)
+                    for (uint8_t b = sieve[n]; b > 0; b &= b - 1)
                     {
-                        int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                        int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//c++20 alternative to lsb(b) is std::countr_zero(b);
                         sieve_offset = sieve30_offsets[index_of_lowest_set_bit];
                         uint64_t prime_candidate_offset = low + n * 30 + sieve_offset;
                         if (m_chain_in_process)
@@ -388,8 +423,12 @@ namespace nexusminer {
                         }
                     }
                 }
-
+               
             }
+        }
+
+        void Sieve::find_chains_batch(uint64_t low)
+        {
         }
 
         void Sieve::close_chain()
@@ -411,9 +450,7 @@ namespace nexusminer {
             //reset chain in process to the default
             m_current_chain = { base_offset };
             m_chain_in_process = true;
-
         }
-
 
         //batch process the list of prime candidates to be fermat tested.  
         void Sieve::primality_batch_test()
@@ -447,6 +484,7 @@ namespace nexusminer {
                 if (primality_test_results[i] == 1)
                     ++prime_count;
                 m_chain[i].update_fermat_status(primality_test_results[i]);
+                //test to verify the gpu primality test results vs the cpu.  this slows things down significantly.
                 if (cpu_verify)
                 {
                     bool is_prime_cpu = primality_test(m_sieve_start + offsets[i]);
@@ -461,11 +499,9 @@ namespace nexusminer {
             mpz_clear(base_as_mpz_t);
             double fermat_positive_rate = 100.0 * prime_count / prime_test_actual_batch_size;
             //std::cout << "GPU batch fermat test results: " << prime_count << "/" << prime_test_actual_batch_size << " (" << fermat_positive_rate << "%)" << std::endl;
-           
-
-
         }
 
+        //use the cpu to prime test in batch mode.  This is slower than the gpu and is intended for debug.
         void Sieve::primality_batch_test_cpu()
         {
             uint64_t prime_count = 0;
@@ -480,12 +516,6 @@ namespace nexusminer {
                 }
                 boost::multiprecision::uint1024_t candidate = m_sieve_start + base_offset + offset;
                 bool is_prime = primality_test(candidate);
-                /*uint1024_t T("0x0000005ff320ec9f9599b9cb0156c793f61060c8a8c49185df9d25603e37259c2f0213d6d96745bbbbe7ea1e4e9da371aeeb5d20c204c22a038b10957b53c67d9eb3a00acfaeb6ccd4c231a8088d5a5745e19f70387a7d91463d9b318a1f0503819a32f5fa32cf3579c7d6a3546cbdceaa364cfa2e989defeb4f5fe29de687cc");
-                uint64_t nNonce = 4933493377870005061;
-                if (candidate >= T + nNonce && candidate <= T + nNonce + 100)
-                {
-                    std::cout << "base offset: " << base_offset << " offset: " << offset << " is prime: " << is_prime << std::endl;
-                }*/
                 chain.update_fermat_status(is_prime);
                 if (is_prime)
                 {
@@ -493,7 +523,6 @@ namespace nexusminer {
                 }
             }
             std::cout << "CPU batch fermat test results: " << prime_count << "/" << m_chain.size() << " (" << 100.0 * prime_count / m_chain.size() << "%)" << std::endl;
-
         }
 
         uint64_t Sieve::get_current_chain_list_length()
@@ -502,6 +531,7 @@ namespace nexusminer {
         }
 
         //search for winners.  delete finished or hopeless chains.
+        //run this after batch primality testing.
         void Sieve::clean_chains()
         {
             size_t chain_count_before = m_chain.size();
@@ -510,8 +540,12 @@ namespace nexusminer {
                 uint64_t base_offset;
                 int offset, length;
 
+                //this approach keeps chains until all offsets in the chain have been tested.
+                //This runs more primality tests but finds alot of short chains. 
+                //Use is_there_still_hope() instead to reduce fermat testing.  Fewer short chains will be found which feels worse but is acutally faster for finding long chains.
                 if (chain.m_untested_count <= 0)  
                 {
+                    //chain is tested.  mark as complete.
                     chain.m_chain_state = Chain::Chain_state::complete;
                     chain.get_best_fermat_chain(base_offset, offset, length);
                     if (length > 0)
@@ -532,17 +566,10 @@ namespace nexusminer {
             m_chain.erase(std::remove_if(m_chain.begin(), m_chain.end(),
                 [](Chain& c) {return c.m_chain_state == Chain::Chain_state::complete; }), m_chain.end());
             size_t chain_count_after = m_chain.size();
-            //std::cout << "removed " << chain_count_before - chain_count_after << " chains" << std::endl;
-
-            /*for (Chain chain : m_chain)
-            {
-                if (chain.m_prime_count >= 5)
-                    std::cout << chain.str() << std::endl;
-            }*/
 
         }
 
-
+        //for debug
         uint64_t Sieve::count_fermat_primes(uint64_t sieve_size, uint64_t low)
         {
             uint64_t count = 0;
@@ -558,16 +585,6 @@ namespace nexusminer {
 
             }
             return count;
-        }
-
-        bool operator < (const Chain::Chain_offset& c1, const Chain::Chain_offset& c2)
-        {
-            return c1.m_offset < c2.m_offset;
-        }
-
-        bool operator == (const Chain::Chain_offset& c1, const Chain::Chain_offset& c2)
-        {
-            return c1.m_offset == c2.m_offset;
         }
 
         bool Sieve::primality_test(boost::multiprecision::uint1024_t p)

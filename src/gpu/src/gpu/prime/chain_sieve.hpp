@@ -36,8 +36,6 @@ namespace nexusminer {
 				int m_offset = 0;  //offset from the base offset
 				Fermat_test_status m_fermat_test_status = Fermat_test_status::untested;
 				Chain_offset(int offset) :m_offset{ offset }, m_fermat_test_status{ Fermat_test_status::untested }{};
-				friend bool operator < (const Chain_offset& c1, const Chain_offset& c2);
-				friend bool operator == (const Chain_offset& c1, const Chain_offset& c2);
 			};
 
 			Chain();
@@ -75,12 +73,36 @@ namespace nexusminer {
 			boost::multiprecision::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
 			void sieve_segment();
+			void sieve_batch(uint64_t low);
+			void sieve_batch_cpu(uint64_t low);
 			std::uint32_t get_segment_size();
+			std::uint32_t get_segment_batch_size();
 			void reset_sieve();
+			void reset_sieve_batch(uint64_t low);
 			void clear_chains();
 			std::vector<std::uint64_t> get_valid_chain_starting_offsets();
 			void reset_stats();
+			void find_chains(uint64_t low, bool batch_sieve_mode);
+			void find_chains_batch(uint64_t low);
+			uint64_t count_fermat_primes(uint64_t sieve_size, uint64_t low);
+			bool primality_test(boost::multiprecision::uint1024_t p);
+			void test_chains();
+			void primality_batch_test();
+			void primality_batch_test_cpu();
+			void clean_chains();
+			uint64_t get_current_chain_list_length();
+			int get_fermat_test_batch_size() { return m_fermat_test_batch_size; }
 			std::vector<std::uint64_t> m_long_chain_starts;
+			uint64_t m_sieve_batch_start_offset;
+
+
+			//stats
+			std::vector<std::uint32_t> m_chain_histogram;
+			uint64_t m_fermat_test_count = 0;
+			uint64_t m_fermat_prime_count = 0;
+			uint64_t m_chain_count = 0;
+			int m_chain_candidate_max_length = 0;
+			uint64_t m_chain_candidate_total_length = 0;
 
 		private:
 			class Fermat_test_candidate {
@@ -102,11 +124,13 @@ namespace nexusminer {
 			
 			//upper limit of the sieving primes. 
 			static constexpr uint32_t sieving_prime_limit = 3e7; //3e8;
-			static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;
+			static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;  //size of the sieve in bytes
 			//each segment byte covers a range of 30 sieving primes 
 			static constexpr uint32_t m_segment_size = sieve_size * 30;
 			//we start sieving at 7
 			static constexpr int sieving_start_prime = 7;
+			static constexpr int m_min_chain_length = 8;
+			
 
 			/// Bitmasks used to unset bits
 			static constexpr uint8_t unset_bit_mask[30] =
@@ -121,50 +145,44 @@ namespace nexusminer {
 				(uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7)
 			};
 
+			//how many bits are set in a byte
+			static constexpr int popcnt[256] =
+			{
+			  0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
+			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
+			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
+			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
+			  4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
+			};
 
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<uint8_t> m_sieve;
 			std::vector<uint32_t> m_sieving_primes;
 			std::vector<uint32_t> m_multiples;
 			std::vector<int> m_wheel_indices;
-			//
-			//std::vector<uint64_t> m_multiples;
-
-			//static constexpr int minChainLength = 8;  //min chain length
-			//static constexpr int maxGap = 12;  //the largest allowable prime gap.
-
 			std::vector<Chain> m_chain;
+			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
-
-			static constexpr int m_fermat_test_batch_size = 5000;
-			//static constexpr int m_fermat_test_array_size = m_fermat_test_batch_size * 3/2;
-
+			static constexpr int m_fermat_test_batch_size = 10000;
+			static constexpr int m_segment_batch_size = 1; //number of segments to batch process
+			static constexpr int m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 			void close_chain();
 			void open_chain(uint64_t base_offset);
-
-
-
-		public:
-			//void do_sieve();
-			void find_chains(uint64_t sieve_size, uint64_t low);
-			uint64_t count_fermat_primes(uint64_t sieve_size, uint64_t low);
-			bool primality_test(boost::multiprecision::uint1024_t p);
-			void test_chains();
-			void primality_batch_test();
-			void primality_batch_test_cpu();
-			void clean_chains();
-			uint64_t get_current_chain_list_length();
-			int get_fermat_test_batch_size() { return m_fermat_test_batch_size; }
-
-			//stats
-			std::vector<std::uint32_t> m_chain_histogram;
-			uint64_t m_fermat_test_count = 0;
-			uint64_t m_fermat_prime_count = 0;
-			uint64_t m_chain_count = 0;
-			int m_chain_candidate_max_length = 0;
-			uint64_t m_chain_candidate_total_length = 0;
+			int sieve_run_cout = 0;
+			
 		};
 
 	}

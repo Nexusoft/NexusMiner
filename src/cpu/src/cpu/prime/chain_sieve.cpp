@@ -1,6 +1,7 @@
 #include "chain_sieve.hpp"
 #include <primesieve.hpp>
 #include <vector>
+#include <queue>
 #include <chrono>
 #include <bitset>
 #include <sstream>
@@ -308,9 +309,34 @@ namespace nexusminer {
         //search the sieve for chains.  Chains can cross segment boundaries.
         void Sieve::find_chains(uint64_t sieve_size, uint64_t low)
         {
+            //get popcount of the first three bytes  
+            int hits_next_four_bytes = 0;
+            std::queue<int> pop_count;
+            pop_count.push(0);
+            for (int i = 0; i < 3; i++)
+            {
+                int pop_count_this_byte = popcnt[m_sieve[i]];
+                pop_count.push(pop_count_this_byte);
+                hits_next_four_bytes += pop_count_this_byte;
+            }
+
             for (uint64_t n = 0; n < sieve_size; n++)
             {
-                if (m_sieve[n] == 0)
+                //remove the oldest popcount from the running sum.
+                hits_next_four_bytes -= pop_count.front();
+                pop_count.pop();
+                //get popcount of the current byte
+                if (n + 3 < sieve_size)
+                {
+                    pop_count.push(popcnt[m_sieve[n + 3]]);
+                    hits_next_four_bytes += pop_count.back();
+                }
+                if (!m_chain_in_process && hits_next_four_bytes < m_min_chain_length)
+                {
+                    //not enough prime candidates in the next 120 numbers to make a long enough chain
+
+                }
+                else if (m_sieve[n] == 0)
                 {
                     //no primes in this group of 30.  end the current chain if it is open.
                     if (m_chain_in_process)
