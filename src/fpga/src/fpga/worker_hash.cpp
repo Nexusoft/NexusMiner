@@ -61,6 +61,12 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 		m_pool_nbits = nbits;
 	}
 
+	send_block_to_fpga();
+    
+}
+
+void Worker_hash::send_block_to_fpga()
+{
 	std::vector<unsigned char> headerB = m_block.GetHeaderBytes();
 	//calculate midstate
 	m_skein.setMessage(headerB);
@@ -83,7 +89,6 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 	}
 
 	start_read();
-    
 }
 
 void Worker_hash::start_read()
@@ -201,8 +206,11 @@ bool Worker_hash::difficulty_check()
 		//check if the hash is less than the fixed difficulty.  This indicates a possible bad hash (hardware error) from the fpga.
 		if (hashActualLeadingZeros < fpga_leading_zero_threshold)
 		{
-			m_logger->info(m_log_leader + "FPGA hash error detected.  Got {} leading zeros.  Expected {}.",hashActualLeadingZeros, fpga_leading_zero_threshold);
 			m_hash_error_count++;
+			m_logger->info(m_log_leader + "FPGA hash error detected.  Got {} leading zeros.  Expected {}.",hashActualLeadingZeros, fpga_leading_zero_threshold);
+			//something is not right.  try resending the block header to the fpga
+			send_block_to_fpga();
+			
 		}
 		return false;
 	}

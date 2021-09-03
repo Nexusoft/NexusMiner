@@ -35,6 +35,7 @@ private:
     void start_read();
     void handle_read(const asio::error_code& error, std::size_t bytes_transferred);
     bool difficulty_check();
+    void send_block_to_fpga();
 
     static constexpr int baud = 230400;
     static constexpr int workPackageLength = 224; //bytes
