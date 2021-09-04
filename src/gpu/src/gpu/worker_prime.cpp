@@ -21,13 +21,15 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_prime_helper{std::make_unique<Prime>()}
 	, m_segmented_sieve{std::make_unique<Sieve>()}
 	, m_stop{ true }
-	, m_log_leader{ "CPU Worker " + m_config.m_id + ": " }
+	, m_log_leader{ "GPU Worker " + m_config.m_id + ": " }
 	, m_primes{ 0 }
 	, m_chains{ 0 }
 	, m_difficulty{ 0 }
 	, m_pool_nbits{ 0 }
 {
 	m_segmented_sieve->generate_sieving_primes();
+	double p_is_prime = m_segmented_sieve->probability_is_prime_after_sieve();
+	m_logger->info("Predicted Fermat Positive Rate: {0:.2f}%", p_is_prime*100);
 	fermat_performance_test();
 	m_chain_histogram = std::vector<std::uint32_t>(10, 0);
 }
@@ -122,8 +124,8 @@ void Worker_prime::run()
 
 		auto sieve_start = std::chrono::steady_clock::now();
 		//m_segmented_sieve->sieve_segment();
-		m_segmented_sieve->sieve_batch_cpu(low);
-		//m_segmented_sieve->sieve_batch(low);
+		//m_segmented_sieve->sieve_batch_cpu(low);
+		m_segmented_sieve->sieve_batch(low);
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
@@ -175,7 +177,7 @@ void Worker_prime::run()
 		bool print_debug = true;
 		if (print_debug && interval_elapsed.count() > 10000)
 		{
-			std::cout << std::endl << "--debug--" << std::endl;
+			std::cout << "--debug--" << std::endl;
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 			elapsed_ms = elapsed.count();
 			double chains_per_mm = 1.0e6 * m_segmented_sieve->m_chain_count / m_range_searched;

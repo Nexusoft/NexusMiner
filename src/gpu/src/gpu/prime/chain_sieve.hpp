@@ -80,10 +80,8 @@ namespace nexusminer {
 			void reset_sieve();
 			void reset_sieve_batch(uint64_t low);
 			void clear_chains();
-			std::vector<std::uint64_t> get_valid_chain_starting_offsets();
 			void reset_stats();
 			void find_chains(uint64_t low, bool batch_sieve_mode);
-			void find_chains_batch(uint64_t low);
 			uint64_t count_fermat_primes(uint64_t sieve_size, uint64_t low);
 			bool primality_test(boost::multiprecision::uint1024_t p);
 			void test_chains();
@@ -92,9 +90,9 @@ namespace nexusminer {
 			void clean_chains();
 			uint64_t get_current_chain_list_length();
 			int get_fermat_test_batch_size() { return m_fermat_test_batch_size; }
+			double probability_is_prime_after_sieve();
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-
 
 			//stats
 			std::vector<std::uint32_t> m_chain_histogram;
@@ -124,13 +122,14 @@ namespace nexusminer {
 			
 			//upper limit of the sieving primes. 
 			static constexpr uint32_t sieving_prime_limit = 3e7; //3e8;
-			static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;  //size of the sieve in bytes
+			//static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;  //size of the sieve in bytes
+			static constexpr uint32_t sieve_size = L1_CACHE_SIZE;  //size of the sieve in bytes
+
 			//each segment byte covers a range of 30 sieving primes 
 			static constexpr uint32_t m_segment_size = sieve_size * 30;
 			//we start sieving at 7
 			static constexpr int sieving_start_prime = 7;
-			static constexpr int m_min_chain_length = 8;
-			
+			static constexpr int m_min_chain_length = 8;	
 
 			/// Bitmasks used to unset bits
 			static constexpr uint8_t unset_bit_mask[30] =
@@ -176,7 +175,7 @@ namespace nexusminer {
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
-			static constexpr int m_fermat_test_batch_size = 10000;
+			static constexpr int m_fermat_test_batch_size = 100;
 			static constexpr int m_segment_batch_size = 1; //number of segments to batch process
 			static constexpr int m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 			void close_chain();

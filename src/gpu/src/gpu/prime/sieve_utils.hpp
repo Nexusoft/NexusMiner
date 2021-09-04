@@ -39,7 +39,7 @@ static T2 get_offset_to_next_multiple(T1 x, T2 n)
         m += 2 * n;
     }
     return m;
-
 }
+
 
 #endif

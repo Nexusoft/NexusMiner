@@ -31,24 +31,24 @@ namespace nexusminer {
             m_chain_state = Chain_state::closed;
         }
 
-        //iterate through the chain and return the offset and length of the longest fermat chain that meets the mininmum gap requirement
-        void Chain::get_best_fermat_chain(uint64_t& base_offset, int& offset, int& chain_length)
+        //analyze the chain fermat test results.  
+        //return the starting offset and length of the longest fermat chain that meets the mininmum gap requirement
+        void Chain::get_best_fermat_chain(uint64_t& base_offset, int& offset, int& best_length)
         {
             base_offset = m_base_offset;
             offset = 0;
-            chain_length = 0;
+            int chain_length = 0;
+            best_length = 0;
             if (length() == 0)
                 return;
 
-            int best_length = 0;
             int gap = 0;
             int starting_offset = 0;
             auto previous_offset = m_offsets[0].m_offset;
             for (int i = 0; i < m_offsets.size(); i++)
             {
-                auto o = m_offsets[i];
                 if (chain_length > 0)
-                    gap += o.m_offset - previous_offset;
+                    gap += m_offsets[i].m_offset - previous_offset;
                 if (gap > maxGap)
                 {
                     //end of the fermat chain
@@ -57,65 +57,63 @@ namespace nexusminer {
                         best_length = chain_length;
                         offset = starting_offset;
                         chain_length = 0;
+                        gap = 0;
                     }
                 }
-                //quit if there are not enough candidates remaining to make a full fermat chain
-                if (m_offsets.size() - i < m_min_chain_length - chain_length)
-                    return;
-                if (o.m_fermat_test_status == Fermat_test_status::pass)
+                if (m_offsets[i].m_fermat_test_status == Fermat_test_status::pass)
                 {
                     chain_length++;
                     gap = 0;
                     if (chain_length == 1)
                     {
-                        starting_offset = o.m_offset;
+                        starting_offset = m_offsets[i].m_offset;
                     }
                 }
-                previous_offset = o.m_offset;
+                previous_offset = m_offsets[i].m_offset;
 
+            }
+            if (chain_length > best_length)
+            {
+                best_length = chain_length;
+                offset = starting_offset;
             }
             return;
         }
 
-
-        //is it still possible for this chain to produce a fermat chain greater than the minimum length?  
-        //use this to determine if we should give up on this chain or keep testing
+        //return true if there is more testing we can do. returns false if we should give up.
         bool Chain::is_there_still_hope()
         {
-
-
-            if ((m_prime_count + m_untested_count) < m_min_chain_length)
+            //nothing left to test
+            if (m_untested_count == 0)
+            {
                 return false;
-            else
-                return true;
-
-            if (m_untested_count == length())
-            {
-                //only should happen on a brand new chain. 
-                return true;
             }
 
+            return ((m_prime_count + m_untested_count) >= m_min_chain_length);
+            
 
-            //create a fake temporary chain where all untested candidates pass
-            Chain temp_chain(*this);
-            for (auto& offset : temp_chain.m_offsets)
-            {
-                if (offset.m_fermat_test_status == Fermat_test_status::untested)
+                // a more complex method that screens out more chains   
+                //create a fake temporary chain where all untested candidates pass
+                /*Chain temp_chain(*this);
+                for (auto& offset : temp_chain.m_offsets)
                 {
-                    offset.m_fermat_test_status = Fermat_test_status::pass;
+                    if (offset.m_fermat_test_status == Fermat_test_status::untested)
+                    {
+                        offset.m_fermat_test_status = Fermat_test_status::pass;
+                    }
                 }
-            }
-            int max_possible_length, offset;
-            uint64_t base_offset;
-            temp_chain.get_best_fermat_chain(base_offset, offset, max_possible_length);
-            return (max_possible_length >= m_min_chain_length);
+                int max_possible_length, offset;
+                uint64_t base_offset;
+                temp_chain.get_best_fermat_chain(base_offset, offset, max_possible_length);
+                return (max_possible_length >= m_min_chain_length);*/
+
 
         }
 
         //get the next untested fermat candidate.  if there are none return false.
         bool Chain::get_next_fermat_candidate(uint64_t& base_offset, int& offset)
         {
-            //This finds the first untested prime candidate.
+            //This returns the next untested prime candidate.
             //There are other more complex ways to do this to minimize primality testing
             //like search for the first candidate that busts the chain if it fails
             for (auto i = 0; i < m_offsets.size(); i++)
@@ -132,8 +130,7 @@ namespace nexusminer {
             return false;
         }
 
-        //set the fermat test status of an offset.  if the offset is not found return false
-        //check if the chain meets the minimum requirement or should be discarded.
+        //set the fermat test status of an offset.  if the offset is not found return false.
         bool Chain::update_fermat_status(bool is_prime)
         {
             m_untested_count--;
@@ -149,27 +146,6 @@ namespace nexusminer {
 
             return true;
 
-            //chain offset vector must be sorted for this to work correctly
-            //std::pair<std::vector<Chain_offset>::iterator, std::vector<Chain_offset>::iterator>  candidate;
-            //Chain_offset co{ offset };
-            //candidate = std::equal_range(m_offsets.begin(), m_offsets.end(), offset);
-
-            //if (candidate.first == candidate.second)
-            //{
-            //    //offset was not found
-            //    return false;
-            //}
-            //else
-            //{
-            //    if (is_prime)
-            //    {
-            //        //std::cout << "found a prime at offset " << offset << " index " << candidate.first - m_offsets.begin() << " offset=" << candidate.first->m_offset << std::endl;
-            //    }
-            //    //offset was found.  set the primality test status
-            //    candidate.first->m_fermat_test_status = is_prime?Fermat_test_status::pass:Fermat_test_status::fail;   
-            //    return true;
-            //}
-
         }
 
         void Chain::push_back(int offset)
@@ -179,15 +155,36 @@ namespace nexusminer {
             m_untested_count++;
             //m_offset_map[offset] = m_offsets.size();
         }
-
-
-
+		
+		//create a string with information about the chain
+        const std::string Chain::str()
+        {
+            std::stringstream ss;
+            uint64_t base_offset;
+            int offset, best_length;
+            get_best_fermat_chain(base_offset, offset, best_length);
+            ss << "len " << best_length << "/" << length() << " " << m_prime_count << "p/" << m_untested_count
+                << "u best_start:" << offset << " test_next:" << m_next_fermat_test_offset_index << " ";
+            ss << m_base_offset << " + ";
+            for (const auto& x : m_offsets)
+            {
+                ss << x.m_offset;
+                std::string test_status = "?";
+                if (x.m_fermat_test_status == Fermat_test_status::pass)
+                    test_status = "*";
+                else if (x.m_fermat_test_status == Fermat_test_status::fail)
+                    test_status = "x";
+                ss << test_status << " ";
+            }
+            return ss.str();
+        }
 
         Sieve::Sieve()
             : m_logger{ spdlog::get("logger") }
         {
             m_sieve.resize(sieve_size);
             reset_stats();
+			reset_sieve_batch(0);
         }
 
         void Sieve::generate_sieving_primes()
@@ -217,7 +214,6 @@ namespace nexusminer {
         {
             return m_sieve_start;
         }
-
 
         void Sieve::calculate_starting_multiples()
         {
@@ -261,8 +257,19 @@ namespace nexusminer {
                 //save the starting multiple and wheel index for the next segment
                 m_multiples[i] = j - m_segment_size;
                 m_wheel_indices[i] = wheel_index;
-                //std::cout << "multiples[" << i << "]: " << j - segment_size << std::endl;
-
+            }
+        }
+		
+		//batch sieve on the cpu for debug
+        void Sieve::sieve_batch_cpu(uint64_t low)
+        {
+            reset_sieve_batch(low);
+            for (auto i = 0; i < m_segment_batch_size; i++)
+            {
+                reset_sieve();
+                sieve_segment();
+                //save the results of the sieve
+                m_sieve_results.insert(m_sieve_results.end(), m_sieve.begin(), m_sieve.end());
             }
         }
 
@@ -275,22 +282,20 @@ namespace nexusminer {
         {
             //fill the sieve with default values (all ones)
             std::fill(m_sieve.begin(), m_sieve.end(), sieve30);
-            //clear the list of chains
-            m_chain = {};
             //m_fermat_candidates = {};
             m_long_chain_starts = {};
-
         }
-
-        std::vector<std::uint64_t> Sieve::get_valid_chain_starting_offsets()
+		
+		void Sieve::reset_sieve_batch(uint64_t low)
         {
-            return m_long_chain_starts;
+            m_sieve_results = {};
+            m_sieve_batch_start_offset = low;
         }
 
-        //void Sieve::set_chain_length_threshold(int min_chain_length)
-        //{
-        //    m_min_chain_length_threshold = min_chain_length;
-        //}
+        void Sieve::clear_chains()
+        {
+            m_chain = {};
+        }
 
         void Sieve::reset_stats()
         {
@@ -300,26 +305,24 @@ namespace nexusminer {
             m_chain_count = 0;
             m_chain_candidate_max_length = 0;
             m_chain_candidate_total_length = 0;
-
         }
 
-
-
-
-        //search the sieve for chains.  Chains can cross segment boundaries.
-        void Sieve::find_chains(uint64_t sieve_size, uint64_t low)
+        //search the sieve for chains that meet the minimum length requirement.  Chains can cross segment boundaries.
+        void Sieve::find_chains(uint64_t low, bool batch_sieve_mode)
         {
+            std::vector<uint8_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
+            uint64_t sieve_size = sieve.size();
+
             //get popcount of the first three bytes  
             int hits_next_four_bytes = 0;
             std::queue<int> pop_count;
             pop_count.push(0);
             for (int i = 0; i < 3; i++)
             {
-                int pop_count_this_byte = popcnt[m_sieve[i]];
+                int pop_count_this_byte = popcnt[sieve[i]];
                 pop_count.push(pop_count_this_byte);
                 hits_next_four_bytes += pop_count_this_byte;
             }
-
             for (uint64_t n = 0; n < sieve_size; n++)
             {
                 //remove the oldest popcount from the running sum.
@@ -328,15 +331,15 @@ namespace nexusminer {
                 //get popcount of the current byte
                 if (n + 3 < sieve_size)
                 {
-                    pop_count.push(popcnt[m_sieve[n + 3]]);
-                    hits_next_four_bytes += pop_count.back();
+                    pop_count.push(popcnt[sieve[n + 3]]);
+                    hits_next_four_bytes += pop_count.back(); 
                 }
                 if (!m_chain_in_process && hits_next_four_bytes < m_min_chain_length)
                 {
                     //not enough prime candidates in the next 120 numbers to make a long enough chain
 
                 }
-                else if (m_sieve[n] == 0)
+                else if (sieve[n] == 0)
                 {
                     //no primes in this group of 30.  end the current chain if it is open.
                     if (m_chain_in_process)
@@ -347,9 +350,9 @@ namespace nexusminer {
                     int index_of_highest_set_bit = 0;
                     int sieve_offset = 0;
                     int previous_sieve_offset = 0;
-                    for (uint8_t b = m_sieve[n]; b > 0; b &= b - 1)
+                    for (uint8_t b = sieve[n]; b > 0; b &= b - 1)
                     {
-                        int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                        int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//c++20 alternative to lsb(b) is std::countr_zero(b);
                         sieve_offset = sieve30_offsets[index_of_lowest_set_bit];
                         uint64_t prime_candidate_offset = low + n * 30 + sieve_offset;
                         if (m_chain_in_process)
@@ -386,7 +389,7 @@ namespace nexusminer {
                         }
                     }
                 }
-
+               
             }
         }
 
@@ -409,7 +412,6 @@ namespace nexusminer {
             //reset chain in process to the default
             m_current_chain = { base_offset };
             m_chain_in_process = true;
-
         }
 
         //get the next prime to test from each chain 
@@ -487,6 +489,7 @@ namespace nexusminer {
         }
 
         //search for winners.  delete finished or hopeless chains.
+        //run this after batch primality testing.
         void Sieve::clean_chains()
         {
             size_t chain_count_before = m_chain.size();
@@ -494,31 +497,33 @@ namespace nexusminer {
             {
                 uint64_t base_offset;
                 int offset, length;
-                chain.get_best_fermat_chain(base_offset, offset, length);
-                if (length > 0)
+
+                //this approach keeps chains until all offsets in the chain have been tested.
+                //This runs more primality tests but finds alot of short chains. 
+                //Use is_there_still_hope() instead to reduce fermat testing.  Fewer short chains will be found which feels worse but is acutally faster for finding long chains.
+                if (chain.m_untested_count <= 0)  
                 {
-                    //collect stats
-                    int count = std::min(static_cast<size_t>(length), m_chain_histogram.size());
-                    m_chain_histogram[count]++;
-                }
-                if (length >= chain.m_min_chain_report_length)
-                {
-                    //we found a long chain.  save it.
-                    m_logger->info("Found a fermat chain of length {}.", length);
-                    m_long_chain_starts.push_back(base_offset + offset);
+                    //chain is tested.  mark as complete.
                     chain.m_chain_state = Chain::Chain_state::complete;
-                                    
-                }
-                else if (!chain.is_there_still_hope())
-                {
-                    chain.m_chain_state = Chain::Chain_state::complete;
+                    chain.get_best_fermat_chain(base_offset, offset, length);
+                    if (length > 0)
+                    {
+                        //collect stats
+                        int count = std::min(static_cast<size_t>(length), m_chain_histogram.size());
+                        m_chain_histogram[count]++;
+                    }
+                    if (length >= chain.m_min_chain_report_length)
+                    {
+                        //we found a long chain.  save it.
+                        m_logger->info("Found a fermat chain of length {}.", length);
+                        m_long_chain_starts.push_back(base_offset + offset);
+                    }
                 }
             }
             //remove completed chains
             m_chain.erase(std::remove_if(m_chain.begin(), m_chain.end(),
                 [](Chain& c) {return c.m_chain_state == Chain::Chain_state::complete; }), m_chain.end());
             size_t chain_count_after = m_chain.size();
-            //std::cout << "removed " << chain_count_before - chain_count_after << " chains" << std::endl;
 
         }
 
@@ -535,19 +540,8 @@ namespace nexusminer {
                     uint1024_t p = m_sieve_start + prime_candidate_offset;
                     count += primality_test(p) ? 1 : 0;
                 }
-
             }
             return count;
-        }
-
-        bool operator < (const Chain::Chain_offset& c1, const Chain::Chain_offset& c2)
-        {
-            return c1.m_offset < c2.m_offset;
-        }
-
-        bool operator == (const Chain::Chain_offset& c1, const Chain::Chain_offset& c2)
-        {
-            return c1.m_offset == c2.m_offset;
         }
 
         bool Sieve::primality_test(boost::multiprecision::uint1024_t p)
@@ -565,8 +559,5 @@ namespace nexusminer {
             }
             return (isPrime);
         }
-
-
-
     }
 }

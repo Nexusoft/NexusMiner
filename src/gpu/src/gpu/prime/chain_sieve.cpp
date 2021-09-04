@@ -427,10 +427,6 @@ namespace nexusminer {
             }
         }
 
-        void Sieve::find_chains_batch(uint64_t low)
-        {
-        }
-
         void Sieve::close_chain()
         {
             if (m_current_chain.length() >= m_current_chain.m_min_chain_length)
@@ -530,6 +526,34 @@ namespace nexusminer {
             return m_chain.size();
         }
 
+        //calculates the probability than a random unsigned number that passed through the sieve is actually prime
+        //compare with primality test stats to verify the sieve is working. 
+        double Sieve::probability_is_prime_after_sieve()
+        {
+            int bits = 1024;
+           
+            //the probability that a large random number is not divisible by 2 is 1/2.
+            //the probability that a large random number is not divisiby by 3 is 2/3.
+            //the probability that a large random number is not divisible by 2 and 3 is 1/2*2/3 = 1/3 = 0.33.
+            //the probability that a large random number is not divisible by the nth prime is 1/2*2/3*4/5*6/7*...*(pn-1)/pn
+            
+            double p_not_divisible_by_nth_prime = 1.0;
+            primesieve::iterator it;
+            uint64_t prime = it.next_prime();
+
+            for (; prime < sieving_prime_limit; prime = it.next_prime())
+                p_not_divisible_by_nth_prime *= (prime - 1.0) / prime;
+            
+
+            //the probability that a large random unsieved number is prime
+            double p = 1.0 / (log(2) * bits);
+
+            //the probability that a large random number is prime after sieving with the set of small primes
+            double p_after_sieve = p / p_not_divisible_by_nth_prime;
+
+            return p_after_sieve;
+        }
+
         //search for winners.  delete finished or hopeless chains.
         //run this after batch primality testing.
         void Sieve::clean_chains()
@@ -602,8 +626,5 @@ namespace nexusminer {
             }
             return (isPrime);
         }
-
-
-
     }
 }
