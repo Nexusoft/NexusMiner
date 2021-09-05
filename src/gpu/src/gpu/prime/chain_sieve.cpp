@@ -191,9 +191,9 @@ namespace nexusminer {
         void Sieve::generate_sieving_primes()
         {
             //generate sieving primes
-            m_logger->info("Generating sieving primes up to {}...", sieving_prime_limit);
+            m_logger->info("Generating sieving primes up to {}...", m_sieving_prime_limit);
             auto start = std::chrono::steady_clock::now();
-            primesieve::generate_primes(sieving_start_prime, sieving_prime_limit, &m_sieving_primes);
+            primesieve::generate_primes(sieving_start_prime, m_sieving_prime_limit, &m_sieving_primes);
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::stringstream ss;
@@ -531,20 +531,8 @@ namespace nexusminer {
         double Sieve::probability_is_prime_after_sieve()
         {
             int bits = 1024;
+            double p_not_divisible_by_nth_prime = sieve_pass_through_rate_expected();
            
-            //the probability that a large random number is not divisible by 2 is 1/2.
-            //the probability that a large random number is not divisiby by 3 is 2/3.
-            //the probability that a large random number is not divisible by 2 and 3 is 1/2*2/3 = 1/3 = 0.33.
-            //the probability that a large random number is not divisible by the nth prime is 1/2*2/3*4/5*6/7*...*(pn-1)/pn
-            
-            double p_not_divisible_by_nth_prime = 1.0;
-            primesieve::iterator it;
-            uint64_t prime = it.next_prime();
-
-            for (; prime < sieving_prime_limit; prime = it.next_prime())
-                p_not_divisible_by_nth_prime *= (prime - 1.0) / prime;
-            
-
             //the probability that a large random unsieved number is prime
             double p = 1.0 / (log(2) * bits);
 
@@ -552,6 +540,35 @@ namespace nexusminer {
             double p_after_sieve = p / p_not_divisible_by_nth_prime;
 
             return p_after_sieve;
+        }
+
+        //what percent of numbers do we expect to pass through the sieve
+        double Sieve::sieve_pass_through_rate_expected()
+        {
+            //the probability that a large random number is not divisible by 2 is 1/2.
+            //the probability that a large random number is not divisiby by 3 is 2/3.
+            //the probability that a large random number is not divisible by 2 and 3 is 1/2*2/3 = 1/3 = 0.33.
+            //the probability that a large random number is not divisible by the nth prime is 1/2*2/3*4/5*6/7*...*(pn-1)/pn
+
+            double p_not_divisible_by_nth_prime = 1.0;
+            primesieve::iterator it;
+            uint64_t prime = it.next_prime();
+
+            for (; prime < m_sieving_prime_limit; prime = it.next_prime())
+                p_not_divisible_by_nth_prime *= (prime - 1.0) / prime;
+
+            return p_not_divisible_by_nth_prime;
+        }
+
+        //count prime candidates in the sieve
+        uint64_t Sieve::count_prime_candidates()
+        {
+            uint64_t candidate_count = 0;
+            for (uint64_t n = 0; n < m_sieve_results.size(); n++)
+            {
+                candidate_count += popcnt[m_sieve_results[n]];
+            }
+            return candidate_count;
         }
 
         //search for winners.  delete finished or hopeless chains.
@@ -594,21 +611,65 @@ namespace nexusminer {
         }
 
         //for debug
-        uint64_t Sieve::count_fermat_primes(uint64_t sieve_size, uint64_t low)
+        uint64_t Sieve::count_fermat_primes_cpu(int sample_size)
         {
             uint64_t count = 0;
-            for (uint64_t n = 0; n < sieve_size; n++)
+            int low = 0;
+            int tests = 0;
+            for (uint64_t n = 0; n < m_sieve_results.size(); n++)
             {
-                for (uint8_t b = m_sieve[n]; b > 0; b &= b - 1)
+                for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
                 {
                     int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
                     uint64_t prime_candidate_offset = low + n * 30 + sieve30_offsets[index_of_lowest_set_bit];
                     uint1024_t p = m_sieve_start + prime_candidate_offset;
-                    count += primality_test(p) ? 1 : 0;
+                    if (primality_test(p))
+                        count++;
+                    tests++;
                 }
-
+                if (tests >= sample_size)
+                    break;
             }
             return count;
+        }
+
+        uint64_t Sieve::count_fermat_primes(int sample_size)
+        {
+            uint64_t prime_count = 0;
+            int low = 0;
+            int tests = 0;
+            std::vector<uint64_t> offsets;
+            for (uint64_t n = 0; n < m_sieve_results.size(); n++)
+            {
+                for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
+                {
+                    int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                    uint64_t prime_candidate_offset = low + n * 30 + sieve30_offsets[index_of_lowest_set_bit];
+                    offsets.push_back(prime_candidate_offset);
+                    tests++;
+                }
+                if (tests >= sample_size)
+                    break;
+            }
+            int prime_test_actual_batch_size = offsets.size();
+            mpz_int base_as_mpz_int = static_cast<mpz_int>(m_sieve_start);
+            mpz_t base_as_mpz_t;
+            mpz_init(base_as_mpz_t);
+            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
+            std::vector<uint8_t> primality_test_results;
+            primality_test_results.resize(prime_test_actual_batch_size);
+
+            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data());
+
+            for (auto i = 0; i < prime_test_actual_batch_size; i++)
+            {
+                if (primality_test_results[i] == 1)
+                    ++prime_count;
+            }
+            
+            mpz_clear(base_as_mpz_t);
+
+            return prime_count;
         }
 
         bool Sieve::primality_test(boost::multiprecision::uint1024_t p)

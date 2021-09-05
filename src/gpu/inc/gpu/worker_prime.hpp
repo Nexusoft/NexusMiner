@@ -43,6 +43,7 @@ private:
     //std::uint64_t leading_zero_mask();
     bool isPrime(uint1k p);
     void fermat_performance_test();
+    void sieve_performance_test();
 
     //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
     //static constexpr int leading_zeros_required = 20;    //set lower to find more nonce candidates

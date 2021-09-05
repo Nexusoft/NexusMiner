@@ -27,11 +27,15 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_difficulty{ 0 }
 	, m_pool_nbits{ 0 }
 {
-	m_segmented_sieve->generate_sieving_primes();
-	double p_is_prime = m_segmented_sieve->probability_is_prime_after_sieve();
-	m_logger->info("Predicted Fermat Positive Rate: {0:.2f}%", p_is_prime*100);
+	
+	//double p_is_prime = m_segmented_sieve->probability_is_prime_after_sieve();
+	//m_logger->info("Predicted Fermat Positive Rate: {0:.2f}%", p_is_prime*100);
 	fermat_performance_test();
+	sieve_performance_test();
+	m_segmented_sieve->generate_sieving_primes();
 	m_chain_histogram = std::vector<std::uint32_t>(10, 0);
+	m_segmented_sieve->reset_stats();
+
 }
 
 Worker_prime::~Worker_prime() noexcept
@@ -256,6 +260,7 @@ void Worker_prime::fermat_performance_test()
 	using namespace boost::multiprecision;
 	using namespace boost::random;
 
+	m_logger->info("Starting fermat primality test performance test.");
 	bool cpu_verify = false;
 	typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
 	generator1024_type gen1024;
@@ -306,8 +311,48 @@ void Worker_prime::fermat_performance_test()
 	double expected_primes = primality_test_batch_size * 2 / (1024 * 0.693147);
 	std::stringstream ss;
 	ss << "Found " << primes_found << " primes out of " << primality_test_batch_size << " tested. Expected about " << expected_primes << ". ";
+	m_logger->info(ss.str());
+	ss = {};
 	ss << std::fixed << std::setprecision(2) << 1000.0 * primality_test_batch_size / elapsed.count() << " primality tests/second. (" << 1.0 * elapsed.count() / primality_test_batch_size << "ms)";
 	m_logger->info(ss.str());
+}
+
+//test sieving for speed and accuracy
+void Worker_prime::sieve_performance_test()
+{
+	//known starting point
+	boost::multiprecision::uint1024_t T200("0x53bf18ac03f0adfb36fc4864b42013375ebdc0bb311f06636771e605ad731ca1383c7d9056522ed9bda4f608ef71498bc9c7dade6c56bf1534494e0ef371e79f09433e4c9e64624695a42d7920bd5022f449156d2f93f3be3a429159794ac9e49f69c706793ef249a284f9173a82379e62dffac42c0f53f155f65a784f31f42c");
+	uint64_t nonce200 = 127171;
+	double diff200 = 3.2608808;
+	m_logger->info("Starting sieve performance test.");
+	Sieve test_sieve;
+	test_sieve.set_sieve_start(T200);
+	//test_sieve.m_sieving_prime_limit = 1000;
+	test_sieve.m_segment_batch_size = 10;
+	test_sieve.generate_sieving_primes();
+	test_sieve.calculate_starting_multiples();
+	test_sieve.reset_sieve();
+	test_sieve.reset_sieve_batch(0);
+	auto start = std::chrono::steady_clock::now();
+	test_sieve.sieve_batch_cpu(0);
+	auto end = std::chrono::steady_clock::now();
+	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+	double elapsed_s = elapsed.count() / 1000.0;
+	uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
+	uint64_t sieve_range = test_sieve.m_sieve_results.size() * 30;
+	double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
+	double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
+	
+	m_logger->info("Sieved {:.1E} integers using primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
+		(double)sieve_range, (double)test_sieve.m_sieving_prime_limit, elapsed_s, sieve_range / elapsed_s / 1e6);
+	m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
+		candidate_ratio * 100, candidate_ratio_expected * 100);
+	double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve();
+	int fermat_sample_size = std::min(100000ull, prime_candidate_count);
+	uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size);
+	m_logger->info("Got {:.3f}% fermat positive rate. Expected about {:.3f}%",
+		100.0*fermat_count/ fermat_sample_size, fermat_positive_rate_expected*100.0);
+
 }
 
 }
