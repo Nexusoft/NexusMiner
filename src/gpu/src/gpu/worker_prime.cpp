@@ -124,8 +124,8 @@ void Worker_prime::run()
 
 		auto sieve_start = std::chrono::steady_clock::now();
 		//m_segmented_sieve->sieve_segment();
-		//m_segmented_sieve->sieve_batch_cpu(low);
-		m_segmented_sieve->sieve_batch(low);
+		m_segmented_sieve->sieve_batch_cpu(low);
+		//m_segmented_sieve->sieve_batch(low);
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();

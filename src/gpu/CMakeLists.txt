@@ -30,7 +30,7 @@ target_include_directories(gpu
 target_link_libraries(gpu LLC worker LLP stats config)
 
 if(WITH_PRIME)
-    target_link_libraries(gpu primesieve::primesieve)
+    target_link_libraries(gpu libprimesieve-static)
     if(WIN32)
         target_link_libraries(gpu mpir)
     else()
