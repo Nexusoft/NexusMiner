@@ -348,7 +348,7 @@ void Worker_prime::sieve_performance_test()
 	m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
 		candidate_ratio * 100, candidate_ratio_expected * 100);
 	double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve();
-	int fermat_sample_size = std::min(100000ull, prime_candidate_count);
+	int fermat_sample_size = std::min<uint64_t>(100000, prime_candidate_count);
 	uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size);
 	m_logger->info("Got {:.3f}% fermat positive rate. Expected about {:.3f}%",
 		100.0*fermat_count/ fermat_sample_size, fermat_positive_rate_expected*100.0);
