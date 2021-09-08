@@ -7,6 +7,8 @@
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve_utils.hpp"
+#include "../cuda_prime/fermat_test.cuh"
+#include "../cuda_prime/sieve.cuh"
 
 namespace nexusminer {
 	namespace gpu
@@ -94,14 +96,25 @@ namespace nexusminer {
 			double probability_is_prime_after_sieve();
 			double sieve_pass_through_rate_expected();
 			uint64_t count_prime_candidates();
+
+		private:
+			//static constexpr uint8_t sieve30 = 0xFF;  //compressed sieve for primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
+			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
+			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
+			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
+			static constexpr int L1_CACHE_SIZE = 32768;
+			static constexpr int L2_CACHE_SIZE = 262144;
+
+		public:
+			const uint32_t sieve_size = kernel_sieve_size;  //size of the sieve in bytes
+
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			uint32_t m_sieving_prime_limit = 3e7; //3e8;
+			uint32_t m_sieving_prime_limit = 3e6; //3e8;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
-			int m_fermat_test_batch_size = 10000;
-			int m_segment_batch_size = 1; //number of segments to batch process
-			int m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
-
+			int m_fermat_test_batch_size = 5000;
+			int m_segment_batch_size = kernel_segments_per_block*10000; //number of segments to sieve in one batch
+			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 
 			//stats
 			std::vector<std::uint32_t> m_chain_histogram;
@@ -122,23 +135,13 @@ namespace nexusminer {
 
 			std::shared_ptr<spdlog::logger> m_logger;
 
-			static constexpr uint8_t sieve30 = 0xFF;  //compressed sieve for primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
-			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
-			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
-			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
-			static constexpr int L1_CACHE_SIZE = 32768;
-			static constexpr int L2_CACHE_SIZE = 262144;
-			
-			static constexpr uint32_t sieve_size = L2_CACHE_SIZE * 16;  //size of the sieve in bytes
-			//static constexpr uint32_t sieve_size = L1_CACHE_SIZE;  //size of the sieve in bytes
-
-			//each segment byte covers a range of 30 sieving primes 
-			static constexpr uint32_t m_segment_size = sieve_size * 30;
+			//each 8 bytes covers a range of 30 sieving primes 
+			const uint32_t m_segment_size = sieve_size/8 * 30;
 			//we start sieving at 7
 			static constexpr int sieving_start_prime = 7;
 			static constexpr int m_min_chain_length = 8;	
 
-			/// Bitmasks used to unset bits
+			/// Bitmasks used to unset bits 
 			static constexpr uint8_t unset_bit_mask[30] =
 			{
 				(uint8_t)~(1 << 0), (uint8_t)~(1 << 0),
@@ -150,6 +153,7 @@ namespace nexusminer {
 				(uint8_t)~(1 << 6), (uint8_t)~(1 << 6), (uint8_t)~(1 << 6), (uint8_t)~(1 << 6),
 				(uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7)
 			};
+
 
 			//how many bits are set in a byte
 			static constexpr int popcnt[256] =
@@ -178,17 +182,17 @@ namespace nexusminer {
 			std::vector<uint32_t> m_multiples;
 			std::vector<int> m_wheel_indices;
 			std::vector<Chain> m_chain;
-			
+
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
 			
 			void close_chain();
 			void open_chain(uint64_t base_offset);
-			int sieve_run_cout = 0;
-			
-		};
+			uint64_t sieve_run_count = 0;
 
+			//experimental
+		};
 	}
 }
 

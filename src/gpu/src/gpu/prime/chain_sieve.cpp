@@ -6,8 +6,7 @@
 #include <bitset>
 #include <sstream>
 #include <boost/integer/mod_inverse.hpp>
-#include "../cuda_prime/fermat_test.cuh"
-#include "../cuda_prime/sieve.cuh"
+
 
 namespace nexusminer {
     namespace gpu
@@ -108,7 +107,6 @@ namespace nexusminer {
             //uint64_t base_offset;
             //temp_chain.get_best_fermat_chain(base_offset, offset, max_possible_length);
             //return (max_possible_length >= m_min_chain_length);
-
         }
 
         //get the next untested fermat candidate.  if there are none return false.
@@ -184,6 +182,7 @@ namespace nexusminer {
             : m_logger{ spdlog::get("logger") }
         {
             m_sieve.resize(sieve_size);
+            m_sieve_results.resize(static_cast<uint64_t>(sieve_size) * static_cast<uint64_t>(m_segment_batch_size));
             reset_stats();
             reset_sieve_batch(0);
         }
@@ -230,8 +229,11 @@ namespace nexusminer {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
                 m_multiples.push_back(m);
                 //where is the starting multiple relative to the wheel
-                int wheel_index = (boost::integer::mod_inverse((int)s, 30) * m) % 30;
-                m_wheel_indices.push_back(sieve30_index[wheel_index]);
+                //int64_t wheel_index = (boost::integer::mod_inverse((int64_t)s, (int64_t)30) * m) % 30;
+                //int wheel_lookup = sieve30_index[wheel_index];
+                int64_t prime_mod_inverse = boost::integer::mod_inverse((int64_t)s, (int64_t)30);
+
+                m_wheel_indices.push_back(prime_mod_inverse);
             }
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -245,47 +247,65 @@ namespace nexusminer {
         {
             for (std::size_t i = 0; i < m_sieving_primes.size(); i++)
             {
-                uint32_t j = m_multiples[i];
-                uint32_t k = m_sieving_primes[i];
+                uint64_t j = m_multiples[i];
+                uint64_t k = m_sieving_primes[i];
                 //where are we in the wheel
-                int wheel_index = m_wheel_indices[i];
+                int wheel_index = sieve30_index[(m_wheel_indices[i]*j) % 30];
                 int next_wheel_gap = sieve30_gaps[wheel_index];
                 while (j < m_segment_size)
                 {
                     //cross off a multiple of the sieving prime
-                    m_sieve[j / 30] &= unset_bit_mask[j % 30];
+                    //m_sieve[j / 30] &= unset_bit_mask[j % 30];
+                    uint64_t sieve_index = (j / 30) * 8 + sieve30_index[j % 30];
+                    
+                    m_sieve[sieve_index] = 0;
+                    
                     //increment the next multiple of the current prime (rotate the wheel).
-                    j += k * next_wheel_gap;
+                    j += k * next_wheel_gap;  
                     wheel_index = (wheel_index + 1) % 8;
                     next_wheel_gap = sieve30_gaps[wheel_index];
                 }
                 //save the starting multiple and wheel index for the next segment
+                //experiment to calculate future multiples
+                uint32_t t = 0;
+                if (m_segment_size >= m_multiples[i])
+                    t = get_offset_to_next_multiple(m_segment_size - m_multiples[i], k);
+                else
+                    t = m_multiples[i] - m_segment_size;
+                if (t != j - m_segment_size)
+                {
+                    std::cout << t << " " << j - m_segment_size << std::endl;
+                }
+                
+                //end experiment
                 m_multiples[i] = j - m_segment_size;
-                m_wheel_indices[i] = wheel_index;
+                //new experiment
+                //int64_t tmp = sieve30_index[(boost::integer::mod_inverse((int64_t)k, (int64_t)30) * m_multiples[i]) % 30];
+                //if (tmp != wheel_index)
+                //{
+                //    std::cout << tmp << " " << wheel_index << std::endl;
+               // }
+                //m_wheel_indices[i] = wheel_index;
+
+
             }
         }
+       
+
         //run the sieve on the gpu
         void Sieve::sieve_batch(uint64_t low)
         {
             reset_sieve_batch(low);
             uint32_t sieve_results_size = m_sieve_batch_buffer_size;
             m_sieve_results.resize(m_sieve_batch_buffer_size);
-            if (sieve_run_cout == 0)
-            {
-                std::cout << "a" << std::endl;
-            }
             run_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
-                m_wheel_indices.data(), m_sieve_results.data(), sieve_results_size);
-            if (sieve_run_cout == 2)
-            {
-                std::cout << "b" << std::endl;
-            }
+                m_wheel_indices.data(), m_sieve_results.data(), sieve_results_size, sieve_run_count*sieve_results_size/8*30);
             if (sieve_results_size != m_sieve_batch_buffer_size)
             {
                 std::cout << "unexpected sieve results buffer size got "
                     << sieve_results_size << " expected " << m_sieve_batch_buffer_size << std::endl;
             }
-            sieve_run_cout++;
+            sieve_run_count++;
 
         }
 
@@ -315,7 +335,7 @@ namespace nexusminer {
         void Sieve::reset_sieve()
         {
             //fill the sieve with default values (all ones)
-            std::fill(m_sieve.begin(), m_sieve.end(), sieve30);
+            std::fill(m_sieve.begin(), m_sieve.end(), 1);
             //clear the list of long chains found. 
             m_long_chain_starts = {};
         }
@@ -346,62 +366,69 @@ namespace nexusminer {
         {
             std::vector<uint8_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
             uint64_t sieve_size = sieve.size();
+            int previous_sieve_offset = 0;
+            int sieve_offset = 0;
+            uint64_t prime_candidate_offset = 0;
 
-            //get popcount of the first three bytes  
-            int hits_next_four_bytes = 0;
-            std::queue<int> pop_count;
-            pop_count.push(0);
-            for (int i = 0; i < 3; i++)
+            //look ahead to do a basic density check to ensure there are enough candidates to form a chain
+            //get count of the first  bytes
+            int look_ahead_by = (((m_min_chain_length - 1) * maxGap + 30 - 1) / 30) * 8;
+            int hits_in_look_ahead_region = 0;
+            std::queue<int> look_ahead;
+            look_ahead.push(0);
+            for (int i = 0; i < look_ahead_by - 1; i++)
             {
-                int pop_count_this_byte = popcnt[sieve[i]];
-                pop_count.push(pop_count_this_byte);
-                hits_next_four_bytes += pop_count_this_byte;
+                look_ahead.push(sieve[i]);
+                hits_in_look_ahead_region += sieve[i];
             }
+            
             for (uint64_t n = 0; n < sieve_size; n++)
             {
-                //remove the oldest popcount from the running sum.
-                hits_next_four_bytes -= pop_count.front();
-                pop_count.pop();
-                //get popcount of the current byte
-                if (n + 3 < sieve_size)
+                //remove the oldest value from the look ahead region running sum.
+                hits_in_look_ahead_region -= look_ahead.front();
+                look_ahead.pop();
+                //add the next look ahead byte
+                if (n + look_ahead_by-1 < sieve_size)
                 {
-                    pop_count.push(popcnt[sieve[n + 3]]);
-                    hits_next_four_bytes += pop_count.back(); 
-                }
-                if (!m_chain_in_process && hits_next_four_bytes < m_min_chain_length)
-                {
-                    //not enough prime candidates in the next 120 numbers to make a long enough chain
-
-                }
-                else if (sieve[n] == 0)
-                {
-                    //no primes in this group of 30.  end the current chain if it is open.
-                    if (m_chain_in_process)
-                        close_chain();
+                    look_ahead.push(sieve[n + look_ahead_by - 1]);
+                    hits_in_look_ahead_region += look_ahead.back();
                 }
                 else
                 {
-                    int index_of_highest_set_bit = 0;
-                    int sieve_offset = 0;
-                    int previous_sieve_offset = 0;
-                    for (uint8_t b = sieve[n]; b > 0; b &= b - 1)
+                    //we are at the end of the sieve. since we don't know what comes next, assume it is a prime candidate
+                    look_ahead.push(1);
+                    hits_in_look_ahead_region += look_ahead.back();
+                }
+                if (!m_chain_in_process && hits_in_look_ahead_region < m_min_chain_length)
+                {
+                    //not enough prime candidates in the next region of numbers to make a long enough chain
+
+                }
+                else
+                {
+                    sieve_offset = sieve30_offsets[n % 8];
+                    prime_candidate_offset = low + n / 8 * 30 + sieve_offset;
+                    if (sieve[n] == 1)
                     {
-                        int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//c++20 alternative to lsb(b) is std::countr_zero(b);
-                        sieve_offset = sieve30_offsets[index_of_lowest_set_bit];
-                        uint64_t prime_candidate_offset = low + n * 30 + sieve_offset;
+                        
                         if (m_chain_in_process)
                         {
-                            if (m_current_chain.m_gap_in_process + sieve_offset - previous_sieve_offset > maxGap)
+                            uint64_t previous_prime_candidate_offset = 
+                                m_current_chain.m_base_offset + m_current_chain.m_offsets[m_current_chain.length() - 1].m_offset;
+
+                            if (prime_candidate_offset - previous_prime_candidate_offset > maxGap)
                             {
                                 //max gap exceeded.  close open chain and start a new one.
                                 close_chain();
                                 open_chain(prime_candidate_offset);
+                                
                             }
                             else
                             {
                                 //continue chain
                                 m_current_chain.push_back(prime_candidate_offset - m_current_chain.m_base_offset);
                                 m_current_chain.m_gap_in_process = 0;
+                                
                             }
                         }
                         else
@@ -409,22 +436,27 @@ namespace nexusminer {
                             //start a new chain
                             open_chain(prime_candidate_offset);
                         }
-                        index_of_highest_set_bit = index_of_lowest_set_bit;
-                        previous_sieve_offset = sieve_offset;
                     }
-                    if (m_chain_in_process)
+                    else
                     {
-                        //accumulate the gap at the end of the sieve word
-                        m_current_chain.m_gap_in_process = 30 - sieve_offset;
-                        //only keep the chain going if the final gap is smaller than the max
-                        if (m_current_chain.m_gap_in_process > maxGap)
+                        if (m_chain_in_process)
                         {
-                            close_chain();
+                            //accumulate the gap
+                            int sieve_offset = sieve30_offsets[n % 8];
+                            uint64_t prime_candidate_offset = low + n / 8 * 30 + sieve_offset;
+                            uint64_t previous_prime_candidate_offset =
+                                m_current_chain.m_base_offset + m_current_chain.m_offsets[m_current_chain.length() - 1].m_offset;
+                            m_current_chain.m_gap_in_process = prime_candidate_offset - previous_prime_candidate_offset;
+                            //only keep the chain going if the current gap is smaller than the max
+                            if (m_current_chain.m_gap_in_process > maxGap)
+                            {
+                                close_chain();
+                            }
                         }
                     }
                 }
-               
             }
+            
         }
 
         void Sieve::close_chain()
@@ -566,7 +598,8 @@ namespace nexusminer {
             uint64_t candidate_count = 0;
             for (uint64_t n = 0; n < m_sieve_results.size(); n++)
             {
-                candidate_count += popcnt[m_sieve_results[n]];
+                //candidate_count += popcnt[m_sieve_results[n]];
+                candidate_count += m_sieve_results[n];
             }
             return candidate_count;
         }
@@ -584,7 +617,8 @@ namespace nexusminer {
                 //this approach keeps chains until all offsets in the chain have been tested.
                 //This runs more primality tests but finds alot of short chains. 
                 //Use is_there_still_hope() instead to reduce fermat testing.  Fewer short chains will be found which feels worse but is acutally faster for finding long chains.
-                if (chain.m_untested_count <= 0)  
+                //if (chain.m_untested_count <= 0)  
+                if (!chain.is_there_still_hope())
                 {
                     //chain is tested.  mark as complete.
                     chain.m_chain_state = Chain::Chain_state::complete;
@@ -618,15 +652,15 @@ namespace nexusminer {
             int tests = 0;
             for (uint64_t n = 0; n < m_sieve_results.size(); n++)
             {
-                for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
-                {
-                    int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
-                    uint64_t prime_candidate_offset = low + n * 30 + sieve30_offsets[index_of_lowest_set_bit];
+                //for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
+                //{
+                    //int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                    uint64_t prime_candidate_offset = low + n/8 * 30 + sieve30_offsets[n%8];
                     uint1024_t p = m_sieve_start + prime_candidate_offset;
                     if (primality_test(p))
                         count++;
                     tests++;
-                }
+                //}
                 if (tests >= sample_size)
                     break;
             }
@@ -641,13 +675,15 @@ namespace nexusminer {
             std::vector<uint64_t> offsets;
             for (uint64_t n = 0; n < m_sieve_results.size(); n++)
             {
-                for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
+                //for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
+                //{
+                if (m_sieve_results[n] == 1)
                 {
-                    int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
-                    uint64_t prime_candidate_offset = low + n * 30 + sieve30_offsets[index_of_lowest_set_bit];
+                    uint64_t prime_candidate_offset = low + n / 8 * 30 + sieve30_offsets[n % 8];
                     offsets.push_back(prime_candidate_offset);
                     tests++;
                 }
+                //}
                 if (tests >= sample_size)
                     break;
             }

@@ -11,6 +11,7 @@ set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES 61 75)
 #set(CMAKE_CUDA_FLAGS "-arch=sm_61")
 #set(CMAKE_CUDA_FLAGS "-gencode arch=compute_61,code=sm_61 -gencode arch=compute_75,code=sm_75")
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
+include_directories(${CUDA_HOME}/samples/common/inc/)
 
 #-DNDEBUG causes nvcc build errors for some architectures
 foreach(flag_var

@@ -128,8 +128,8 @@ void Worker_prime::run()
 
 		auto sieve_start = std::chrono::steady_clock::now();
 		//m_segmented_sieve->sieve_segment();
-		m_segmented_sieve->sieve_batch_cpu(low);
-		//m_segmented_sieve->sieve_batch(low);
+		//m_segmented_sieve->sieve_batch_cpu(low);
+		m_segmented_sieve->sieve_batch(low);
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
@@ -173,6 +173,7 @@ void Worker_prime::run()
 				}
 			}
 		}
+		m_segmented_sieve->m_long_chain_starts = {};
 		low += sieve_batch_range;
 
 		//debug
@@ -328,18 +329,19 @@ void Worker_prime::sieve_performance_test()
 	Sieve test_sieve;
 	test_sieve.set_sieve_start(T200);
 	//test_sieve.m_sieving_prime_limit = 1000;
-	test_sieve.m_segment_batch_size = 10;
+	//test_sieve.m_segment_batch_size = 100;
 	test_sieve.generate_sieving_primes();
 	test_sieve.calculate_starting_multiples();
 	test_sieve.reset_sieve();
 	test_sieve.reset_sieve_batch(0);
 	auto start = std::chrono::steady_clock::now();
-	test_sieve.sieve_batch_cpu(0);
+	//test_sieve.sieve_batch_cpu(0);
+	test_sieve.sieve_batch(0);
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	double elapsed_s = elapsed.count() / 1000.0;
 	uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
-	uint64_t sieve_range = test_sieve.m_sieve_results.size() * 30;
+	uint64_t sieve_range = test_sieve.m_sieve_results.size()/8 * 30;
 	double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
 	double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
 	
