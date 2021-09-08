@@ -22,8 +22,12 @@ namespace nexusminer {
         //return the offset from x to the next integer multiple of n greater than x that is not divisible by 2, 3, or 5.  
 //x must be a multiple of the primorial 30 and n must be a prime greater than 5.
         
+        __constant__ uint32_t * sieving_primes;
+        //__device__ uint32_t* multiples;
+        //__device__ int* wheel_indices;
+
         template <typename T1, typename T2>
-        __device__ static T2 get_offset_to_next_multiple(T1 x, T2 n)
+        __device__ T2 get_offset_to_next_multiple(T1 x, T2 n)
         {
             T2 m = n - static_cast<T2>(x % n);
             if (m % 2 == 0)
@@ -45,7 +49,7 @@ namespace nexusminer {
 
         //seive kernel
 
-        __global__ void do_sieve(uint32_t sieving_primes[], uint32_t sieving_prime_count, uint32_t starting_multiples[],
+        __global__ void do_sieve(uint32_t sieving_prime_count, uint32_t starting_multiples[],
             int wheel_indices[], uint8_t sieve_results[], uint32_t sieve_results_size, uint64_t sieve_start_offset)
         {
             uint32_t segment_size = kernel_sieve_size / 8 * 30;
@@ -150,64 +154,67 @@ namespace nexusminer {
             uint32_t starting_multiples[], int wheel_indices[], uint8_t sieve[], uint32_t& sieve_size, uint64_t sieve_start_offset)
         {
             //device memory pointers
-            uint32_t* d_sieving_primes, * d_starting_multiples, * d_sieve_size, * d_sieving_prime_count;
+            uint32_t* d_sieving_primes, * d_starting_multiples;
             int* d_wheel_indices;
             uint8_t* d_sieve;
 
             //each block sieves its own range.  Within a block, each thread handles a subset of the sieving primes.
-            int threads_per_block = 1024;
-            uint32_t segments = sieve_size / kernel_sieve_size;
+            //uint32_t segments = sieve_size / kernel_sieve_size;
             int num_blocks = sieve_size / kernel_sieve_size_per_block;
             //dim3 grid(numBlocks,1);
 
             checkCudaErrors(cudaSetDevice(0));
 
             //allocate memory on the gpu
-            checkCudaErrors(cudaMalloc(&d_sieving_primes, sieving_prime_count * sizeof(uint32_t)));
+            //checkCudaErrors(cudaMalloc(&d_sieving_primes, sieving_prime_count * sizeof(uint32_t)));
             checkCudaErrors(cudaMalloc(&d_starting_multiples, sieving_prime_count * sizeof(uint32_t)));
-            //cudaMalloc(&d_sieve_size, sizeof(uint32_t));
-            //cudaMalloc(&d_sieving_prime_count, sizeof(uint32_t));
             checkCudaErrors(cudaMalloc(&d_wheel_indices, sieving_prime_count * sizeof(int)));
             checkCudaErrors(cudaMalloc(&d_sieve, sieve_size * sizeof(uint8_t)));
 
             //copy data to the gpu
-            checkCudaErrors(cudaMemcpy(d_sieving_primes, sieving_primes, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+            //checkCudaErrors(cudaMemcpy(d_sieving_primes, sieving_primes, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
-            //cudaMemcpy(d_sieve_size, &sieve_size, sizeof(uint32_t), cudaMemcpyHostToDevice);
-            //cudaMemcpy(d_sieving_prime_count, &sieving_prime_count, sizeof(uint32_t), cudaMemcpyHostToDevice);
             checkCudaErrors(cudaMemcpy(d_wheel_indices, wheel_indices, sieving_prime_count * sizeof(int), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_sieve, sieve, sieve_size * sizeof(uint8_t), cudaMemcpyHostToDevice));
 
             //run the kernel
-            do_sieve <<<num_blocks, threads_per_block >>> (d_sieving_primes, sieving_prime_count, d_starting_multiples, d_wheel_indices, d_sieve, sieve_size, sieve_start_offset);
+            do_sieve <<<num_blocks, threads_per_block >>> (sieving_prime_count, d_starting_multiples, d_wheel_indices, d_sieve, sieve_size, sieve_start_offset);
 
             checkCudaErrors(cudaDeviceSynchronize());
 
             //copy results from device to the host
             checkCudaErrors(cudaMemcpy(starting_multiples, d_starting_multiples, sieving_prime_count * sizeof(uint32_t), cudaMemcpyDeviceToHost));
-            //cudaMemcpy(&sieve_size, d_sieve_size, sizeof(uint32_t), cudaMemcpyDeviceToHost);
             checkCudaErrors(cudaMemcpy(wheel_indices, d_wheel_indices, sieving_prime_count * sizeof(int), cudaMemcpyDeviceToHost));
             checkCudaErrors(cudaMemcpy(sieve, d_sieve, sieve_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
 
             //clean up
-            checkCudaErrors(cudaFree(d_sieving_primes));
+            //checkCudaErrors(cudaFree(d_sieving_primes));
             checkCudaErrors(cudaFree(d_starting_multiples));
-            //cudaFree(d_sieve_size);
             checkCudaErrors(cudaFree(d_wheel_indices));
             checkCudaErrors(cudaFree(d_sieve));
-            //cudaFree(d_sieving_prime_count);
 
         }
 
-        void load_sieve(uint32_t sieving_primes[], uint32_t sieving_prime_count)
+        void load_sieve(uint32_t primes[], uint32_t sieving_prime_count)
         {
             //device memory pointers
-            uint32_t* d_sieving_primes, *d_sieving_prime_mod_inverses;
-
+            uint32_t* d_sieving_primes;
             
+            checkCudaErrors(cudaSetDevice(0));
+            //allocate memory on the gpu
+            checkCudaErrors(cudaMalloc(&d_sieving_primes, sieving_prime_count * sizeof(uint32_t)));
+            //copy data to the gpu
+            checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+            //point the global device variable to the allocated memory
+            checkCudaErrors(cudaMemcpyToSymbol(sieving_primes, &d_sieving_primes, sizeof(uint32_t*)));
+        
+        }
 
-
-
+        void free_sieve()
+        {
+            uint32_t* d_sieving_primes;
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_sieving_primes, sieving_primes, sizeof(uint32_t*)));
+            checkCudaErrors(cudaFree(d_sieving_primes));
         }
     }
 }

@@ -74,6 +74,8 @@ namespace nexusminer {
 			void set_sieve_start(boost::multiprecision::uint1024_t);
 			boost::multiprecision::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
+			void gpu_sieve_init();
+			void gpu_sieve_free();
 			void sieve_segment();
 			void sieve_batch(uint64_t low);
 			void sieve_batch_cpu(uint64_t low);

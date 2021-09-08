@@ -242,6 +242,16 @@ namespace nexusminer {
             //m_logger->info(ss.str());
         }
 
+        void Sieve::gpu_sieve_init()
+        {
+            load_sieve(m_sieving_primes.data(), m_sieving_primes.size());
+        }
+
+        void Sieve::gpu_sieve_free()
+        {
+            free_sieve();
+        }
+
         //run the sieve on one segment
         void Sieve::sieve_segment()
         {
@@ -295,6 +305,7 @@ namespace nexusminer {
         //run the sieve on the gpu
         void Sieve::sieve_batch(uint64_t low)
         {
+            
             reset_sieve_batch(low);
             uint32_t sieve_results_size = m_sieve_batch_buffer_size;
             m_sieve_results.resize(m_sieve_batch_buffer_size);
@@ -306,7 +317,7 @@ namespace nexusminer {
                     << sieve_results_size << " expected " << m_sieve_batch_buffer_size << std::endl;
             }
             sieve_run_count++;
-
+           
         }
 
         //batch sieve on the cpu for debug

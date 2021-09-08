@@ -114,6 +114,8 @@ void Worker_prime::run()
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
 	bool batch_sieve_mode = true;
+	m_segmented_sieve->gpu_sieve_init();
+
 
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
@@ -209,6 +211,7 @@ void Worker_prime::run()
 			std::cout << std::endl;
 		}
 	}
+	m_segmented_sieve->gpu_sieve_free();
 }
 
 double Worker_prime::getDifficulty(uint1k p)
@@ -334,12 +337,15 @@ void Worker_prime::sieve_performance_test()
 	test_sieve.calculate_starting_multiples();
 	test_sieve.reset_sieve();
 	test_sieve.reset_sieve_batch(0);
+	test_sieve.gpu_sieve_init();
 	auto start = std::chrono::steady_clock::now();
 	//test_sieve.sieve_batch_cpu(0);
 	test_sieve.sieve_batch(0);
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	double elapsed_s = elapsed.count() / 1000.0;
+	test_sieve.gpu_sieve_free();
+
 	uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
 	uint64_t sieve_range = test_sieve.m_sieve_results.size()/8 * 30;
 	double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
