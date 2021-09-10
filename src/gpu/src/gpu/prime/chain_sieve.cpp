@@ -221,7 +221,7 @@ namespace nexusminer {
             //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
             //do this once at the start of a new block to initialize the sieve.
             m_multiples = {};
-            m_wheel_indices = {};
+            m_prime_mod_inverses = {};
             m_logger->info("Calculating starting multiples.");
             auto start = std::chrono::steady_clock::now();
             for (auto s : m_sieving_primes)
@@ -233,7 +233,7 @@ namespace nexusminer {
                 //int wheel_lookup = sieve30_index[wheel_index];
                 int64_t prime_mod_inverse = boost::integer::mod_inverse((int64_t)s, (int64_t)30);
 
-                m_wheel_indices.push_back(prime_mod_inverse);
+                m_prime_mod_inverses.push_back(prime_mod_inverse);
             }
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -244,7 +244,11 @@ namespace nexusminer {
 
         void Sieve::gpu_sieve_init()
         {
-            load_sieve(m_sieving_primes.data(), m_sieving_primes.size());
+            
+            load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
+                m_prime_mod_inverses.data(), m_sieve_batch_buffer_size);
+            sieve_run_count = 0;
+
         }
 
         void Sieve::gpu_sieve_free()
@@ -260,7 +264,7 @@ namespace nexusminer {
                 uint64_t j = m_multiples[i];
                 uint64_t k = m_sieving_primes[i];
                 //where are we in the wheel
-                int wheel_index = sieve30_index[(m_wheel_indices[i]*j) % 30];
+                int wheel_index = sieve30_index[(m_prime_mod_inverses[i]*j) % 30];
                 int next_wheel_gap = sieve30_gaps[wheel_index];
                 while (j < m_segment_size)
                 {
@@ -308,14 +312,7 @@ namespace nexusminer {
             
             reset_sieve_batch(low);
             uint32_t sieve_results_size = m_sieve_batch_buffer_size;
-            m_sieve_results.resize(m_sieve_batch_buffer_size);
-            run_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
-                m_wheel_indices.data(), m_sieve_results.data(), sieve_results_size, sieve_run_count*sieve_results_size/8*30);
-            if (sieve_results_size != m_sieve_batch_buffer_size)
-            {
-                std::cout << "unexpected sieve results buffer size got "
-                    << sieve_results_size << " expected " << m_sieve_batch_buffer_size << std::endl;
-            }
+            run_sieve(sieve_run_count*sieve_results_size/8*30, m_sieve_results.data());            
             sieve_run_count++;
            
         }
@@ -353,8 +350,11 @@ namespace nexusminer {
 
         void Sieve::reset_sieve_batch(uint64_t low)
         {
-            m_sieve_results = {};
+            
             m_sieve_batch_start_offset = low;
+            m_sieve_results = {};
+            m_sieve_results.resize(m_sieve_batch_buffer_size);
+            m_long_chain_starts = {};
         }
 
         void Sieve::clear_chains()

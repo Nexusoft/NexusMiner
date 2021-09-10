@@ -19,13 +19,22 @@
 namespace nexusminer {
     namespace gpu {
 
-        //return the offset from x to the next integer multiple of n greater than x that is not divisible by 2, 3, or 5.  
-//x must be a multiple of the primorial 30 and n must be a prime greater than 5.
         
-        __constant__ uint32_t * sieving_primes;
-        //__device__ uint32_t* multiples;
-        //__device__ int* wheel_indices;
+        
+        //global variables used by all kernels
+        __device__ uint32_t* sieving_primes;
+        __device__ uint32_t sieving_prime_count[1];
+        __device__ uint32_t* multiples;
+        __device__ uint32_t* starting_multiples;
+        __device__ uint32_t* prime_mod_inverses;
+        __device__ uint8_t* wheel_indices;
+        __device__ uint8_t* sieve_global;  //the result of the sieve is stored here
+        __device__ uint32_t sieve_global_size[1];  //the size of the sieve in bytes
+        uint32_t sieving_prime_count_host;
 
+
+        //return the offset from x to the next integer multiple of n greater than x that is not divisible by 2, 3, or 5.  
+        //x must be a multiple of the primorial 30 and n must be a prime greater than 5.
         template <typename T1, typename T2>
         __device__ T2 get_offset_to_next_multiple(T1 x, T2 n)
         {
@@ -49,46 +58,30 @@ namespace nexusminer {
 
         //seive kernel
 
-        __global__ void do_sieve(uint32_t sieving_prime_count, uint32_t starting_multiples[],
-            int wheel_indices[], uint8_t sieve_results[], uint32_t sieve_results_size, uint64_t sieve_start_offset)
+        __global__ void do_sieve(uint64_t sieve_start_offset)
         {
             uint32_t segment_size = kernel_sieve_size / 8 * 30;
-           
 
             //local shared copy of the sieve
             __shared__ uint8_t sieve[kernel_sieve_size];
 
-            int block_id = blockIdx.x;
-            int index = threadIdx.x;
-            int stride = blockDim.x;
-            int num_blocks = gridDim.x;
+            uint64_t block_id = blockIdx.x;
+            uint64_t index = threadIdx.x;
+            uint64_t stride = blockDim.x;
+            uint64_t num_blocks = gridDim.x;
            
-            int segments = kernel_segments_per_block;
-            int sieve_results_index = block_id * kernel_sieve_size_per_block;
+            uint64_t segments = kernel_segments_per_block;
+            uint64_t sieve_results_index = block_id * kernel_sieve_size_per_block;
 
-            int primes_per_block = (sieving_prime_count + stride - 1) / stride;
-            //printf("sieving primes %i ppb %i ", sieving_prime_count, primes_per_block);
-            //uint32_t* multiples;
-            //multiples = new uint32_t[primes_per_block];
-            //int index_count = 0;
+            uint64_t primes_per_block = (sieving_prime_count[0] + stride - 1) / stride;
+            
             //each block sieves a different region
             uint64_t start_offset = sieve_start_offset + block_id * kernel_sieve_size_per_block / 8 * 30;
-            //initialize the starting multiples for this block region
-            //printf("a");
-            //__syncthreads();
-            //printf("1");
-            //for (int i = index; i < sieving_prime_count; i += stride)
-            //{
-            //    multiples[index_count] = starting_multiples[i];
-            //    //get aligned to this region
-            //    if (start_offset >= starting_multiples[i])
-            //        multiples[index_count] = get_offset_to_next_multiple(start_offset - starting_multiples[i], sieving_primes[i]);
-            //    else
-            //        multiples[index_count] -= start_offset;
-            //    index_count++;
-            //}
-            //printf("b");
-
+            
+            int wheel_index;
+            int next_wheel_gap;
+            uint64_t j;
+            uint64_t k;
             for (int s = 0; s < segments; s++)
             {
                 //everyone in the block initialize part of the shared sieve
@@ -99,21 +92,32 @@ namespace nexusminer {
                 }
 
                 __syncthreads();
-                for (int i = index; i < sieving_prime_count; i += stride)
+                for (uint32_t i = index; i < sieving_prime_count[0]; i += stride)
                 {
-                    if (i < sieving_prime_count)
+                    if (i < sieving_prime_count[0])
                     {
-                        uint64_t j = starting_multiples[i];
-                        //get aligned to this region
-                        if (start_offset >= j)
-                            j = get_offset_to_next_multiple(start_offset - j, sieving_primes[i]);
-                        else
-                            j -= start_offset;
-                        uint64_t k = sieving_primes[i];
                         
-                        //where are we in the wheel
-                        int wheel_index = sieve30_index[(wheel_indices[i] * j) % 30];
-                        int next_wheel_gap = sieve30_gaps[wheel_index];
+                        k = sieving_primes[i];
+                        //get aligned to this region
+                        if (s == 0)
+                        {
+                            j = starting_multiples[i];
+                            //the first time through we need to calculate the starting offsets
+                            if (start_offset >= j)
+                                j = get_offset_to_next_multiple(start_offset - j, sieving_primes[i]);
+                            else
+                                j -= start_offset;
+                            
+                            //where are we in the wheel
+                            wheel_index = sieve30_index[(prime_mod_inverses[i] * j) % 30];
+                        }
+                        else
+                        {
+                            j = multiples[block_id* sieving_prime_count[0] +i];
+                            wheel_index = wheel_indices[block_id * sieving_prime_count[0] + i];
+                        }
+                        next_wheel_gap = sieve30_gaps[wheel_index];
+                        
                         while (j < segment_size)
                         {
                             //cross off a multiple of the sieving prime
@@ -125,13 +129,10 @@ namespace nexusminer {
                             next_wheel_gap = sieve30_gaps[wheel_index];
                         }
                         //save the starting multiple and wheel index for the next segment
-
-                        //multiples[index_count] = j - segment_size;
-                        //wheel_indices[i] = wheel_index;
+                        multiples[block_id * sieving_prime_count[0] + i] = j - segment_size;
+                        wheel_indices[block_id * sieving_prime_count[0] + i] = wheel_index;
                     }
                 }
-                
-
                 __syncthreads();
                 //copy the sieve results to global memory
                 
@@ -139,82 +140,96 @@ namespace nexusminer {
                 {
                     if (j2 < kernel_sieve_size)
                     {
-                        sieve_results[sieve_results_index + j2] = sieve[j2];
+                        sieve_global[sieve_results_index + j2] = sieve[j2];
                     }
                 }
+                
                 sieve_results_index += kernel_sieve_size;
                 __syncthreads();
                 
             }
-            //delete[] multiples;
         }
 
 
-        void run_sieve(uint32_t sieving_primes[], uint32_t sieving_prime_count,
-            uint32_t starting_multiples[], int wheel_indices[], uint8_t sieve[], uint32_t& sieve_size, uint64_t sieve_start_offset)
+        void run_sieve(uint64_t sieve_start_offset, uint8_t sieve[])
         {
-            //device memory pointers
-            uint32_t* d_sieving_primes, * d_starting_multiples;
-            int* d_wheel_indices;
+            
             uint8_t* d_sieve;
 
-            //each block sieves its own range.  Within a block, each thread handles a subset of the sieving primes.
-            //uint32_t segments = sieve_size / kernel_sieve_size;
-            int num_blocks = sieve_size / kernel_sieve_size_per_block;
-            //dim3 grid(numBlocks,1);
-
-            checkCudaErrors(cudaSetDevice(0));
-
-            //allocate memory on the gpu
-            //checkCudaErrors(cudaMalloc(&d_sieving_primes, sieving_prime_count * sizeof(uint32_t)));
-            checkCudaErrors(cudaMalloc(&d_starting_multiples, sieving_prime_count * sizeof(uint32_t)));
-            checkCudaErrors(cudaMalloc(&d_wheel_indices, sieving_prime_count * sizeof(int)));
-            checkCudaErrors(cudaMalloc(&d_sieve, sieve_size * sizeof(uint8_t)));
-
-            //copy data to the gpu
-            //checkCudaErrors(cudaMemcpy(d_sieving_primes, sieving_primes, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_wheel_indices, wheel_indices, sieving_prime_count * sizeof(int), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_sieve, sieve, sieve_size * sizeof(uint8_t), cudaMemcpyHostToDevice));
-
             //run the kernel
-            do_sieve <<<num_blocks, threads_per_block >>> (sieving_prime_count, d_starting_multiples, d_wheel_indices, d_sieve, sieve_size, sieve_start_offset);
+            do_sieve <<<num_blocks, threads_per_block >>> (sieve_start_offset);
 
             checkCudaErrors(cudaDeviceSynchronize());
 
-            //copy results from device to the host
-            checkCudaErrors(cudaMemcpy(starting_multiples, d_starting_multiples, sieving_prime_count * sizeof(uint32_t), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(wheel_indices, d_wheel_indices, sieving_prime_count * sizeof(int), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(sieve, d_sieve, sieve_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
-
-            //clean up
-            //checkCudaErrors(cudaFree(d_sieving_primes));
-            checkCudaErrors(cudaFree(d_starting_multiples));
-            checkCudaErrors(cudaFree(d_wheel_indices));
-            checkCudaErrors(cudaFree(d_sieve));
-
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_sieve, sieve_global, sizeof(uint8_t*)));
+            checkCudaErrors(cudaMemcpy(sieve, d_sieve, sieve_total_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
         }
 
-        void load_sieve(uint32_t primes[], uint32_t sieving_prime_count)
+        //allocate global memory and load values used by the sieve to the gpu 
+        void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t starting_multiples_host[],
+            uint32_t prime_mod_inverses_host[], uint32_t sieve_size)
         {
             //device memory pointers
             uint32_t* d_sieving_primes;
+            uint32_t* d_starting_multiples;
+            uint32_t* d_prime_mod_inverses;
+            uint8_t* d_sieve;
+            uint32_t* d_multiples;
+            uint8_t* d_wheel_indices;
             
+            sieving_prime_count_host = prime_count;
             checkCudaErrors(cudaSetDevice(0));
             //allocate memory on the gpu
-            checkCudaErrors(cudaMalloc(&d_sieving_primes, sieving_prime_count * sizeof(uint32_t)));
+            checkCudaErrors(cudaMalloc(&d_sieving_primes, prime_count * sizeof(uint32_t)));
+            checkCudaErrors(cudaMalloc(&d_starting_multiples, prime_count * sizeof(uint32_t)));
+            checkCudaErrors(cudaMalloc(&d_prime_mod_inverses, prime_count * sizeof(uint32_t)));
+            checkCudaErrors(cudaMalloc(&d_sieve, sieve_size * sizeof(uint8_t)));
+            checkCudaErrors(cudaMalloc(&d_multiples, prime_count * num_blocks * sizeof(uint32_t)));
+            checkCudaErrors(cudaMalloc(&d_wheel_indices, prime_count * num_blocks * sizeof(uint8_t)));
+
+
             //copy data to the gpu
-            checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, sieving_prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples_host, prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemcpy(d_prime_mod_inverses, prime_mod_inverses_host, prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
+
             //point the global device variable to the allocated memory
             checkCudaErrors(cudaMemcpyToSymbol(sieving_primes, &d_sieving_primes, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyToSymbol(starting_multiples, &d_starting_multiples, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyToSymbol(prime_mod_inverses, &d_prime_mod_inverses, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyToSymbol(sieve_global, &d_sieve, sizeof(uint8_t*)));
+            checkCudaErrors(cudaMemcpyToSymbol(sieving_prime_count, &prime_count, sizeof(uint32_t)));
+            checkCudaErrors(cudaMemcpyToSymbol(sieve_global_size, &sieve_size, sizeof(uint32_t)));
+            checkCudaErrors(cudaMemcpyToSymbol(wheel_indices, &d_wheel_indices, sizeof(uint8_t*)));
+            checkCudaErrors(cudaMemcpyToSymbol(multiples, &d_multiples, sizeof(uint32_t*)));
+
         
         }
 
         void free_sieve()
         {
             uint32_t* d_sieving_primes;
+            uint32_t* d_starting_multiples;
+            uint32_t* d_prime_mod_inverses;
+            uint32_t* d_multiples;
+            uint8_t* d_wheel_indices;
+            uint8_t* d_sieve;
+
             checkCudaErrors(cudaMemcpyFromSymbol(&d_sieving_primes, sieving_primes, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_starting_multiples, starting_multiples, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_prime_mod_inverses, prime_mod_inverses, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_multiples, multiples, sizeof(uint32_t*)));
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_wheel_indices, wheel_indices, sizeof(uint8_t*)));
+            checkCudaErrors(cudaMemcpyFromSymbol(&d_sieve, sieve_global, sizeof(uint8_t*)));
+
             checkCudaErrors(cudaFree(d_sieving_primes));
+            checkCudaErrors(cudaFree(d_starting_multiples));
+            checkCudaErrors(cudaFree(d_wheel_indices));
+            checkCudaErrors(cudaFree(d_multiples));
+            checkCudaErrors(cudaFree(d_prime_mod_inverses));
+            checkCudaErrors(cudaFree(d_sieve));
+
+
         }
     }
 }

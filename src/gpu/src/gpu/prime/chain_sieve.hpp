@@ -114,8 +114,8 @@ namespace nexusminer {
 			uint64_t m_sieve_batch_start_offset;
 			uint32_t m_sieving_prime_limit = 3e6; //3e8;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
-			int m_fermat_test_batch_size = 5000;
-			int m_segment_batch_size = kernel_segments_per_block*10000; //number of segments to sieve in one batch
+			int m_fermat_test_batch_size = 10000;
+			int m_segment_batch_size = kernel_segments_per_block*num_blocks; //number of segments to sieve in one batch
 			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 
 			//stats
@@ -182,7 +182,7 @@ namespace nexusminer {
 			std::vector<uint8_t> m_sieve;
 			std::vector<uint32_t> m_sieving_primes;
 			std::vector<uint32_t> m_multiples;
-			std::vector<int> m_wheel_indices;
+			std::vector<uint32_t> m_prime_mod_inverses;
 			std::vector<Chain> m_chain;
 
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
