@@ -74,7 +74,7 @@ namespace nexusminer {
 			void set_sieve_start(boost::multiprecision::uint1024_t);
 			boost::multiprecision::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
-			void gpu_sieve_init();
+			void gpu_sieve_init(uint16_t device);
 			void gpu_sieve_free();
 			void sieve_segment();
 			void sieve_batch(uint64_t low);
@@ -108,14 +108,14 @@ namespace nexusminer {
 			static constexpr int L2_CACHE_SIZE = 262144;
 
 		public:
-			const uint32_t sieve_size = kernel_sieve_size;  //size of the sieve in bytes
+			const uint32_t sieve_size = CudaSieve::m_kernel_sieve_size;  //size of the sieve in bytes
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
 			uint32_t m_sieving_prime_limit = 3e6; //3e8;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
 			int m_fermat_test_batch_size = 10000;
-			int m_segment_batch_size = kernel_segments_per_block*num_blocks; //number of segments to sieve in one batch
+			int m_segment_batch_size = CudaSieve::m_kernel_segments_per_block* CudaSieve::m_num_blocks; //number of segments to sieve in one batch
 			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 
 			//stats
@@ -192,6 +192,8 @@ namespace nexusminer {
 			void close_chain();
 			void open_chain(uint64_t base_offset);
 			uint64_t sieve_run_count = 0;
+
+			CudaSieve m_cuda_sieve;
 
 			//experimental
 		};

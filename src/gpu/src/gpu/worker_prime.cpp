@@ -114,7 +114,8 @@ void Worker_prime::run()
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
 	bool batch_sieve_mode = true;
-	m_segmented_sieve->gpu_sieve_init();
+	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
+	m_segmented_sieve->gpu_sieve_init(worker_config_gpu.m_device);
 
 
 	auto start = std::chrono::steady_clock::now();
@@ -193,6 +194,8 @@ void Worker_prime::run()
 			double fermat_tests_per_chain = 1.0 * m_segmented_sieve->m_fermat_test_count / m_segmented_sieve->m_chain_count;
 			std::cout << std::fixed << std::setprecision(2) << m_range_searched /1.0e9 << " billion integers searched." <<
 				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
+			std::cout << "Avg chain length: " << std::fixed << std::setprecision(2) << 1.0 * m_segmented_sieve->m_chain_candidate_total_length / m_segmented_sieve->m_chain_count
+				<< " Max chain: " << m_segmented_sieve->m_chain_candidate_max_length << std::endl;
 			std::cout << "Fermat Tests: " << m_segmented_sieve->m_fermat_test_count << " Fermat Primes: " << m_segmented_sieve->m_fermat_prime_count <<
 				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
@@ -337,7 +340,8 @@ void Worker_prime::sieve_performance_test()
 	test_sieve.calculate_starting_multiples();
 	test_sieve.reset_sieve();
 	test_sieve.reset_sieve_batch(0);
-	test_sieve.gpu_sieve_init();
+	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
+	test_sieve.gpu_sieve_init(worker_config_gpu.m_device);
 	auto start = std::chrono::steady_clock::now();
 	//test_sieve.sieve_batch_cpu(0);
 	test_sieve.sieve_batch(0);
