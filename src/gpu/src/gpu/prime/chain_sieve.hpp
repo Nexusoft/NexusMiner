@@ -87,11 +87,11 @@ namespace nexusminer {
 			void reset_stats();
 			void find_chains_cpu(uint64_t low, bool batch_sieve_mode);
 			void find_chains();
-			uint64_t count_fermat_primes(int sample_size);
+			uint64_t count_fermat_primes(int sample_size, uint16_t device);
 			uint64_t count_fermat_primes_cpu(int sample_size);
 			bool primality_test(boost::multiprecision::uint1024_t p);
 			void test_chains();
-			void primality_batch_test();
+			void primality_batch_test(uint16_t device);
 			void primality_batch_test_cpu();
 			void clean_chains();
 			uint64_t get_current_chain_list_length();

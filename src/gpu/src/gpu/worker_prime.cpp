@@ -146,7 +146,7 @@ void Worker_prime::run()
 		{
 			//m_logger->debug("Batch primality testing {} candidates.", m_segmented_sieve->get_current_chain_list_length());
 			auto test_chains_start = std::chrono::steady_clock::now();
-			m_segmented_sieve->primality_batch_test();
+			m_segmented_sieve->primality_batch_test(worker_config_gpu.m_device);
 			auto test_chains_stop = std::chrono::steady_clock::now();
 			auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
 			test_chains_ms += test_chains_elapsed.count();
@@ -294,9 +294,9 @@ void Worker_prime::fermat_performance_test()
 	std::vector<uint8_t> primality_test_results;
 	primality_test_results.resize(primality_test_batch_size);
 	//bool primality_test_results[primality_test_batch_size];
-
+	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
 	auto start = std::chrono::steady_clock::now();
-	run_primality_test(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data());
+	run_primality_test(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), worker_config_gpu.m_device);
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	mpz_clear(base_as_mpz_t);
@@ -370,7 +370,7 @@ void Worker_prime::sieve_performance_test()
 		candidate_ratio * 100, candidate_ratio_expected * 100);
 	double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve();
 	int fermat_sample_size = std::min<uint64_t>(100000, prime_candidate_count);
-	uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size);
+	uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size, worker_config_gpu.m_device);
 	m_logger->info("Got {:.3f}% fermat positive rate. Expected about {:.3f}%",
 		100.0*fermat_count/ fermat_sample_size, fermat_positive_rate_expected*100.0);
 	m_logger->info("Found {} chains in {:.4f} seconds ({:.2f} chains/MIS @ {:.1f} MISPS).",

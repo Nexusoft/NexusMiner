@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
-
 add_library(gpu STATIC "src/gpu/worker_hash.cpp" "src/gpu/cuda_hash/util.cu" "src/gpu/cuda_hash/constants.cu" "src/gpu/cuda_hash/sk1024.cu")
+
 
 if(WITH_PRIME)
     target_sources(gpu PRIVATE src/gpu/worker_prime.cpp src/gpu/prime/prime.cpp src/gpu/prime/chain_sieve.cpp "src/gpu/cuda_prime/cuda_chain.cu" src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/sieve.cu)

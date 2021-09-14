@@ -269,7 +269,7 @@ __global__ void kernel_fermat(cgbn_error_report_t* report, typename fermat_t<par
 
 
 template<class params>
-void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, uint8_t results[]) {
+void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, uint8_t results[], int device) {
   typedef typename fermat_t<params>::instance_t instance_t;
   
   instance_t          *instances, *gpuInstances;
@@ -281,7 +281,7 @@ void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, u
   //printf("Genereating instances ...\n");
   instances=fermat_t<params>::generate_instances(base_big_int, offsets, instance_count);
   //printf("Copying instances to the GPU ...\n");
-  CUDA_CHECK(cudaSetDevice(0));
+  CUDA_CHECK(cudaSetDevice(device));
   CUDA_CHECK(cudaMalloc((void **)&gpuInstances, sizeof(instance_t)*instance_count));
   CUDA_CHECK(cudaMemcpy(gpuInstances, instances, sizeof(instance_t)*instance_count, cudaMemcpyHostToDevice));
   
@@ -316,11 +316,11 @@ void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, u
 }
 
 
-void run_primality_test(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[])
+void run_primality_test(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
 {
     //printf("Testing %i prime candidates\n", offset_count);
 	typedef fermat_params_t<8, 1024, 5> params;
-    run_test<params>(base_big_int, offsets, offset_count, results);
+    run_test<params>(base_big_int, offsets, offset_count, results, device);
     
 }
 

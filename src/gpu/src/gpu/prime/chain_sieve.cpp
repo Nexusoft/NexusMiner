@@ -511,7 +511,7 @@ namespace nexusminer {
         }
 
         //batch process the list of prime candidates to be fermat tested.  
-        void Sieve::primality_batch_test()
+        void Sieve::primality_batch_test(uint16_t device=0)
         {
             bool cpu_verify = false;
             uint64_t prime_count = 0;
@@ -535,7 +535,7 @@ namespace nexusminer {
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
 
-            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data());
+            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(), device);
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
@@ -703,7 +703,7 @@ namespace nexusminer {
             return count;
         }
 
-        uint64_t Sieve::count_fermat_primes(int sample_size)
+        uint64_t Sieve::count_fermat_primes(int sample_size, uint16_t device)
         {
             uint64_t prime_count = 0;
             int low = 0;
@@ -731,7 +731,7 @@ namespace nexusminer {
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
 
-            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data());
+            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(),device);
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
