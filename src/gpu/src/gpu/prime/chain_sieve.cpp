@@ -372,8 +372,25 @@ namespace nexusminer {
             m_chain_candidate_total_length = 0;
         }
 
+        //find chains on the gpu
+        void Sieve::find_chains()
+        {
+            uint32_t chain_count;
+            m_cuda_chains = {};
+            m_cuda_chains.resize(m_cuda_sieve.m_max_chains);
+            m_cuda_sieve.find_chains(m_cuda_chains.data(), chain_count);
+            //convert gpu chains to cpu chains
+            for (auto i=0; i< chain_count;i++)
+            {
+                Chain chain(m_cuda_chains[i].m_base_offset);
+                for (auto j = 1; j < m_cuda_chains[i].m_offset_count; j++)
+                    chain.push_back(m_cuda_chains[i].m_offsets[j]);
+                m_chain.push_back(chain);
+            }
+        }
+
         //search the sieve for chains that meet the minimum length requirement.  Chains can cross segment boundaries.
-        void Sieve::find_chains(uint64_t low, bool batch_sieve_mode)
+        void Sieve::find_chains_cpu(uint64_t low, bool batch_sieve_mode)
         {
             std::vector<uint8_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
             uint64_t sieve_size = sieve.size();
@@ -469,6 +486,8 @@ namespace nexusminer {
             }
             
         }
+
+        
 
         void Sieve::close_chain()
         {
@@ -569,6 +588,11 @@ namespace nexusminer {
             return m_chain.size();
         }
 
+        uint64_t Sieve::get_cuda_chain_list_length()
+        {
+            return m_cuda_chains.size();
+        }
+
         //calculates the probability than a random unsigned number that passed through the sieve is actually prime
         //compare with primality test stats to verify the sieve is working. 
         double Sieve::probability_is_prime_after_sieve()
@@ -644,6 +668,7 @@ namespace nexusminer {
                     {
                         //we found a long chain.  save it.
                         m_logger->info("Found a fermat chain of length {}.", length);
+                        //std::cout << chain.str() << std::endl;
                         m_long_chain_starts.push_back(base_offset + offset);
                     }
                 }

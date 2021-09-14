@@ -137,7 +137,8 @@ void Worker_prime::run()
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
 		auto find_chains_start = std::chrono::steady_clock::now();
-		m_segmented_sieve->find_chains(low, batch_sieve_mode);
+		//m_segmented_sieve->find_chains_cpu(low, batch_sieve_mode);
+		m_segmented_sieve->find_chains();
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
@@ -347,7 +348,15 @@ void Worker_prime::sieve_performance_test()
 	test_sieve.sieve_batch(0);
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-	double elapsed_s = elapsed.count() / 1000.0;
+	double sieve_elapsed_s = elapsed.count() / 1000.0;
+	start = std::chrono::steady_clock::now();
+	test_sieve.find_chains();
+	end = std::chrono::steady_clock::now();
+	elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+	double find_chains_elapsed_s = elapsed.count() / 1000.0;
+	//test_sieve.clear_chains();
+	//test_sieve.find_chains_cpu(0, true);
+
 	test_sieve.gpu_sieve_free();
 
 	uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
@@ -356,7 +365,7 @@ void Worker_prime::sieve_performance_test()
 	double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
 	
 	m_logger->info("Sieved {:.1E} integers using primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
-		(double)sieve_range, (double)test_sieve.m_sieving_prime_limit, elapsed_s, sieve_range / elapsed_s / 1e6);
+		(double)sieve_range, (double)test_sieve.m_sieving_prime_limit, sieve_elapsed_s, sieve_range / sieve_elapsed_s / 1e6);
 	m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
 		candidate_ratio * 100, candidate_ratio_expected * 100);
 	double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve();
@@ -364,6 +373,10 @@ void Worker_prime::sieve_performance_test()
 	uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size);
 	m_logger->info("Got {:.3f}% fermat positive rate. Expected about {:.3f}%",
 		100.0*fermat_count/ fermat_sample_size, fermat_positive_rate_expected*100.0);
+	m_logger->info("Found {} chains in {:.4f} seconds ({:.2f} chains/MIS @ {:.1f} MISPS).",
+		test_sieve.get_current_chain_list_length(),
+		find_chains_elapsed_s, 1.0e6 * test_sieve.get_current_chain_list_length()/sieve_range,
+		sieve_range / find_chains_elapsed_s / 1e6);
 
 }
 

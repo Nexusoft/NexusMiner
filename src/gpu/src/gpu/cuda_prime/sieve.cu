@@ -1,6 +1,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "sieve.cuh"
+
 #include <cuda.h>
 #include <stdio.h>
 #include <math.h>
@@ -19,6 +20,95 @@
 namespace nexusminer {
     namespace gpu {
 
+        __device__ void cuda_chain_push_back(CudaChain& chain, int offset);
+        __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset);
+
+        __constant__ const int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };
+
+        __constant__ const int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
+
+        __constant__ const int sieve30_index[]
+        { -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
+
+
+        //search the sieve for chains that meet the minimum length requirement.  
+        __global__ void find_chain_kernel(uint8_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset)
+        {
+            
+            uint64_t sieve_size = CudaSieve::m_sieve_total_size;
+            CudaChain current_chain;
+            uint64_t num_blocks = gridDim.x;
+            uint64_t num_threads = blockDim.x;
+            uint64_t block_id = blockIdx.x;
+            uint64_t index = block_id * num_threads + threadIdx.x;
+            uint64_t stride = num_blocks * num_threads;
+            int sieve_offset;
+            int gap;
+            uint64_t chain_start, prime_candidate_offset;
+            if (index == 0)
+                *chain_index = 0;
+            __syncthreads();
+            //search each sieve location for a possible chain
+            for (uint64_t i = index; i < sieve_size; i += stride)
+            {
+                if (i < sieve_size)
+                {
+                    //chain must start with a prime
+                    if (sieve[i] == 0)
+                    {
+                        return;
+                    }
+                    //search left for another prime less than max gap away
+                    gap = 0;
+                    int64_t j = i;
+                    j--;
+                    while (j >= 0 && gap <= maxGap)
+                    {
+                        gap += sieve30_gaps[j % 8];
+                        if (gap <= maxGap && sieve[j] == 1)
+                        {
+                            //there is a valid element to the left.  this is not the first element in a chain. abort.
+                            return;
+                        }
+                        
+                        j--;
+                    }
+                    //this is the start of a possible chain.  search right
+                    //where are we in the wheel
+                    sieve_offset = sieve30_offsets[i % 8];
+                    chain_start = sieve_start_offset + i / 8 * 30 + sieve_offset;
+                    cuda_chain_open(current_chain, chain_start);
+                    gap = 0;
+                    j = i;
+                    j++;
+                    while (j < sieve_size && gap <= maxGap)
+                    {
+                        gap += sieve30_gaps[j % 8];
+                        if (gap <= maxGap && sieve[j] == 1)
+                        {
+                            //another possible candidate.  add it to the chain
+                            gap = 0;
+                            sieve_offset = sieve30_offsets[j % 8];
+                            prime_candidate_offset = sieve_start_offset + j / 8 * 30 + sieve_offset;
+                            cuda_chain_push_back(current_chain, prime_candidate_offset - chain_start);
+                        }
+                        j++;
+                    }
+                    //we reached the end of the chain.  check if it meets the length requirement
+                    if (current_chain.m_offset_count >= CudaSieve::m_min_chain_length)
+                    {
+                        //increment the chain list index
+                        uint32_t chain_idx = atomicInc(chain_index, CudaSieve::m_max_chains);
+                        //copy the current chain to the global list
+                        chains[chain_idx] = current_chain;
+                    }
+                }
+            }
+            
+
+        }
+
+       
         //return the offset from x to the next integer multiple of n greater than x that is not divisible by 2, 3, or 5.  
         //x must be a multiple of the primorial 30 and n must be a prime greater than 5.
         template <typename T1, typename T2>
@@ -36,11 +126,7 @@ namespace nexusminer {
             return m;
         }
 
-        __constant__ const int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
-
-        __constant__ const int sieve30_index[]
-            { -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
-
+        
 
         //seive kernel
 
@@ -140,12 +226,28 @@ namespace nexusminer {
 
         void CudaSieve::run_sieve(uint64_t sieve_start_offset, uint8_t sieve[])
         {
+            m_sieve_start_offset = sieve_start_offset;
+            
             //run the kernel
             do_sieve <<<m_num_blocks, m_threads_per_block >>> (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
                 d_starting_multiples, d_prime_mod_inverses, d_sieve, d_multiples, d_wheel_indices);
 
+            //checkCudaErrors(cudaDeviceSynchronize());
+            //checkCudaErrors(cudaMemcpy(sieve, d_sieve, m_sieve_total_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+        }
+
+        void CudaSieve::find_chains(CudaChain chains[], uint32_t& chain_count)
+        {
+            int sieve_threads = 256;
+            int sieve_blocks = (m_sieve_total_size + sieve_threads - 1)/ sieve_threads;
+            //reset the chain index
+            //checkCudaErrors(cudaMemset(d_chain_index, 0, sizeof(uint32_t)));
+            //run the kernel
+            find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_chain_index, m_sieve_start_offset);
+
             checkCudaErrors(cudaDeviceSynchronize());
-            checkCudaErrors(cudaMemcpy(sieve, d_sieve, m_sieve_total_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_index, sizeof(uint32_t), cudaMemcpyDeviceToHost));
+            checkCudaErrors(cudaMemcpy(chains, d_chains, chain_count * sizeof(CudaChain), cudaMemcpyDeviceToHost));
         }
 
         //allocate global memory and load values used by the sieve to the gpu 
@@ -162,12 +264,16 @@ namespace nexusminer {
             checkCudaErrors(cudaMalloc(&d_sieve, sieve_size * sizeof(uint8_t)));
             checkCudaErrors(cudaMalloc(&d_multiples, prime_count * m_num_blocks * sizeof(uint32_t)));
             checkCudaErrors(cudaMalloc(&d_wheel_indices, prime_count * m_num_blocks * sizeof(uint8_t)));
+            checkCudaErrors(cudaMalloc(&d_chains, m_max_chains * sizeof(CudaChain)));
+            checkCudaErrors(cudaMalloc(&d_chain_index, sizeof(uint32_t)));
+
 
             //copy data to the gpu
             checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples_host, prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_prime_mod_inverses, prime_mod_inverses_host, prime_count * sizeof(uint32_t), cudaMemcpyHostToDevice));
-        
+            checkCudaErrors(cudaMemset(d_chain_index, 0, sizeof(uint32_t)));
+
         }
 
         void CudaSieve::free_sieve()
@@ -178,6 +284,8 @@ namespace nexusminer {
             checkCudaErrors(cudaFree(d_multiples));
             checkCudaErrors(cudaFree(d_prime_mod_inverses));
             checkCudaErrors(cudaFree(d_sieve));
+            checkCudaErrors(cudaFree(d_chains));
+            checkCudaErrors(cudaFree(d_chain_index));
         }
     }
 }

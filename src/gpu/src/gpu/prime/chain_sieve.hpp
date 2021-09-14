@@ -13,13 +13,13 @@
 namespace nexusminer {
 	namespace gpu
 	{
-		enum class Fermat_test_status {
+		/*enum class Fermat_test_status {
 			untested,
 			fail,
 			pass
-		};
+		};*/
 
-		static constexpr int maxGap = 12;  //the largest allowable prime gap.
+		//static constexpr int maxGap = 12;  //the largest allowable prime gap.
 
 		//a candidate for a dense prime cluster.  A chain consists of a base integer plus a list of offsets. 
 		class Chain
@@ -85,7 +85,8 @@ namespace nexusminer {
 			void reset_sieve_batch(uint64_t low);
 			void clear_chains();
 			void reset_stats();
-			void find_chains(uint64_t low, bool batch_sieve_mode);
+			void find_chains_cpu(uint64_t low, bool batch_sieve_mode);
+			void find_chains();
 			uint64_t count_fermat_primes(int sample_size);
 			uint64_t count_fermat_primes_cpu(int sample_size);
 			bool primality_test(boost::multiprecision::uint1024_t p);
@@ -94,6 +95,7 @@ namespace nexusminer {
 			void primality_batch_test_cpu();
 			void clean_chains();
 			uint64_t get_current_chain_list_length();
+			uint64_t get_cuda_chain_list_length();
 			int get_fermat_test_batch_size() { return m_fermat_test_batch_size; }
 			double probability_is_prime_after_sieve();
 			double sieve_pass_through_rate_expected();
@@ -114,7 +116,7 @@ namespace nexusminer {
 			uint64_t m_sieve_batch_start_offset;
 			uint32_t m_sieving_prime_limit = 3e6; //3e8;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
-			int m_fermat_test_batch_size = 10000;
+			int m_fermat_test_batch_size = 20000;
 			int m_segment_batch_size = CudaSieve::m_kernel_segments_per_block* CudaSieve::m_num_blocks; //number of segments to sieve in one batch
 			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 
@@ -184,6 +186,7 @@ namespace nexusminer {
 			std::vector<uint32_t> m_multiples;
 			std::vector<uint32_t> m_prime_mod_inverses;
 			std::vector<Chain> m_chain;
+			std::vector<CudaChain>m_cuda_chains;
 
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
