@@ -5,6 +5,9 @@
 #include "stats/types.hpp"
 #include <string>
 #include <sstream>
+#include <iostream>
+#include <iomanip>
+
 
 namespace nexusminer {
 namespace stats
@@ -25,9 +28,11 @@ public:
     {
         auto const global_stats = stats_collector.get_global_stats();
         std::stringstream ss;
-        ss << "Blocks accepted: " << global_stats.m_accepted_blocks
+        ss << std::setprecision(2) << std::fixed;
+        ss << "Hours elapsed: " << stats_collector.get_elapsed_time_seconds().count() / 3600.0;
+        ss << " Blocks accepted: " << global_stats.m_accepted_blocks
             << " rejected: " << global_stats.m_rejected_blocks;
-        ss << " Connection retry attempts: " << global_stats.m_connection_retries << std::endl;
+        ss << " Connection retries: " << global_stats.m_connection_retries << std::endl;
 
         return ss.str();
     }
@@ -41,9 +46,11 @@ public:
     {
         auto const global_stats = stats_collector.get_global_stats();
         std::stringstream ss;
-        ss << "Shares accepted: " << global_stats.m_accepted_shares
+        ss << std::setprecision(2) << std::fixed;
+        ss << "Hours elapsed: " << stats_collector.get_elapsed_time_seconds().count() / 3600.0;
+        ss << " Shares accepted: " << global_stats.m_accepted_shares
             << " rejected: " << global_stats.m_rejected_shares;
-        ss << " Connection retry attempts: " << global_stats.m_connection_retries << std::endl;
+        ss << " Connection retries: " << global_stats.m_connection_retries << std::endl;
 
         return ss.str();
     }

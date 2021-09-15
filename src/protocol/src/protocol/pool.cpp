@@ -35,7 +35,7 @@ network::Shared_payload Pool::login(std::string const& account_name, Login_handl
 
 network::Shared_payload Pool::get_work()
 {
-    m_logger->info("Nexus Network: New Block");
+    m_logger->info("Get new block");
 
     // get new block from wallet
     Packet packet;
@@ -86,6 +86,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         auto block = deserialize_block(std::move(original_block));
         if (block.nHeight > m_current_height)
         {
+            m_logger->info("Nexus Network: New height {}", block.nHeight);
             m_current_height = block.nHeight;
             if(m_set_block_handler)
             {

@@ -35,6 +35,7 @@ private:
     void start_read();
     void handle_read(const asio::error_code& error, std::size_t bytes_transferred);
     bool difficulty_check();
+    void send_block_to_fpga();
 
     static constexpr int baud = 230400;
     static constexpr int workPackageLength = 224; //bytes
@@ -53,12 +54,13 @@ private:
     std::mutex m_mtx;
     std::string m_log_leader;
 
-
-    static constexpr uint64_t nonce_difficulty_filter = 1ULL << 32;  //the fixed difficulty check inside the FPGA
+    static constexpr int fpga_leading_zero_threshold = 32; //FPGA uses a fixed difficulty check.
+    static constexpr uint64_t nonce_difficulty_filter = 1ULL << fpga_leading_zero_threshold;
     void reset_statistics();
     int m_nonce_candidates_recieved;
     int m_best_leading_zeros;
     int m_met_difficulty_count;
+    int m_hash_error_count;
 
     std::uint32_t m_pool_nbits;
 };

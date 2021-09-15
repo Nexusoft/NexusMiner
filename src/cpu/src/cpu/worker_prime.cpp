@@ -2,10 +2,12 @@
 #include "config/config.hpp"
 #include "stats/stats_collector.hpp"
 #include "prime/prime.hpp"
+#include "prime/chain_sieve.hpp"
 #include "block.hpp"
 #include <asio.hpp>
 #include <primesieve.hpp>
 #include <sstream> 
+#include <boost/random.hpp>
 
 namespace nexusminer
 {
@@ -16,6 +18,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_logger{ spdlog::get("logger") }
 	, m_config{ config }
 	, m_prime_helper{std::make_unique<Prime>()}
+	, m_segmented_sieve{std::make_unique<Sieve>()}
 	, m_stop{ true }
 	, m_log_leader{ "CPU Worker " + m_config.m_id + ": " }
 	, m_primes{ 0 }
@@ -23,8 +26,10 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_difficulty{ 0 }
 	, m_pool_nbits{ 0 }
 {
-	//m_prime_helper->InitializePrimes();
+	m_segmented_sieve->generate_sieving_primes();
+	fermat_performance_test();
 	m_chain_histogram = std::vector<std::uint32_t>(10, 0);
+	m_segmented_sieve->reset_stats();
 }
 
 Worker_prime::~Worker_prime() noexcept
@@ -74,9 +79,15 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 		//set the starting nonce for each worker to something different that won't overlap with the others
 		m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
 		m_nonce = m_starting_nonce;
-		
-		//m_nonce = big_nonce.convert_to<uint64_t>();
-		m_logger->debug("starting nonce: {}", m_nonce);
+
+		//set the sieve start range
+		uint1k startprime = m_base_hash + m_nonce;
+		m_segmented_sieve->set_sieve_start(startprime);
+		//update the starting nonce to reflect the actual sieve start used
+		m_nonce = static_cast<uint64_t>(m_segmented_sieve->get_sieve_start() - m_base_hash);
+		//m_logger->debug("starting nonce: {}", m_nonce);
+		//clear out any old chains from the last block
+		m_segmented_sieve->clear_chains();
 	}
 	//restart the mining loop
 	m_stop = false;
@@ -85,22 +96,102 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 
 void Worker_prime::run()
 {
-	std::uint64_t i = 0;
+	m_segmented_sieve->calculate_starting_multiples();
+	uint32_t segment_size = m_segmented_sieve->get_segment_size();
+	uint64_t find_chains_ms = 0;
+	uint64_t sieving_ms = 0;
+	uint64_t test_chains_ms = 0;
+	uint64_t elapsed_ms = 0;
+	uint64_t high = 0;
+	uint64_t low = 0;
+	uint64_t range_searched_this_cycle = 0;
+
+	auto start = std::chrono::steady_clock::now();
+	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
 	{
-		uint1k startprime = m_base_hash + m_nonce + m_sieveRange * i;
-		startprime = startprime + 1 - (startprime % 2);  //ensure odd start
-		//std::cout << "Sieving range " << m_sieveRange * i << " to " << m_sieveRange * (i + 1) - 1 << std::endl;
-		generate_seive(startprime);
-		analyze_chains();
-		mine_region(startprime);
-		i++;
+		m_segmented_sieve->reset_sieve();
+		m_segmented_sieve->clear_chains();
+
+		// current segment = [low, high]
+		high = low + segment_size - 1;
+		uint64_t sieve_size = (high - low) / 30 + 1;
+		m_range_searched += segment_size;
+		range_searched_this_cycle += segment_size;
+
+		auto sieve_start = std::chrono::steady_clock::now();
+		m_segmented_sieve->sieve_segment();
+		auto sieve_stop = std::chrono::steady_clock::now();
+		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
+		sieving_ms += sieve_elapsed.count();
+		auto find_chains_start = std::chrono::steady_clock::now();
+		m_segmented_sieve->find_chains(low, false);
+		auto find_chains_stop = std::chrono::steady_clock::now();
+		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
+		find_chains_ms += find_chains_elapsed.count();
+		auto test_chains_start = std::chrono::steady_clock::now();
+		m_segmented_sieve->test_chains();
+		auto test_chains_stop = std::chrono::steady_clock::now();
+		auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
+		test_chains_ms += test_chains_elapsed.count();
+		//check difficulty of any chains that passed through the filter
+		for (auto x : m_segmented_sieve->m_long_chain_starts)
+		{
+			m_block.nNonce = m_nonce + x;
+			uint1k chain_start = m_base_hash + m_block.nNonce;
+			m_logger->info("Actual difficulty {} required {}", getDifficulty(chain_start), getNetworkDifficulty());
+			if (difficulty_check(chain_start))
+			{
+				//we found a valid chain.  submit it. 
+				{
+					if (m_found_nonce_callback)
+					{
+						m_io_context->post([self = shared_from_this()]()
+						{
+							self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
+						});
+					}
+					else
+					{
+						m_logger->debug(m_log_leader + "Miner callback function not set.");
+					}
+				}
+			}
+		}
+		low += segment_size;
+		//debug
+		auto end = std::chrono::steady_clock::now();
+		auto interval_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - interval_start);
+		bool print_debug = false;
+		if (print_debug && interval_elapsed.count() > 10000)
+		{
+			std::cout << "--debug--" << std::endl;
+			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+			elapsed_ms = elapsed.count();
+			double chains_per_mm = 1.0e6 * m_segmented_sieve->m_chain_count / m_range_searched;
+			double chains_per_sec = 1.0e3 * m_segmented_sieve->m_chain_count / elapsed_ms;
+			double fermat_positive_rate = 1.0 * m_segmented_sieve->m_fermat_prime_count / m_segmented_sieve->m_fermat_test_count;
+			double fermat_tests_per_chain = 1.0 * m_segmented_sieve->m_fermat_test_count / m_segmented_sieve->m_chain_count;
+			std::cout << std::fixed << std::setprecision(2) << m_range_searched / 1.0e9 << " billion integers searched." <<
+				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
+			std::cout << "Fermat Tests: " << m_segmented_sieve->m_fermat_test_count << " Fermat Primes: " << m_segmented_sieve->m_fermat_prime_count <<
+				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
+				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
+				1.0e6 * m_segmented_sieve->m_fermat_test_count / m_range_searched << std::endl;
+
+			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << range_searched_this_cycle / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
+			double predicted_8chain_positivity_rate = std::pow(fermat_positive_rate, 8);
+			//std::cout << "Predicted chains tested to find one Fermat 8-chains: " << 1 / predicted_8chain_positivity_rate << std::endl;
+			//double predicted_days_between_8chains = 1.0 / (predicted_8chain_positivity_rate * chains_per_sec * 3600 * 24);
+			//std::cout << "Predicted days between 8 chains per core: " << std::fixed << std::setprecision(2) << predicted_days_between_8chains << std::endl;
+			std::cout << "Elapsed time: " << std::fixed << std::setprecision(2) << elapsed_ms / 1000.0 << "s. Sieving: " <<
+				100.0 * sieving_ms / elapsed_ms << "% Chain filtering: " << 100.0 * find_chains_ms / elapsed_ms
+				<< "% Fermat testing: " << 100.0 * test_chains_ms / elapsed_ms << "% Other: " <<
+				100.0 * (elapsed_ms - (sieving_ms + find_chains_ms + test_chains_ms)) / elapsed_ms << "%" << std::endl;
+			interval_start = std::chrono::steady_clock::now();
+			std::cout << std::endl;
+		}
 	}
-
-
-
-
-	
 }
 
 double Worker_prime::getDifficulty(uint1k p)
@@ -121,275 +212,7 @@ bool Worker_prime::difficulty_check(uint1k p)
 	return getDifficulty(p) >= getNetworkDifficulty();
 }
 
-bool Worker_prime::isPrime(uint1k p)
-{
-	uint1k base = 2;
-	uint1k result;
-	result = boost::multiprecision::powm(base, p - 1, p);
-	return (result == 1);
-}
 
-void Worker_prime::generate_seive(uint1k sieve_start)
-{
-	m_sieve = {};
-	//sieve contains locations of possible primes.Only odd numbers are considered.
-	//sieve6 is based on the primorial 2 * 3 = 6, and is 6 positions long(3 odd positions 1, 3, 5)
-	std::vector<bool> sieve6{ true, false, true };
-	//sieve30 is based on the primorial 2 * 3 * 5 = 30, is 30 positions long(15 odd positions).Generate it by replicating sieve6 five times and crossing out the multiples of 5.
-	std::vector<bool> sieve30{ true, false, false, true, false, true, true, false, true, true, false, true, false, false, true };
-	//the next sieve after sieve6 starts with the next prime, 5
-	int startPrime = 5;
-	//5 is the third prime
-	int startPrimePosition = 3;
-	int primorialFinalPrime = startPrime;  // last prime in the primorial chain
-	//uint1k T("0x0000005ff320ec9f9599b9cb0156c793f61060c8a8c49185df9d25603e37259c2f0213d6d96745bbbbe7ea1e4e9da371aeeb5d20c204c22a038b10957b53c67d9eb3a00acfaeb6ccd4c231a8088d5a5745e19f70387a7d91463d9b318a1f0503819a32f5fa32cf3579c7d6a3546cbdceaa364cfa2e989defeb4f5fe29de687cc");
-	uint64_t nonce = 4933493377870005061;
-	double difficulty = 8.268849;
-	//uint1k sieveStart = T + nonce - 2;
-	//sieveStart = T
-	//sieveStart += (sieveStart + 1) % 2;  //start on an odd number
-	//sieveStart = T + 1
-	//sieveStart = 1;
-	uint1k sieveStart = sieve_start;
-	//Initialize the sieve by replicating sieve6
-	int replicate = m_maxSieveLength / 3 + (m_maxSieveLength % 3 != 0);
-
-	//sieve might be a few elements longer than maxsievelength
-	for (auto i = 0; i < replicate; i++)
-	{
-		m_sieve.insert(m_sieve.end(), sieve6.begin(), sieve6.end());
-	}
-	//adjust for sieve start location not on even multiple of 6
-	int rotate_left_by = (((sieveStart - 1) % 6) >> 1).convert_to<int>();
-	std::rotate(m_sieve.begin(), m_sieve.begin() + rotate_left_by, m_sieve.end());
-
-	//create the sieve
-	primesieve::iterator it(startPrime);
-	uint64_t p = startPrime;
-	uint64_t prime_index = 3;
-
-	//iterate through the sequence of primes between the 3rd prime(5) and the desired primorial end prime
-	while (prime_index <= m_primorialEndPrime)
-	{
-		//offset to the start of the sieve.  round up to the nearest odd integer multiple of the current prime.
-		uint1k startIndex_big = (((sieveStart + p - 1) / p) * p);  //round up to nearest integer multiple
-		//if it is even add another prime to get to the next odd multiple
-		startIndex_big += ((startIndex_big + 1) % 2) * p;
-		//subtract start offset
-		int startIndex = (startIndex_big - sieveStart).convert_to<int>();
-		//std::cout << "Prime: " << p << " Start Index: " << startIndex << std::endl;
-		//cross out multiples of the current prime. We are incrementing by p * 2 to skip even numbers
-		for (auto i = startIndex; i < m_sieveLength * 2; i = i + p * 2)
-		{
-			m_sieve[(i >> 1)] = false;
-		}
-		primorialFinalPrime = p;
-		p = it.next_prime();
-		prime_index++;
-	}
-	//std::cout << "Sieve Done" << std::endl;
-	//std::cout << "Sieve Length: " << sieveLength << std::endl;
-	//std::cout << "Primorial Final Prime: " << primorialFinalPrime << std::endl;
-}
-
-void Worker_prime::analyze_chains()
-//search the seive for chains with minimum length
-{
-
-	m_chainStartPosArray = {};
-	m_chainLengthArray = {};
-	m_chainOffsets = {};
-	m_chainCount = 0;
-	m_candidateCount = 0;
-
-	int chainLength = 0;     //measures chain length of current chain in process
-
-	std::vector<int> lastPos{ 0, -1, -1, -1 }; //#last four posistions. lastpos[0] is the last position just to the left of the current position. - 1 means not valid
-	//int lastGap = 0;
-	std::vector<int> currentChainOffsets;
-
-
-
-	//start position of chain in process
-	//find the first true in the sieve
-	int chainStartPos = 0;
-	for (auto i = 0; i < m_sieveLength; i++)
-	{
-		if (m_sieve[i])
-		{
-			chainStartPos = i;
-			break;
-		}
-	}
-
-
-	//go through the sieve and cross out primes not part of a chain
-	for (auto i = 0; i < m_sieveLength; i++)
-	{
-		if (m_sieve[i])
-		{
-			m_candidateCount += 1;
-			if (i - lastPos[0] <= m_maxGap)  //chain is still good
-			{
-				currentChainOffsets.push_back(i - chainStartPos);
-				chainLength += 1;
-			}
-			else // found a large gap.This is the end of the chain
-			{
-				if (m_minChainLength <= chainLength)
-				{
-					//save the chain
-					m_chainStartPosArray.push_back(chainStartPos);
-					m_chainLengthArray.push_back(chainLength);
-					m_chainOffsets.push_back(currentChainOffsets);
-					m_chainCount += 1;
-				}
-				else
-				{
-					//The chain is too short.
-
-				}
-				//start a new chain
-				chainLength = 1;
-				chainStartPos = i;
-				currentChainOffsets = { 0 };
-			}
-			lastPos[0] = i;
-		}
-		else
-		{
-			//not a valid candidate
-		}
-	}
-
-	//add the final chain if it is valid
-	if (m_minChainLength <= chainLength)
-	{
-		//save the chain
-		m_chainStartPosArray.push_back(chainStartPos);
-		m_chainLengthArray.push_back(chainLength);
-		m_chainOffsets.push_back(currentChainOffsets);
-		m_chainCount += 1;
-	}
-
-	int sieveRange = m_sieveLength * 2;
-	//std::cout << "Range: " << sieveLength * 2 << std::endl;
-	//std::cout << "Candidates: " << candidateCount << std::endl;
-	//std::cout << "Candidate Ratio: " << candidateCount / sieveRange << std::endl;
-	int candidatesEliminated = sieveRange - m_candidateCount;
-	//std::cout << "Candidates Eliminated: " << candidatesEliminated << std::endl;
-	//std::cout << "Chains greater than or equal to " << m_minChainLength << " : " << m_chainCount << std::endl;
-	//print("Million candidates eliminated per second:", candidatesEliminated / 1e6 / sieveCreationTime)
-	int maxChainLength = *std::max_element(m_chainLengthArray.begin(), m_chainLengthArray.end());
-	//std::cout << "Max chain length: " << maxChainLength << std::endl;
-
-	//print a few chains
-	/*int showChains = 0;
-	for (auto i = 0; i < showChains; i++)
-	{
-		int chainLen = m_chainLengthArray[i];
-		std::cout << "Length " << chainLen << " chain base offset " << (m_chainStartPosArray[i] * 2) + 1 << " offsets [";
-		for (auto j = 0; j < chainLen; j++)
-		{
-			std::cout << m_chainOffsets[i][j] * 2 << ", ";
-		}
-		std::cout << "]" << std::endl;
-	}*/
-}
-
-void Worker_prime::mine_region(uint1k start_here)
-{
-	int chain_index = 0;
-	uint64_t offset_from_start = m_chainStartPosArray[chain_index] * 2;
-	int offset_index = 0;
-	uint1k first_prime_candidate = start_here + offset_from_start;
-	uint1k prime_candidate = first_prime_candidate;
-	int chain_length = 0;
-	int target_length = 3;
-	int chain_start_offset_index = 0;
-
-	//int primorial_index = 0;
-	int gap = 0;
-	bool done_with_this_chain = false;
-	while (chain_index < m_chainCount)
-	{
-		//m_logger->debug("testing offset {} gap {}", m_prime_candidate_offsets[offset_index], gap);
-		if (isPrime(prime_candidate))
-		{
-			//std::cout << "found a prime" << std::endl;
-			m_primes++;
-			if (chain_length == 0)
-			{
-				chain_start_offset_index = offset_index;
-			}
-			chain_length += 1;
-			gap = 0;
-
-		}
-		offset_index += 1;
-		if (offset_index < m_chainLengthArray[chain_index])
-		{
-			int delta = (m_chainOffsets[chain_index][offset_index] - m_chainOffsets[chain_index][offset_index - 1]) * 2;
-			gap += delta;
-			prime_candidate += delta;
-
-			if (gap > 12)
-			{
-				done_with_this_chain = true;
-			}
-		}
-		else
-		{
-			done_with_this_chain = true;
-		}
-		if (done_with_this_chain)
-		{
-			if (chain_length >= 2)
-			{
-				m_chains++;
-				offset_from_start = m_chainStartPosArray[chain_index] * 2;
-				m_logger->debug("found a chain of length {} at offset {}", chain_length, offset_from_start);
-				m_chain_histogram[chain_length]++;
-				if (chain_length >= target_length)
-				{
-					uint1k chain_start = start_here + offset_from_start + m_chainOffsets[chain_index][chain_start_offset_index]*2;
-					uint1k bigNonce = chain_start - m_base_hash;
-					m_block.nNonce = bigNonce.convert_to<uint64_t>();
-					m_logger->debug("actual difficulty {} required {}", getDifficulty(chain_start), getNetworkDifficulty());
-					if (difficulty_check(chain_start))
-					{
-						//++m_met_difficulty_count;
-						//update the block with the nonce and call the callback function;
-						
-						//std::cout << "nonce: " << m_block.nNonce << " block hash " << m_base_hash.str() << std::endl;
-						{
-							if (m_found_nonce_callback)
-							{
-								m_io_context->post([self = shared_from_this()]()
-								{
-									self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
-								});
-							}
-							else
-							{
-								m_logger->debug(m_log_leader + "Miner callback function not set.");
-							}
-						}
-					}
-				}
-			}
-			//m_logger->debug("done with chain.  found {} primes.", chain_length);
-			chain_index++;
-			prime_candidate = start_here + m_chainStartPosArray[chain_index] * 2;
-			chain_length = 0;
-			offset_index = 0;
-			gap = 0;
-			chain_start_offset_index = 0;
-			done_with_this_chain = false;
-			
-		}
-	}
-}
 
 LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
 {
@@ -404,10 +227,11 @@ LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
 void Worker_prime::update_statistics(stats::Collector& stats_collector)
 {
 	auto prime_stats = std::get<stats::Prime>(stats_collector.get_worker_stats(m_config.m_internal_id));
-	prime_stats.m_primes = m_primes;
-	prime_stats.m_chains = m_chains;
+	prime_stats.m_primes = m_segmented_sieve->m_fermat_prime_count;
+	prime_stats.m_chains = m_segmented_sieve->m_chain_count;
 	prime_stats.m_difficulty = m_difficulty;
-	prime_stats.m_chain_histogram = m_chain_histogram;
+	prime_stats.m_chain_histogram = m_segmented_sieve->m_chain_histogram;
+	prime_stats.m_range_searched = m_range_searched;
 
 
 	stats_collector.update_worker_stats(m_config.m_internal_id, prime_stats);
@@ -416,6 +240,41 @@ void Worker_prime::update_statistics(stats::Collector& stats_collector)
 	m_chains = 0;
 }
 
+void Worker_prime::fermat_performance_test()
+//test the throughput of fermat primality test
+{
+	using namespace boost::multiprecision;
+	using namespace boost::random;
+
+	typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
+	generator1024_type gen1024;
+	gen1024.seed(time(0));
+	// Generate some random 1024-bit unsigned values:
+	std::vector<boost::multiprecision::uint1024_t> big_uints;
+	int sample_size = 2000;
+	for (unsigned i = 0; i < sample_size; ++i)
+	{
+		boost::multiprecision::uint1024_t pp = gen1024();
+		//make it odd
+		pp += 1?(pp % 2) == 0:0;
+		big_uints.push_back(pp);
+	}
+
+	int p_count = 0;
+	auto start = std::chrono::steady_clock::now();
+	for (unsigned i = 0; i < sample_size; ++i)
+	{
+		p_count += 1 ? m_segmented_sieve->primality_test(big_uints[i]) : 0;
+	}
+	auto end = std::chrono::steady_clock::now();
+	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+	double expected_primes = sample_size * 2 / (1024 * 0.693147);
+	std::stringstream ss;
+	ss << "Found " << p_count << " primes out of " << sample_size << " tested. Expected about " << expected_primes << ". ";
+	ss << std::fixed << std::setprecision(2) << 1000.0* sample_size /elapsed.count()<< " primality tests/second. (" << 1.0*elapsed.count()/ sample_size << "ms)";
+	m_logger->info(ss.str());
+	
+}
 
 }
 }

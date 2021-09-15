@@ -1,8 +1,12 @@
 #include "worker_manager.hpp"
 #include "cpu/worker_hash.hpp"
+
 #include "fpga/worker_hash.hpp"
 #ifdef GPU_ENABLED
 #include "gpu/worker_hash.hpp"
+#ifdef PRIME_ENABLED
+#include "gpu/worker_prime.hpp"
+#endif
 #endif
 #ifdef PRIME_ENABLED
 #include "cpu/worker_prime.hpp"
@@ -124,7 +128,11 @@ void Worker_manager::create_workers()
 #ifdef GPU_ENABLED
                 if (m_config.get_mining_mode() == config::Mining_mode::PRIME)
                 {
-                    m_logger->error("GPU worker is currently not supported for PRIME mining!");
+#ifdef PRIME_ENABLED
+                    m_workers.push_back(std::make_shared<gpu::Worker_prime>(m_io_context, worker_config));
+#else
+                    m_logger->error("NexusMiner not built 'WITH_PRIME' -> no worker created!");
+#endif
                 }
                 else
                 {

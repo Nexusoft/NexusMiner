@@ -12,7 +12,7 @@
 #include "LLC/types/bignum.h"
 
 
-namespace nexusminer {
+namespace nexusminer{
 namespace cpu
 {
 using uint1k = boost::multiprecision::uint1024_t;

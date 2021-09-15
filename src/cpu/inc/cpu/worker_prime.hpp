@@ -23,6 +23,7 @@ namespace cpu
 {
     using uint1k = boost::multiprecision::uint1024_t;
     class Prime;
+    class Sieve;
 class Worker_prime : public Worker, public std::enable_shared_from_this<Worker_prime>
 {
 public:
@@ -41,9 +42,10 @@ private:
     bool difficulty_check(uint1k p);
     //std::uint64_t leading_zero_mask();
     bool isPrime(uint1k p);
+    void fermat_performance_test();
 
     //Poor man's difficulty.  Report any nonces with at least this many leading zeros. Let the software perform additional filtering. 
-    static constexpr int leading_zeros_required = 20;    //set lower to find more nonce candidates
+    //static constexpr int leading_zeros_required = 20;    //set lower to find more nonce candidates
 
     std::shared_ptr<asio::io_context> m_io_context;
     std::shared_ptr<spdlog::logger> m_logger;
@@ -52,6 +54,7 @@ private:
     std::atomic<bool> m_stop;
     std::thread m_run_thread;
     Worker::Block_found_handler m_found_nonce_callback;
+    std::unique_ptr<Sieve> m_segmented_sieve;
 
     Block_data m_block;
     std::mutex m_mtx;
@@ -95,6 +98,7 @@ private:
 
     //stats
     std::vector<std::uint32_t> m_chain_histogram;
+    uint64_t m_range_searched = 0;
 
 };
 }
