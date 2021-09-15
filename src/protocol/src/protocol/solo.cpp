@@ -68,7 +68,7 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         auto const height = bytes2uint(*packet.m_data);
         if (height > m_current_height)
         {
-            m_logger->info("Nexus Network: New Block with height {}", height);
+            m_logger->info("Nexus Network: New height {}", height);
             m_current_height = height;
             connection->transmit(get_work());          
         }			

@@ -86,7 +86,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         auto block = deserialize_block(std::move(original_block));
         if (block.nHeight > m_current_height)
         {
-            m_logger->info("Nexus Network: New Block with height {}", block.nHeight);
+            m_logger->info("Nexus Network: New height {}", block.nHeight);
             m_current_height = block.nHeight;
             if(m_set_block_handler)
             {
