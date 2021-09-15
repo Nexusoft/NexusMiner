@@ -29,7 +29,7 @@ Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet h
 
   ./NexusMiner ../../myownminer.conf -c
 ## Prebuilt Binaries (Windows x64)
-Download NexusMiner.exe and sample miner.conf from the latest release. 
+Download NexusMiner.exe from the [latest release](https://github.com/Nexusoft/NexusMiner/releases). 
 
 ## Building (Cmake) 
 Optional cmake build options are
