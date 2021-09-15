@@ -6,7 +6,7 @@ Miner for Nexus Hash channel with FPGA and (optional) CUDA GPU. Both pool and so
 List of supported [FPGA boards](https://github.com/Nexusoft/NexusMiner/blob/v2.0/docs/fpga_support.md). 
 
 ## Prime Channel
-The miner currently supports CPU prime mining, solo only.  CPU prime mining is useful for development and testnet work but is not competitive with GPU prime mining on main net.  
+The miner currently supports prime mining for CPU and GPU (Beta), solo only.  CPU prime mining is useful for development and testnet work but is not competitive with GPU prime mining on main net. 
 ## Wallet Setup
 
 Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet has been unlocked for mining.
@@ -28,25 +28,26 @@ Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet h
 ```
 
   ./NexusMiner ../../myownminer.conf -c
+## Prebuilt Binaries (Windows x64)
+Download NexusMiner.exe and sample miner.conf from the latest release. 
 
 ## Building (Cmake) 
 Optional cmake build options are
 * WITH_GPU_CUDA       to enable HASH channel gpu mining. CUDA Toolkit required
-* WITH_PRIME          to enable PRIME channel mining (currently CPU only). primesieve and boost required
+* WITH_PRIME          to enable PRIME channel mining. GMP and boost required
+* Example cmake command: cmake -DCMAKE_BUILD_TYPE=Release -DWITH_GPU_CUDA=On DWITH_PRIME=On ..
 
 ### Windows
 * OpenSSL: 
     * Download and run OpenSSL [installer](https://slproweb.com/products/Win32OpenSSL.html)
-* [primesieve](https://github.com/kimwalisch/primesieve) (required for WITH_PRIME): 
-    * Follow detailed [build instructions](https://github.com/kimwalisch/primesieve/blob/master/doc/BUILD.md) for Windows/Microsoft Visual C++.
-    * You may need to add the location of primesieve.dll to your system path.  Try C:\Program Files (x86)\primesieve\bin
+* [MPIR](http://www.mpir.org/) (required for WITH_PRIME):
+    * Download and build.  Copy gmp*.lib and mpir.lib to NexusMiner/libs
 * [boost](https://www.boost.org/users/download/) (required for WITH_PRIME):
     * Download and extract to C:\boost
-
 ### Ubuntu/Debian
 * OpenSSL:
     * sudo apt-get install libssl-dev
-* primesieve (required for WITH_PRIME):  
-    * sudo apt-get install libprimesieve-dev
+* gmp (required for WITH_PRIME):  
+    * sudo apt-get install libgmp-dev
 * boost (required for WITH_PRIME):
     * sudo apt-get install libboost-all-dev
