@@ -35,7 +35,7 @@ Download NexusMiner.exe from the [latest release](https://github.com/Nexusoft/Ne
 Optional cmake build options are
 * WITH_GPU_CUDA       to enable HASH channel gpu mining. CUDA Toolkit required
 * WITH_PRIME          to enable PRIME channel mining. GMP and boost required
-* Example cmake command: cmake -DCMAKE_BUILD_TYPE=Release -DWITH_GPU_CUDA=On DWITH_PRIME=On ..
+* Example cmake command: cmake -DCMAKE_BUILD_TYPE=Release -DWITH_GPU_CUDA=On -DWITH_PRIME=On ..
 
 ### Windows
 * OpenSSL: 
