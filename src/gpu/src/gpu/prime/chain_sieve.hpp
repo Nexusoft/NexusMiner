@@ -197,6 +197,7 @@ namespace nexusminer {
 			uint64_t sieve_run_count = 0;
 
 			CudaSieve m_cuda_sieve;
+			CudaPrimalityTest m_cuda_prime_test;
 
 			//experimental
 		};

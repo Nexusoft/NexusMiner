@@ -296,7 +296,8 @@ void Worker_prime::fermat_performance_test()
 	//bool primality_test_results[primality_test_batch_size];
 	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
 	auto start = std::chrono::steady_clock::now();
-	run_primality_test(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), worker_config_gpu.m_device);
+	CudaPrimalityTest cuda_prime_test;
+	cuda_prime_test.run_primality_test(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), worker_config_gpu.m_device);
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	mpz_clear(base_as_mpz_t);

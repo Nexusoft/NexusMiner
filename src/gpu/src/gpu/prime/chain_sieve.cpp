@@ -535,7 +535,7 @@ namespace nexusminer {
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
 
-            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(), device);
+            m_cuda_prime_test.run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(), device);
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
@@ -731,7 +731,7 @@ namespace nexusminer {
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
 
-            run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(),device);
+            m_cuda_prime_test.run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(),device);
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
