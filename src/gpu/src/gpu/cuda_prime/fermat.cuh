@@ -41,6 +41,8 @@ IN THE SOFTWARE.
 namespace nexusminer {
 	namespace gpu {
 
+        
+
         template<uint32_t tpi, uint32_t bits, uint32_t window_bits>
         class fermat_params_t {
         public:

@@ -1,4 +1,5 @@
-#include "chain_sieve.hpp"
+#include "sieve.hpp"
+#include "chain.hpp"
 #include <primesieve.hpp>
 #include <vector>
 #include <queue>
@@ -11,173 +12,6 @@
 namespace nexusminer {
     namespace gpu
     {
-        using namespace boost::multiprecision;
-        Chain::Chain()
-        {
-        }
-        Chain::Chain(uint64_t base_offset)
-        {
-            open(base_offset);
-        }
-
-        void Chain::open(uint64_t base_offset)
-        {
-            m_base_offset = base_offset;
-            m_chain_state = Chain_state::open;
-            push_back(0);  //the first offset is always zero
-            m_gap_in_process = 0;
-            m_prime_count = 0;
-        }
-        void Chain::close()
-        {
-            m_chain_state = Chain_state::closed;
-        }
-
-        //analyze the chain fermat test results.  
-        //return the starting offset and length of the longest fermat chain that meets the mininmum gap requirement
-        void Chain::get_best_fermat_chain(uint64_t& base_offset, int& offset, int& best_length)
-        {
-            base_offset = m_base_offset;
-            offset = 0;
-            int chain_length = 0;
-            best_length = 0;
-            if (length() == 0)
-                return;
-
-            int gap = 0;
-            int starting_offset = 0;
-            auto previous_offset = m_offsets[0].m_offset;
-            for (int i = 0; i < m_offsets.size(); i++)
-            {
-                if (chain_length > 0)
-                    gap += m_offsets[i].m_offset - previous_offset;
-                if (gap > maxGap)
-                {
-                    //end of the fermat chain
-                    if (chain_length > best_length)
-                    {
-                        best_length = chain_length;
-                        offset = starting_offset;
-                        chain_length = 0;
-                        gap = 0;
-                    }
-                }
-                if (m_offsets[i].m_fermat_test_status == Fermat_test_status::pass)
-                {
-                    chain_length++;
-                    gap = 0;
-                    if (chain_length == 1)
-                    {
-                        starting_offset = m_offsets[i].m_offset;
-                    }
-                }
-                previous_offset = m_offsets[i].m_offset;
-
-            }
-            if (chain_length > best_length)
-            {
-                best_length = chain_length;
-                offset = starting_offset;
-            }
-            return;
-        }
-
-        //return true if there is more testing we can do. returns false if we should give up.
-        bool Chain::is_there_still_hope()
-        {
-            //nothing left to test
-            if (m_untested_count == 0)
-            {
-                return false;
-            }
-
-            return (m_prime_count + m_untested_count) >= m_min_chain_length;
-
-            // a more complex method that screens out more chains   
-            ////create a fake temporary chain where all untested candidates pass
-            //Chain temp_chain(*this);
-            //for (auto& offset : temp_chain.m_offsets)
-            //{
-            //    if (offset.m_fermat_test_status == Fermat_test_status::untested)
-            //    {
-            //        offset.m_fermat_test_status = Fermat_test_status::pass;
-            //    }
-            //}
-            //int max_possible_length, offset;
-            //uint64_t base_offset;
-            //temp_chain.get_best_fermat_chain(base_offset, offset, max_possible_length);
-            //return (max_possible_length >= m_min_chain_length);
-        }
-
-        //get the next untested fermat candidate.  if there are none return false.
-        bool Chain::get_next_fermat_candidate(uint64_t& base_offset, int& offset)
-        {
-            //This returns the next untested prime candidate.
-            //There are other more complex ways to do this to minimize primality testing
-            //like search for the first candidate that busts the chain if it fails
-            for (auto i = 0; i < m_offsets.size(); i++)
-            {
-                if (m_offsets[i].m_fermat_test_status == Fermat_test_status::untested)
-                {
-                    base_offset = m_base_offset;
-                    offset = m_offsets[i].m_offset;
-                    //save the offset under test index for later
-                    m_next_fermat_test_offset_index = i;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        //set the fermat test status of an offset.  if the offset is not found return false.
-        bool Chain::update_fermat_status(bool is_prime)
-        {
-            m_untested_count--;
-            if (is_prime)
-            {
-                m_offsets[m_next_fermat_test_offset_index].m_fermat_test_status = Fermat_test_status::pass;
-                m_prime_count++;
-            }
-            else
-            {
-                m_offsets[m_next_fermat_test_offset_index].m_fermat_test_status = Fermat_test_status::fail;
-            }
-
-            return true;
-
-        }
-
-        //add a new offset to the chain
-        void Chain::push_back(int offset)
-        {
-            Chain_offset chain_offset{ offset };
-            m_offsets.push_back(chain_offset);
-            m_untested_count++;
-        }
-
-        //create a string with information about the chain
-        const std::string Chain::str()
-        {
-            std::stringstream ss;
-            uint64_t base_offset;
-            int offset, best_length;
-            get_best_fermat_chain(base_offset, offset, best_length);
-            ss << "len " << best_length << "/" << length() << " " << m_prime_count << "p/" << m_untested_count
-                << "u best_start:" << offset << " test_next:" << m_next_fermat_test_offset_index << " ";
-            ss << m_base_offset << " + ";
-            for (const auto& x : m_offsets)
-            {
-                ss << x.m_offset;
-                std::string test_status = "?";
-                if (x.m_fermat_test_status == Fermat_test_status::pass)
-                    test_status = "*";
-                else if (x.m_fermat_test_status == Fermat_test_status::fail)
-                    test_status = "x";
-                ss << test_status << " ";
-            }
-            return ss.str();
-        }
-
         Sieve::Sieve()
             : m_logger{ spdlog::get("logger") }
         {
@@ -293,15 +127,7 @@ namespace nexusminer {
                 
                 //end experiment
                 m_multiples[i] = j - m_segment_size;
-                //new experiment
-                //int64_t tmp = sieve30_index[(boost::integer::mod_inverse((int64_t)k, (int64_t)30) * m_multiples[i]) % 30];
-                //if (tmp != wheel_index)
-                //{
-                //    std::cout << tmp << " " << wheel_index << std::endl;
-               // }
-                //m_wheel_indices[i] = wheel_index;
-
-
+                
             }
         }
        
@@ -487,8 +313,6 @@ namespace nexusminer {
             
         }
 
-        
-
         void Sieve::close_chain()
         {
             if (m_current_chain.length() >= m_current_chain.m_min_chain_length)
@@ -528,14 +352,14 @@ namespace nexusminer {
                 offsets.push_back(base_offset + static_cast<uint64_t>(offset));
             }
 
-            mpz_int base_as_mpz_int = static_cast<mpz_int>(m_sieve_start);
+            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
             mpz_t base_as_mpz_t;
             mpz_init(base_as_mpz_t);
             mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
 
-            m_cuda_prime_test.run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(), device);
+            m_cuda_prime_test.fermat_run(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(), device);
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
@@ -692,7 +516,7 @@ namespace nexusminer {
                 //{
                     //int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
                     uint64_t prime_candidate_offset = low + n/8 * 30 + sieve30_offsets[n%8];
-                    uint1024_t p = m_sieve_start + prime_candidate_offset;
+                    boost::multiprecision::uint1024_t p = m_sieve_start + prime_candidate_offset;
                     if (primality_test(p))
                         count++;
                     tests++;
@@ -724,14 +548,14 @@ namespace nexusminer {
                     break;
             }
             int prime_test_actual_batch_size = offsets.size();
-            mpz_int base_as_mpz_int = static_cast<mpz_int>(m_sieve_start);
+            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
             mpz_t base_as_mpz_t;
             mpz_init(base_as_mpz_t);
             mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
 
-            m_cuda_prime_test.run_primality_test(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(),device);
+            m_cuda_prime_test.fermat_run(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(),device);
 
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
@@ -747,9 +571,9 @@ namespace nexusminer {
         bool Sieve::primality_test(boost::multiprecision::uint1024_t p)
         {
             //gmp powm is about 7 times faster than boost backend
-            mpz_int base = 2;
-            mpz_int result;
-            mpz_int p1 = static_cast<mpz_int>(p);
+            boost::multiprecision::mpz_int base = 2;
+            boost::multiprecision::mpz_int result;
+            boost::multiprecision::mpz_int p1 = static_cast<boost::multiprecision::mpz_int>(p);
             result = boost::multiprecision::powm(base, p1 - 1, p1);
             m_fermat_test_count++;
             bool isPrime = (result == 1);

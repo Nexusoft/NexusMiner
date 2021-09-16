@@ -27,8 +27,6 @@ IN THE SOFTWARE.
 #include <stdlib.h>
 #include <cuda.h>
 #include <gmp.h>
-#include "cgbn/cgbn.h"
-#include "cgbn/utility/support.h"
 #include "fermat_test.cuh"
 #include "fermat.cuh"
 #include "cuda_runtime.h"
@@ -121,48 +119,34 @@ namespace nexusminer {
         void CudaPrimalityTest::fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
         {
             //printf("Testing %i prime candidates\n", offset_count);
+            using params = fermat_params_t<8, 1024, 5>;
+            
             
             run_test<params>(base_big_int, offsets, offset_count, results, device);
         }
 
         //allocate device memory for gpu fermat testing.  we used a fixed maximum batch size and allocate device memory once at the beginning. 
-        void CudaPrimalityTest::fermat_init(uint32_t batch_size, int device)
-        {
-            
-            instance_t* instances;
+        //void CudaPrimalityTest::fermat_init(uint32_t batch_size, int device)
+        //{
+        //    
+        //    instance_t* instances;
 
-            m_device = device;
+        //    m_device = device;
 
-            CUDA_CHECK(cudaSetDevice(device));
-            CUDA_CHECK(cudaMalloc((void**)&d_instances, sizeof(instance_t) * batch_size));
+        //    CUDA_CHECK(cudaSetDevice(device));
+        //    CUDA_CHECK(cudaMalloc((void**)&d_instances, sizeof(instance_t) * batch_size));
 
-            // create a cgbn_error_report for CGBN to report back errors
-            CUDA_CHECK(cgbn_error_report_alloc(&d_report)); 
+        //    // create a cgbn_error_report for CGBN to report back errors
+        //    CUDA_CHECK(cgbn_error_report_alloc(&d_report)); 
 
-            //printf("Running GPU kernel ...\n");
-            // launch kernel with blocks=ceil(instance_count/IPB) and threads=TPB
-            //kernel_fermat<params> << <(batch_size + IPB - 1) / IPB, TPB >> > (d_report, d_instances, batch_size);
+        //    
+        //}
 
-            // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
-            //CUDA_CHECK(cudaDeviceSynchronize());
-            //CGBN_CHECK(report);
-
-            // copy the instances back from gpuMemory
-            //printf("Copying results back to CPU ...\n");
-            //CUDA_CHECK(cudaMemcpy(instances, d_instances, sizeof(instance_t) * batch_size, cudaMemcpyDeviceToHost));
-
-            //printf("Verifying the results ...\n");
-            //fermat_t<params>::verify_results(instances, instance_count);
-
-
-            
-        }
-
-        void CudaPrimalityTest::fermat_free()
-        {
-            CUDA_CHECK(cudaFree(d_instances));
-            CUDA_CHECK(cgbn_error_report_free(d_report));
-        }
+        //void CudaPrimalityTest::fermat_free()
+        //{
+        //    CUDA_CHECK(cudaFree(d_instances));
+        //    CUDA_CHECK(cgbn_error_report_free(d_report));
+        //}
 
         void CudaPrimalityTest::set_base_int(mpz_t base_big_int)
         {

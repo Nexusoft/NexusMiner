@@ -132,30 +132,5 @@ namespace nexusminer {
         }
 
         
-
-        //create a string with information about the chain
-        /*const char* CudaChain::cstr()
-        {
-            std::stringstream ss;
-            uint64_t base_offset;
-            int offset, best_length;
-            get_best_fermat_chain(base_offset, offset, best_length);
-            ss << "len " << best_length << "/" << length() << " " << m_prime_count << "p/" << m_untested_count
-                << "u best_start:" << offset << " test_next:" << m_next_fermat_test_offset_index << " ";
-            ss << m_base_offset << " + ";
-            for (const auto& x : m_offsets)
-            {
-                ss << x.m_offset;
-                std::string test_status = "?";
-                if (x.m_fermat_test_status == Fermat_test_status::pass)
-                    test_status = "*";
-                else if (x.m_fermat_test_status == Fermat_test_status::fail)
-                    test_status = "x";
-                ss << test_status << " ";
-            }
-            return ss.str();
-        }*/
-
-        
     }
 }
