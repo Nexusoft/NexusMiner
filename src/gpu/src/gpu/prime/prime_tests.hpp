@@ -2,12 +2,11 @@
 #define NEXUSMINER_GPU_PRIME_TESTS_HPP
 #include <spdlog/spdlog.h>
 #include <boost/multiprecision/cpp_int.hpp>
+#include "../cuda_prime/fermat_test.hpp"
 
 namespace nexusminer {
 namespace gpu
 {
-	//forward declaration?
-	class Cuda_fermat_test;
 
 	class PrimeTests
 	{
@@ -23,7 +22,7 @@ namespace gpu
 		int m_device = 0;
 		uint64_t m_fermat_test_count = 0;
 		uint64_t m_fermat_prime_count = 0;
-		std::unique_ptr<Cuda_fermat_test> m_cuda_fermat_test;
+		Cuda_fermat_test m_cuda_fermat_test;
 	};
 
 }

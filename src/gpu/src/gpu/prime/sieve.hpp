@@ -8,16 +8,13 @@
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve_utils.hpp"
 #include "chain.hpp"
-//this is the offending cuda header file that we want to avoid including
-//#include "../cuda_prime/fermat_test.cuh"
+#include "../cuda_prime/fermat_test.hpp"
 #include "../cuda_prime/sieve.cuh"
 #include "gpu/prime_common.hpp"
 
 namespace nexusminer {
 	namespace gpu
 	{
-		//forward declaration?
-		class Cuda_fermat_test;
 
 		class Sieve
 		{
@@ -150,8 +147,7 @@ namespace nexusminer {
 			uint64_t sieve_run_count = 0;
 
 			CudaSieve m_cuda_sieve;
-			//unique pointer to the object.  now how do i get a new object and get a reference to it?
-			std::unique_ptr<Cuda_fermat_test> m_cuda_prime_test;
+			Cuda_fermat_test m_cuda_prime_test;
 
 		};
 	}

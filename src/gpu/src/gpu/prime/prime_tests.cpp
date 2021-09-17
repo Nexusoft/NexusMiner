@@ -3,7 +3,6 @@
 #include <boost/random.hpp>
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve.hpp"
-//#include "../cuda_prime/fermat_test.cuh"
 #include "../cuda_prime/sieve.cuh"
 
 
@@ -51,7 +50,7 @@ namespace gpu
 		primality_test_results.resize(primality_test_batch_size);
 		//bool primality_test_results[primality_test_batch_size];
 		auto start = std::chrono::steady_clock::now();
-		m_cuda_fermat_test->fermat_run(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), m_device);
+		m_cuda_fermat_test.fermat_run(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), m_device);
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		mpz_clear(base_as_mpz_t);

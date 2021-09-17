@@ -21,9 +21,11 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 
 ***/
+#ifndef CGBN_GPU_SUPPORT_H
+#define CGBN_GPU_SUPPORT_H
 
 // support routines
-void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NULL, int32_t line=0) {
+inline void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NULL, int32_t line=0) {
   // check for cuda errors
 
   if(status!=cudaSuccess) {
@@ -34,7 +36,7 @@ void cuda_check(cudaError_t status, const char *action=NULL, const char *file=NU
   }
 }
 
-void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line=0) {
+inline void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line=0) {
   // check for cgbn errors
 
   if(cgbn_error_report_check(report)) {
@@ -63,3 +65,5 @@ void cgbn_check(cgbn_error_report_t *report, const char *file=NULL, int32_t line
 
 #define CUDA_CHECK(action) cuda_check(action, #action, __FILE__, __LINE__)
 #define CGBN_CHECK(report) cgbn_check(report, __FILE__, __LINE__)
+
+#endif

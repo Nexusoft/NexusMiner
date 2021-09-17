@@ -22,7 +22,7 @@ IN THE SOFTWARE.
 
 ***/
 
-cudaError_t cgbn_error_report_alloc(cgbn_error_report_t **report) {
+inline cudaError_t cgbn_error_report_alloc(cgbn_error_report_t **report) {
   cudaError_t status;
 
   status=cudaMallocManaged((void **)report, sizeof(cgbn_error_report_t));
@@ -39,15 +39,15 @@ cudaError_t cgbn_error_report_alloc(cgbn_error_report_t **report) {
   return status;
 }
 
-cudaError_t cgbn_error_report_free(cgbn_error_report_t *report) {
+inline cudaError_t cgbn_error_report_free(cgbn_error_report_t *report) {
   return cudaFree(report);
 }
 
-bool cgbn_error_report_check(cgbn_error_report_t *report) {
+inline bool cgbn_error_report_check(cgbn_error_report_t *report) {
   return report->_error!=cgbn_no_error;
 }
 
-void cgbn_error_report_reset(cgbn_error_report_t *report) {
+inline void cgbn_error_report_reset(cgbn_error_report_t *report) {
   report->_error=cgbn_no_error;
   report->_instance=0xFFFFFFFFu;
   report->_threadIdx.x=0xFFFFFFFFu;
@@ -58,7 +58,7 @@ void cgbn_error_report_reset(cgbn_error_report_t *report) {
   report->_blockIdx.z=0xFFFFFFFFu;
 }
 
-const char *cgbn_error_string(cgbn_error_report_t *report) {
+inline const char *cgbn_error_string(cgbn_error_report_t *report) {
   if(report->_error==cgbn_no_error)
     return NULL;
   switch(report->_error) {

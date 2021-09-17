@@ -24,11 +24,11 @@ IN THE SOFTWARE.
 
 #ifdef __GMP_H__
 
-void to_mpz(mpz_t r, uint32_t *x, uint32_t count) {
+inline void to_mpz(mpz_t r, uint32_t *x, uint32_t count) {
   mpz_import(r, count, -1, sizeof(uint32_t), 0, 0, x);
 }
 
-void from_mpz(mpz_t s, uint32_t *x, uint32_t count) {
+inline void from_mpz(mpz_t s, uint32_t *x, uint32_t count) {
   size_t words;
 
   if(mpz_sizeinbase(s, 2)>count*32) {
@@ -43,7 +43,7 @@ void from_mpz(mpz_t s, uint32_t *x, uint32_t count) {
 
 #endif
 
-uint32_t random_word() {
+inline uint32_t random_word() {
   uint32_t random;
 
   random=rand() & 0xFFFF;
@@ -51,14 +51,14 @@ uint32_t random_word() {
   return random;
 }
 
-void zero_words(uint32_t *x, uint32_t count) {
+inline void zero_words(uint32_t *x, uint32_t count) {
   int index;
 
   for(index=0;index<count;index++)
     x[index]=0;
 }
 
-void print_words(uint32_t *x, uint32_t count) {
+inline void print_words(uint32_t *x, uint32_t count) {
   int index;
 
   for(index=count-1;index>=0;index--)
@@ -66,14 +66,14 @@ void print_words(uint32_t *x, uint32_t count) {
   printf("\n");
 }
 
-void copy_words(uint32_t *from, uint32_t *to, uint32_t count) {
+inline void copy_words(uint32_t *from, uint32_t *to, uint32_t count) {
   int index;
 
   for(index=0;index<count;index++)
     to[index]=from[index];
 }
 
-int32_t nibble(char c) {
+inline int32_t nibble(char c) {
   if('0'<=c && c<='9')
     return c-'0';
   else if('a'<=c && c<='f')
@@ -86,7 +86,7 @@ int32_t nibble(char c) {
   }
 }
 
-void set_words(uint32_t *x, const char *hex_string, uint32_t count) {
+inline void set_words(uint32_t *x, const char *hex_string, uint32_t count) {
   int index=0, length=0, value;
 
   for(index=0;index<count;index++)
@@ -99,7 +99,7 @@ void set_words(uint32_t *x, const char *hex_string, uint32_t count) {
   }
 }
 
-int compare_words(uint32_t *x, uint32_t *y, uint32_t count) {
+inline int compare_words(uint32_t *x, uint32_t *y, uint32_t count) {
   int index;
 
   for(index=count-1;index>=0;index--) {
@@ -113,7 +113,7 @@ int compare_words(uint32_t *x, uint32_t *y, uint32_t count) {
   return 0;
 }
 
-void swap_words(uint32_t *a, uint32_t *b, uint32_t count) {
+inline void swap_words(uint32_t *a, uint32_t *b, uint32_t count) {
   uint32_t temp;
   int      index;
 
@@ -124,7 +124,7 @@ void swap_words(uint32_t *a, uint32_t *b, uint32_t count) {
   }
 }
 
-void random_words(uint32_t *x, uint32_t count) {
+inline void random_words(uint32_t *x, uint32_t count) {
   int index;
 
   for(index=0;index<count;index++)
