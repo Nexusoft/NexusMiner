@@ -13,6 +13,21 @@ namespace nexusminer {
         {
             m_impl->fermat_run(base_big_int, offsets, offset_count, results, device);
         }
+
+        void Cuda_fermat_test::fermat_init(uint32_t batch_size, int device)
+        {
+            m_impl->fermat_init(batch_size, device);
+        }
+
+        void Cuda_fermat_test::fermat_free()
+        {
+            m_impl->fermat_free();
+        }
+
+        void Cuda_fermat_test::set_base_int(mpz_t base_big_int)
+        {
+            m_impl->set_base_int(base_big_int);
+        }
          
     }
 }

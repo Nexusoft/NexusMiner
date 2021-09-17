@@ -236,33 +236,46 @@ namespace nexusminer {
 
         void Cuda_fermat_test_impl::fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
         {
-            //printf("Testing %i prime candidates\n", offset_count);
 
-            run_test(base_big_int, offsets, offset_count, results, device);
+            int32_t              TPB = (fermat_params_t::TPB == 0) ? 128 : fermat_params_t::TPB;
+            int32_t              TPI = fermat_params_t::TPI, IPB = TPB / TPI;
+
+            fermat_t::instance_t* instances = fermat_t::generate_instances(base_big_int, offsets, offset_count);
+            
+            CUDA_CHECK(cudaMemcpy(d_instances, instances, sizeof(fermat_t::instance_t) * offset_count, cudaMemcpyHostToDevice));
+            kernel_fermat << <(offset_count + IPB - 1) / IPB, TPB >> > (d_report, d_instances, offset_count);
+            CUDA_CHECK(cudaDeviceSynchronize());
+
+            CUDA_CHECK(cudaMemcpy(instances, d_instances, sizeof(fermat_t::instance_t) * offset_count, cudaMemcpyDeviceToHost));
+
+            for (auto i = 0; i < offset_count; i++)
+            {
+                results[i] = instances[i].passed ? 1 : 0;
+            }
+
+
         }
 
-        //allocate device memory for gpu fermat testing.  we used a fixed maximum batch size and allocate device memory once at the beginning. 
-        //void Cuda_fermat_test::fermat_init(uint32_t batch_size, int device)
-        //{
-        //    
-        //    instance_t* instances;
+        //allocate device memory for gpu fermat testing.  we use a fixed maximum batch size and allocate device memory once at the beginning. 
+        void Cuda_fermat_test_impl::fermat_init(uint32_t batch_size, int device)
+        {
+            
+            m_device = device;
 
-        //    m_device = device;
+            CUDA_CHECK(cudaSetDevice(device));
+            CUDA_CHECK(cudaMalloc((void**)&d_instances, sizeof(fermat_t::instance_t) * batch_size));
 
-        //    CUDA_CHECK(cudaSetDevice(device));
-        //    CUDA_CHECK(cudaMalloc((void**)&d_instances, sizeof(instance_t) * batch_size));
+            // create a cgbn_error_report for CGBN to report back errors
+            CUDA_CHECK(cgbn_error_report_alloc(&d_report)); 
 
-        //    // create a cgbn_error_report for CGBN to report back errors
-        //    CUDA_CHECK(cgbn_error_report_alloc(&d_report)); 
+            
+        }
 
-        //    
-        //}
-
-        //void Cuda_fermat_test::fermat_free()
-        //{
-        //    CUDA_CHECK(cudaFree(d_instances));
-        //    CUDA_CHECK(cgbn_error_report_free(d_report));
-        //}
+        void Cuda_fermat_test_impl::fermat_free()
+        {
+            CUDA_CHECK(cudaFree(d_instances));
+            CUDA_CHECK(cgbn_error_report_free(d_report));
+        }
 
         void Cuda_fermat_test_impl::set_base_int(mpz_t base_big_int)
         {

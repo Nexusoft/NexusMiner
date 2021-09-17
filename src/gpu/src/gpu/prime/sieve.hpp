@@ -67,6 +67,7 @@ namespace nexusminer {
 			uint32_t m_sieving_prime_limit = 3e6; //3e8;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
 			int m_fermat_test_batch_size = 20000;
+			int m_fermat_test_batch_size_max = m_fermat_test_batch_size * 10;
 			int m_segment_batch_size = CudaSieve::m_kernel_segments_per_block* CudaSieve::m_num_blocks; //number of segments to sieve in one batch
 			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 

@@ -81,6 +81,7 @@ namespace nexusminer {
             
             m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
                 m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
+            m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
             sieve_run_count = 0;
 
         }
@@ -88,6 +89,7 @@ namespace nexusminer {
         void Sieve::gpu_sieve_free()
         {
             m_cuda_sieve.free_sieve();
+            m_cuda_prime_test.fermat_free();
         }
 
         //run the sieve on one segment

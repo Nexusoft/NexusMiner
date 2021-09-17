@@ -49,10 +49,12 @@ namespace gpu
 		std::vector<uint8_t> primality_test_results;
 		primality_test_results.resize(primality_test_batch_size);
 		//bool primality_test_results[primality_test_batch_size];
+		m_cuda_fermat_test.fermat_init(primality_test_batch_size, m_device);
 		auto start = std::chrono::steady_clock::now();
 		m_cuda_fermat_test.fermat_run(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), m_device);
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		m_cuda_fermat_test.fermat_free();
 		mpz_clear(base_as_mpz_t);
 
 		int primes_found = 0;

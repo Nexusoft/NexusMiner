@@ -19,9 +19,9 @@ namespace nexusminer {
 			Cuda_fermat_test();
 			~Cuda_fermat_test();
 			void fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device);
-            //void fermat_init(uint32_t batch_size, int device);
-            //void fermat_free();
-            //void set_base_int(mpz_t base_big_int);
+            void fermat_init(uint32_t batch_size, int device);
+            void fermat_free();
+            void set_base_int(mpz_t base_big_int);
 
 		};
 	}
