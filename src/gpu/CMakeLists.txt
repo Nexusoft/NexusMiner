@@ -6,7 +6,7 @@ if(WITH_PRIME)
     target_sources(gpu PRIVATE src/gpu/worker_prime.cpp src/gpu/prime/prime.cpp src/gpu/prime/prime_tests.cpp
         src/gpu/prime/chain.cpp src/gpu/prime/sieve.cpp
         src/gpu/cuda_prime/cuda_chain.cu src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/sieve.cu
-        src/gpu/cuda_prime/fermat_test_impl.cu)
+        src/gpu/cuda_prime/sieve_impl.cu src/gpu/cuda_prime/fermat_test_impl.cu )
 endif()
 
 set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

@@ -9,7 +9,7 @@
 #include "sieve_utils.hpp"
 #include "chain.hpp"
 #include "../cuda_prime/fermat_test.hpp"
-#include "../cuda_prime/sieve.cuh"
+#include "../cuda_prime/sieve.hpp"
 #include "gpu/prime_common.hpp"
 
 namespace nexusminer {
@@ -60,7 +60,7 @@ namespace nexusminer {
 			static constexpr int L2_CACHE_SIZE = 262144;
 
 		public:
-			const uint32_t sieve_size = CudaSieve::m_kernel_sieve_size;  //size of the sieve in bytes
+			const uint32_t sieve_size = Cuda_sieve::m_kernel_sieve_size;  //size of the sieve in bytes
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
@@ -68,7 +68,7 @@ namespace nexusminer {
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
 			int m_fermat_test_batch_size = 20000;
 			int m_fermat_test_batch_size_max = m_fermat_test_batch_size * 10;
-			int m_segment_batch_size = CudaSieve::m_kernel_segments_per_block* CudaSieve::m_num_blocks; //number of segments to sieve in one batch
+			int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block* Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
 			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 
 			//stats
@@ -147,7 +147,7 @@ namespace nexusminer {
 			void open_chain(uint64_t base_offset);
 			uint64_t sieve_run_count = 0;
 
-			CudaSieve m_cuda_sieve;
+			Cuda_sieve m_cuda_sieve;
 			Cuda_fermat_test m_cuda_prime_test;
 
 		};

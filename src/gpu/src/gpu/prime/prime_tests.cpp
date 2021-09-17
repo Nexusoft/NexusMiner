@@ -3,7 +3,7 @@
 #include <boost/random.hpp>
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve.hpp"
-#include "../cuda_prime/sieve.cuh"
+#include "../cuda_prime/sieve.hpp"
 
 
 namespace nexusminer

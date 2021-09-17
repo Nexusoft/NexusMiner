@@ -1,12 +1,15 @@
-#ifndef NEXUSMINER_GPU_CUDA_SIEVE_CUH
-#define NEXUSMINER_GPU_CUDA_SIEVE_CUH
+#ifndef NEXUSMINER_GPU_CUDA_SIEVE_HPP
+#define NEXUSMINER_GPU_CUDA_SIEVE_HPP
 
 #include "cuda_chain.cuh"
 #include <stdint.h>
+#include <memory>
+
 namespace nexusminer {
 	namespace gpu {
 
-		class CudaSieve
+		class Cuda_sieve_impl;
+		class Cuda_sieve
 		{
 		public:
 			static const int m_kernel_sieve_size = 4096 * 8;  //this is the size of the sieve in bytes.  it should be a multiple of 8. 
@@ -19,9 +22,10 @@ namespace nexusminer {
 			static const int m_estimated_chains_per_million = 12;
 			static const uint32_t m_max_chains = 10*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const int m_min_chain_length = 8;
-			uint32_t m_sieving_prime_count;
-			uint64_t m_sieve_start_offset;
-			
+			//uint32_t m_sieving_prime_count;
+			//uint64_t m_sieve_start_offset;
+			Cuda_sieve();
+			~Cuda_sieve();
 			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t starting_multiples[],
 				uint32_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device);
 			void free_sieve();
@@ -30,16 +34,7 @@ namespace nexusminer {
 			void find_chains(CudaChain chains[], uint32_t& chain_count);
 
 		private:
-			//device memory pointers
-			uint32_t* d_sieving_primes;
-			uint32_t* d_starting_multiples;
-			uint32_t* d_prime_mod_inverses;
-			uint8_t* d_sieve;
-			uint32_t* d_multiples;
-			uint8_t* d_wheel_indices;
-			//array of chains
-			CudaChain* d_chains;
-			uint32_t* d_chain_index;
+			std::unique_ptr<Cuda_sieve_impl> m_impl;
 			
 
 		};
