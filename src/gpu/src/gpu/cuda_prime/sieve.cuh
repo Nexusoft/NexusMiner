@@ -1,5 +1,5 @@
-#ifndef CUDA_SIEVE_CUH
-#define CUDA_SIEVE_CUH
+#ifndef NEXUSMINER_GPU_CUDA_SIEVE_CUH
+#define NEXUSMINER_GPU_CUDA_SIEVE_CUH
 
 #include "cuda_chain.cuh"
 #include <stdint.h>

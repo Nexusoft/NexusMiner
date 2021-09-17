@@ -1,5 +1,5 @@
-#ifndef SIEVE_UTILS_HPP
-#define SIEVE_UTILS_HPP
+#ifndef NEXUSMINER_GPU_SIEVE_UTILS_HPP
+#define NEXUSMINER_GPU_SIEVE_UTILS_HPP
 
 // https://stackoverflow.com/questions/8622256/in-c11-is-sqrt-defined-as-constexpr
 // C++14 compile time square root using binary search

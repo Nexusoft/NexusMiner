@@ -1,5 +1,5 @@
-#ifndef CHAIN_HPP
-#define CHAIN_HPP
+#ifndef NEXUSMINER_GPU_CHAIN_HPP
+#define NEXUSMINER_GPU_CHAIN_HPP
 
 #include <string>
 #include <vector>

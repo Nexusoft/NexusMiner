@@ -25,8 +25,8 @@ IN THE SOFTWARE.
 
 ***/
 
-#ifndef FERMAT_CUH
-#define FERMAT_CUH
+#ifndef NEXUSMINER_GPU_FERMAT_CUH
+#define NEXUSMINER_GPU_FERMAT_CUH
 
 #include <stdio.h>
 #include <stdint.h>
@@ -37,6 +37,17 @@ IN THE SOFTWARE.
 #include "cgbn/utility/support.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+
+// The CGBN context uses the following three parameters:
+//   TBP             - threads per block (zero means to use the blockDim.x)
+//   MAX_ROTATION    - must be small power of 2, imperically, 4 works well
+//   SHM_LIMIT       - number of bytes of dynamic shared memory available to the kernel
+//   CONSTANT_TIME   - require constant time algorithms (currently, constant time algorithms are not available)
+
+// Locally it will also be helpful to have several parameters:
+//   TPI             - threads per instance
+//   BITS            - number of bits per instance
+//   WINDOW_BITS     - number of bits to use for the windowed exponentiation
 
 namespace nexusminer {
 	namespace gpu {

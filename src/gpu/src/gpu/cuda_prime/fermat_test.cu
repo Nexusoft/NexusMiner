@@ -116,17 +116,15 @@ namespace nexusminer {
         }
 
 
-        void CudaPrimalityTest::fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
+        void Cuda_fermat_test::fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
         {
             //printf("Testing %i prime candidates\n", offset_count);
-            using params = fermat_params_t<8, 1024, 5>;
             
-            
-            run_test<params>(base_big_int, offsets, offset_count, results, device);
+            run_test<fermat_params>(base_big_int, offsets, offset_count, results, device);
         }
 
         //allocate device memory for gpu fermat testing.  we used a fixed maximum batch size and allocate device memory once at the beginning. 
-        //void CudaPrimalityTest::fermat_init(uint32_t batch_size, int device)
+        //void Cuda_fermat_test::fermat_init(uint32_t batch_size, int device)
         //{
         //    
         //    instance_t* instances;
@@ -142,13 +140,13 @@ namespace nexusminer {
         //    
         //}
 
-        //void CudaPrimalityTest::fermat_free()
+        //void Cuda_fermat_test::fermat_free()
         //{
         //    CUDA_CHECK(cudaFree(d_instances));
         //    CUDA_CHECK(cgbn_error_report_free(d_report));
         //}
 
-        void CudaPrimalityTest::set_base_int(mpz_t base_big_int)
+        void Cuda_fermat_test::set_base_int(mpz_t base_big_int)
         {
            
         }
