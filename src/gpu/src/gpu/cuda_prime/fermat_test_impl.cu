@@ -218,10 +218,10 @@ namespace nexusminer {
             {
                 if (passed)
                 {
-                    atomicAdd(pass_count, 1);
+                    atomicAdd(pass_count, (uint64_t)1);
                 }
                 results[instance] = passed ? 1 : 0;
-                atomicAdd(test_count, 1);
+                atomicAdd(test_count, (uint64_t)1);
             }
             
 
