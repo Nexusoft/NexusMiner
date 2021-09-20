@@ -32,6 +32,7 @@ IN THE SOFTWARE.
 #include "cgbn/utility/support.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include "nppdefs.h"
 
 // The CGBN context uses the following three parameters:
 //   TBP             - threads per block (zero means to use the blockDim.x)
@@ -140,6 +141,26 @@ namespace nexusminer {
                 return instances;
             }
 
+            //convert 64 bit offsets to equivalent cgbn mem types
+            __host__ void fermat_t::offsets_to_cgbn(uint64_t offsets[], uint32_t count, cgbn_mem_t<64> cgbn_offsets[]) {
+                //cgbn_mem_t<64>* instances = (cgbn_mem_t<64>*)malloc(sizeof(cgbn_mem_t<64>) * count);
+                mpz_t o;
+                //mpz_init(p);
+                mpz_init(o);
+
+                for (int index = 0; index < count; index++) {
+                    //mpz doesn't natively handle 64 bit ints.  need to use import function.
+                    uint64_t off = offsets[index];
+                    mpz_import(o, 1, 1, sizeof(off), 0, 0, &off);
+                    //mpz_add(p, base_big_int, o);
+                    from_mpz(o, cgbn_offsets[index]._limbs, 64/32);
+                    //instances[index].passed = 0;
+                }
+                //mpz_clear(p);
+                mpz_clear(o);
+
+            }
+
             __host__ void fermat_t::verify_results(instance_t* instances, uint32_t instance_count) {
                 int   index, total = 0;
                 mpz_t candidate;
@@ -168,118 +189,125 @@ namespace nexusminer {
             }
 
 
-        __global__ void kernel_fermat(cgbn_error_report_t* report, typename fermat_t::instance_t* instances, uint32_t instance_count) {
-            int32_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / fermat_params_t::TPI;
+        __global__ void kernel_fermat(cgbn_error_report_t* report, cgbn_mem_t<64>* offsets, uint64_t* offset_count, 
+            cgbn_mem_t<fermat_params_t::BITS>* base_int, uint8_t* results, uint64_t* test_count, uint64_t* pass_count) {
+            int64_t instance = (blockIdx.x * blockDim.x + threadIdx.x)/ fermat_params_t::TPI;
 
-            if (instance >= instance_count)
+            if (instance >= *offset_count)
                 return;
 
-            fermat_t                     fermat_test(cgbn_report_monitor, report, instance);
-            typename fermat_t::bn_t      candidate;
-            bool                               passed;
+            fermat_t            fermat_test(cgbn_report_monitor, report, instance);
+            fermat_t::bn_t      bn_candidate, bn_base_int, bn_offset;
+            bool                passed;
 
-            cgbn_load(fermat_test._env, candidate, &(instances[instance].candidate));
+            //convert 64 bit bignum to 1024 bit bignum by padding with zeros.
+            cgbn_mem_t<64> offset64 = offsets[instance];
+            cgbn_mem_t<1024> offset;
+            offset._limbs[0] = offset64._limbs[0];
+            offset._limbs[1] = offset64._limbs[1];
+            for (int i = 2; i<1024/32 - 2; i++)
+                offset._limbs[i] = 0;
+           
+            //add the offset to the base int
+            cgbn_load(fermat_test._env, bn_offset, &offset);
+            cgbn_load(fermat_test._env, bn_base_int, base_int);
+            cgbn_add(fermat_test._env, bn_candidate, bn_offset, bn_base_int);
+            passed = fermat_test.fermat(bn_candidate);
 
-            passed = fermat_test.fermat(candidate);
-
-            instances[instance].passed = passed;
-        }
-
-
-       
-        void run_test(mpz_t base_big_int, uint64_t offsets[], uint32_t instance_count, uint8_t results[], int device) {
-            //typedef typename fermat_t::instance_t instance_t;
-            using instance_t = fermat_t::instance_t;
-
-            instance_t* instances, * gpuInstances;
-            cgbn_error_report_t* report;
-            int32_t              TPB = (fermat_params_t::TPB == 0) ? 128 : fermat_params_t::TPB;
-            int32_t              TPI = fermat_params_t::TPI, IPB = TPB / TPI;
-
-            //printf("Genereating instances ...\n");
-            instances = fermat_t::generate_instances(base_big_int, offsets, instance_count);
-            //printf("Copying instances to the GPU ...\n");
-            CUDA_CHECK(cudaSetDevice(device));
-            CUDA_CHECK(cudaMalloc((void**)&gpuInstances, sizeof(instance_t) * instance_count));
-            CUDA_CHECK(cudaMemcpy(gpuInstances, instances, sizeof(instance_t) * instance_count, cudaMemcpyHostToDevice));
-
-            // create a cgbn_error_report for CGBN to report back errors
-            CUDA_CHECK(cgbn_error_report_alloc(&report)); 
-
-            //printf("Running GPU kernel ...\n");
-            // launch kernel with blocks=ceil(instance_count/IPB) and threads=TPB
-            kernel_fermat<< <(instance_count + IPB - 1) / IPB, TPB >> > (report, gpuInstances, instance_count);
-
-            // error report uses managed memory, so we sync the device (or stream) and check for cgbn errors
-            CUDA_CHECK(cudaDeviceSynchronize());
-            //CGBN_CHECK(report);
-
-            // copy the instances back from gpuMemory
-            //printf("Copying results back to CPU ...\n");
-            CUDA_CHECK(cudaMemcpy(instances, gpuInstances, sizeof(instance_t) * instance_count, cudaMemcpyDeviceToHost));
-
-            //printf("Verifying the results ...\n");
-            //fermat_t<params>::verify_results(instances, instance_count);
-
-            for (auto i = 0; i < instance_count; i++)
+            if (threadIdx.x % fermat_params_t::TPI == 0)
             {
-                results[i] = instances[i].passed ? 1 : 0;
+                if (passed)
+                {
+                    atomicAdd(pass_count, 1);
+                }
+                results[instance] = passed ? 1 : 0;
+                atomicAdd(test_count, 1);
             }
+            
 
-            // clean up
-
-            free(instances);
-            CUDA_CHECK(cudaFree(gpuInstances));
-            CUDA_CHECK(cgbn_error_report_free(report));
         }
 
-
-        void Cuda_fermat_test_impl::fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
+        void Cuda_fermat_test_impl::fermat_run()
         {
 
-            int32_t              TPB = (fermat_params_t::TPB == 0) ? 128 : fermat_params_t::TPB;
-            int32_t              TPI = fermat_params_t::TPI, IPB = TPB / TPI;
+            int32_t threads_per_block = (fermat_params_t::TPB == 0) ? 64 : fermat_params_t::TPB;
+            int32_t threads_per_instance = fermat_params_t::TPI;
+            int32_t instances_per_block = threads_per_block / threads_per_instance;
 
-            fermat_t::instance_t* instances = fermat_t::generate_instances(base_big_int, offsets, offset_count);
-            
-            CUDA_CHECK(cudaMemcpy(d_instances, instances, sizeof(fermat_t::instance_t) * offset_count, cudaMemcpyHostToDevice));
-            kernel_fermat << <(offset_count + IPB - 1) / IPB, TPB >> > (d_report, d_instances, offset_count);
+            int blocks = (m_offset_count + instances_per_block - 1) / instances_per_block;
+
+            kernel_fermat << <blocks, threads_per_block>> > (d_report, d_offsets, d_offset_count, d_base_int,
+                d_results, d_fermat_test_count, d_fermat_pass_count);
             CUDA_CHECK(cudaDeviceSynchronize());
-
-            CUDA_CHECK(cudaMemcpy(instances, d_instances, sizeof(fermat_t::instance_t) * offset_count, cudaMemcpyDeviceToHost));
-
-            for (auto i = 0; i < offset_count; i++)
-            {
-                results[i] = instances[i].passed ? 1 : 0;
-            }
 
 
         }
 
         //allocate device memory for gpu fermat testing.  we use a fixed maximum batch size and allocate device memory once at the beginning. 
-        void Cuda_fermat_test_impl::fermat_init(uint32_t batch_size, int device)
+        void Cuda_fermat_test_impl::fermat_init(uint64_t batch_size, int device)
         {
             
             m_device = device;
 
             CUDA_CHECK(cudaSetDevice(device));
-            CUDA_CHECK(cudaMalloc((void**)&d_instances, sizeof(fermat_t::instance_t) * batch_size));
+            CUDA_CHECK(cudaMalloc(&d_instances, sizeof(*d_instances) * batch_size));
+            CUDA_CHECK(cudaMalloc(&d_base_int, sizeof(*d_base_int)));
+            CUDA_CHECK(cudaMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
+            CUDA_CHECK(cudaMalloc(&d_results, sizeof(*d_results) * batch_size));
+            CUDA_CHECK(cudaMalloc(&d_offset_count, sizeof(*d_offset_count)));
+            CUDA_CHECK(cudaMalloc(&d_fermat_test_count, sizeof(*d_fermat_test_count)));
+            CUDA_CHECK(cudaMalloc(&d_fermat_pass_count, sizeof(*d_fermat_pass_count)));
+            reset_stats();
 
-            // create a cgbn_error_report for CGBN to report back errors
+            // allocate memory for a cgbn_error_report for CGBN to report back errors. 
             CUDA_CHECK(cgbn_error_report_alloc(&d_report)); 
-
-            
         }
 
         void Cuda_fermat_test_impl::fermat_free()
         {
             CUDA_CHECK(cudaFree(d_instances));
+            CUDA_CHECK(cudaFree(d_base_int));
+            CUDA_CHECK(cudaFree(d_offsets));
+            CUDA_CHECK(cudaFree(d_results));
+            CUDA_CHECK(cudaFree(d_offset_count));
+            CUDA_CHECK(cudaFree(d_fermat_test_count));
+            CUDA_CHECK(cudaFree(d_fermat_pass_count));
+
             CUDA_CHECK(cgbn_error_report_free(d_report));
         }
 
         void Cuda_fermat_test_impl::set_base_int(mpz_t base_big_int)
         {
+            cgbn_mem_t<fermat_params_t::BITS> cgbn_base_int;
+            from_mpz(base_big_int, cgbn_base_int._limbs, fermat_params_t::BITS / 32);
+            CUDA_CHECK(cudaMemcpy(d_base_int, &cgbn_base_int, sizeof(cgbn_base_int), cudaMemcpyHostToDevice));
+        }
 
+        void Cuda_fermat_test_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
+        {
+            cgbn_mem_t<64>* cgbn_offsets = new cgbn_mem_t<64>[offset_count];
+            fermat_t::offsets_to_cgbn(offsets, offset_count, cgbn_offsets);
+            CUDA_CHECK(cudaMemcpy(d_offsets, cgbn_offsets, sizeof(cgbn_offsets) *  offset_count, cudaMemcpyHostToDevice));
+            CUDA_CHECK(cudaMemcpy(d_offset_count, &offset_count, sizeof(offset_count), cudaMemcpyHostToDevice));
+            m_offset_count = offset_count;
+            delete[] cgbn_offsets;
+        }
+
+        void Cuda_fermat_test_impl::get_results(uint8_t results[])
+        {
+            CUDA_CHECK(cudaMemcpy(results, d_results, sizeof(uint8_t) * m_offset_count, cudaMemcpyDeviceToHost));
+        }
+
+        void Cuda_fermat_test_impl::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes)
+        {
+            CUDA_CHECK(cudaMemcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(cudaMemcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), cudaMemcpyDeviceToHost));
+        }
+
+        void Cuda_fermat_test_impl::reset_stats()
+        {
+            CUDA_CHECK(cudaMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
+            CUDA_CHECK(cudaMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
         }
 
     }

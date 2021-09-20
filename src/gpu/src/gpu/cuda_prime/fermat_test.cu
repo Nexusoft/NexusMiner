@@ -9,9 +9,9 @@ namespace nexusminer {
 
         Cuda_fermat_test::Cuda_fermat_test() : m_impl(std::make_unique<Cuda_fermat_test_impl>()) {}
         Cuda_fermat_test::~Cuda_fermat_test() = default;
-        void Cuda_fermat_test::fermat_run(mpz_t base_big_int, uint64_t offsets[], uint32_t offset_count, uint8_t results[], int device)
+        void Cuda_fermat_test::fermat_run()
         {
-            m_impl->fermat_run(base_big_int, offsets, offset_count, results, device);
+            m_impl->fermat_run();
         }
 
         void Cuda_fermat_test::fermat_init(uint32_t batch_size, int device)
@@ -27,6 +27,26 @@ namespace nexusminer {
         void Cuda_fermat_test::set_base_int(mpz_t base_big_int)
         {
             m_impl->set_base_int(base_big_int);
+        }
+
+        void Cuda_fermat_test::set_offsets(uint64_t offsets[], uint64_t offset_count)
+        {
+            m_impl->set_offsets(offsets, offset_count);
+        }
+
+        void Cuda_fermat_test::get_results(uint8_t results[])
+        {
+            m_impl->get_results(results);
+        }
+
+        void Cuda_fermat_test::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes)
+        {
+            m_impl->get_stats(fermat_tests, fermat_passes);
+        }
+
+        void Cuda_fermat_test::reset_stats()
+        {
+            m_impl->reset_stats();
         }
          
     }

@@ -233,7 +233,7 @@ namespace nexusminer {
             do_sieve <<<Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block >>> (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
                 d_starting_multiples, d_prime_mod_inverses, d_sieve, d_multiples, d_wheel_indices);
 
-            //checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(cudaDeviceSynchronize());
             //checkCudaErrors(cudaMemcpy(sieve, d_sieve, m_sieve_total_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
         }
 

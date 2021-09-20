@@ -2,6 +2,7 @@
 #define NEXUSMINER_GPU_CUDA_SIEVE_HPP
 
 #include "cuda_chain.cuh"
+//#include "fermat_test.hpp"
 #include <stdint.h>
 #include <memory>
 
@@ -22,8 +23,7 @@ namespace nexusminer {
 			static const int m_estimated_chains_per_million = 12;
 			static const uint32_t m_max_chains = 10*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const int m_min_chain_length = 8;
-			//uint32_t m_sieving_prime_count;
-			//uint64_t m_sieve_start_offset;
+
 			Cuda_sieve();
 			~Cuda_sieve();
 			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t starting_multiples[],

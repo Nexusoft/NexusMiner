@@ -51,13 +51,13 @@ namespace nexusminer {
         public:
             // parameters used by the CGBN context
             static const uint32_t TPB = 0;                     // get TPB from blockDim.x  
-            static const uint32_t MAX_ROTATION = 4;            // good default value
+            static const uint32_t MAX_ROTATION = 8;            // must be a small power of 2.  4 or 8 work
             static const uint32_t SHM_LIMIT = 0;               // no shared mem available
             static const bool     CONSTANT_TIME = false;       // constant time implementations aren't available yet
 
             // parameters used locally in the application
-            static const uint32_t TPI = 8;                   // threads per instance
-            static const uint32_t BITS = 1024;                 // instance size
+            static const uint32_t TPI = 8;                   // threads per instance -- must be 8, 16, or 32 for 1024 bits.  8 is fastest.
+            static const uint32_t BITS = 1024;                 // bit width of the big uint
             static const uint32_t WINDOW_BITS = 5;   // window size
         };
 
@@ -68,7 +68,7 @@ namespace nexusminer {
 
             typedef struct {
                 cgbn_mem_t<fermat_params_t::BITS> candidate;
-                bool                 passed;
+                bool           passed;
             } instance_t;
 
             typedef cgbn_context_t<fermat_params_t::TPI, fermat_params_t>    context_t;
@@ -85,6 +85,7 @@ namespace nexusminer {
             __device__ void powm(bn_t& x, const bn_t& power, const bn_t& modulus); 
             __device__ bool fermat(const bn_t& candidate); 
             __host__ static instance_t* generate_instances(mpz_t base_big_int, uint64_t offsets[], uint32_t count); 
+            __host__ static void offsets_to_cgbn(uint64_t offsets[], uint32_t count, cgbn_mem_t<64> cgbn_offsets[]);
             __host__ static void verify_results(instance_t* instances, uint32_t instance_count); 
         };
 	}

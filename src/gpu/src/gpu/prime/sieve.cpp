@@ -82,6 +82,13 @@ namespace nexusminer {
             m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
                 m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
             m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
+            
+            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
+            mpz_t base_as_mpz_t;
+            mpz_init(base_as_mpz_t);
+            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
+            m_cuda_prime_test.set_base_int(base_as_mpz_t);
+            mpz_clear(base_as_mpz_t);
             sieve_run_count = 0;
 
         }
@@ -354,15 +361,15 @@ namespace nexusminer {
                 offsets.push_back(base_offset + static_cast<uint64_t>(offset));
             }
 
-            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
+           /* boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
             mpz_t base_as_mpz_t;
             mpz_init(base_as_mpz_t);
-            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
+            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());*/
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
-
-            m_cuda_prime_test.fermat_run(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(), device);
-
+            m_cuda_prime_test.set_offsets(offsets.data(), prime_test_actual_batch_size);
+            m_cuda_prime_test.fermat_run( );
+            m_cuda_prime_test.get_results(primality_test_results.data());
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
                 if (primality_test_results[i] == 1)
@@ -380,7 +387,7 @@ namespace nexusminer {
             }
             m_fermat_prime_count += prime_count;
             m_fermat_test_count += prime_test_actual_batch_size;
-            mpz_clear(base_as_mpz_t);
+            //mpz_clear(base_as_mpz_t);
             double fermat_positive_rate = 100.0 * prime_count / prime_test_actual_batch_size;
             //std::cout << "GPU batch fermat test results: " << prime_count << "/" << prime_test_actual_batch_size << " (" << fermat_positive_rate << "%)" << std::endl;
         }
@@ -551,21 +558,21 @@ namespace nexusminer {
             }
             int prime_test_actual_batch_size = offsets.size();
             boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
-            mpz_t base_as_mpz_t;
+            /*mpz_t base_as_mpz_t;
             mpz_init(base_as_mpz_t);
-            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
+            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());*/
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
-
-            m_cuda_prime_test.fermat_run(base_as_mpz_t, offsets.data(), prime_test_actual_batch_size, primality_test_results.data(),device);
-
+            m_cuda_prime_test.set_offsets(offsets.data(), prime_test_actual_batch_size);
+            m_cuda_prime_test.fermat_run();
+            m_cuda_prime_test.get_results(primality_test_results.data());
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
                 if (primality_test_results[i] == 1)
                     ++prime_count;
             }
             
-            mpz_clear(base_as_mpz_t);
+            //mpz_clear(base_as_mpz_t);
 
             return prime_count;
         }

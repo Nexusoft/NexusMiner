@@ -182,7 +182,7 @@ void Worker_prime::run()
 		//debug
 		auto end = std::chrono::steady_clock::now();
 		auto interval_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - interval_start); 
-		bool print_debug = false;
+		bool print_debug = true;
 		if (print_debug && interval_elapsed.count() > 10000)
 		{
 			std::cout << "--debug--" << std::endl;

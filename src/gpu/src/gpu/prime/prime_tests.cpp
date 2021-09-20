@@ -50,12 +50,19 @@ namespace gpu
 		primality_test_results.resize(primality_test_batch_size);
 		//bool primality_test_results[primality_test_batch_size];
 		m_cuda_fermat_test.fermat_init(primality_test_batch_size, m_device);
+		m_cuda_fermat_test.set_base_int(base_as_mpz_t);
+		m_cuda_fermat_test.set_offsets(offsets.data(), primality_test_batch_size);
 		auto start = std::chrono::steady_clock::now();
-		m_cuda_fermat_test.fermat_run(base_as_mpz_t, offsets.data(), primality_test_batch_size, primality_test_results.data(), m_device);
+		m_cuda_fermat_test.fermat_run();
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		m_cuda_fermat_test.get_results(primality_test_results.data());
+		uint64_t cuda_primality_test_count, cuda_primality_pass_count;
+		m_cuda_fermat_test.get_stats(cuda_primality_test_count, cuda_primality_pass_count);
 		m_cuda_fermat_test.fermat_free();
 		mpz_clear(base_as_mpz_t);
+
+		
 
 		int primes_found = 0;
 		for (auto i = 0; i < primality_test_batch_size; i++)
@@ -72,12 +79,18 @@ namespace gpu
 			}
 		}
 
+		if (cuda_primality_test_count != primality_test_batch_size)
+		{
+			m_logger->debug("Primality stats mismatch. GPU reports {}/{} passed/attempted vs {}/{}",
+				cuda_primality_pass_count, cuda_primality_test_count, primes_found, primality_test_batch_size);
+		}
+
 		double expected_primes = primality_test_batch_size * 2 / (1024 * 0.693147);
 		std::stringstream ss;
 		ss << "Found " << primes_found << " primes out of " << primality_test_batch_size << " tested. Expected about " << expected_primes << ". ";
 		m_logger->info(ss.str());
 		ss = {};
-		ss << std::fixed << std::setprecision(2) << 1000.0 * primality_test_batch_size / elapsed.count() << " primality tests/second. (" << 1.0 * elapsed.count() / primality_test_batch_size << "ms)";
+		ss << std::fixed << std::setprecision(2) << 1000.0 * primality_test_batch_size / elapsed.count() << " primality tests/second. (" << 1000.0 * elapsed.count() / primality_test_batch_size << "us)";
 		m_logger->info(ss.str());
 	}
 
@@ -112,8 +125,6 @@ namespace gpu
 		//test_sieve.clear_chains();
 		//test_sieve.find_chains_cpu(0, true);
 
-		test_sieve.gpu_sieve_free();
-
 		uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
 		uint64_t sieve_range = test_sieve.m_sieve_results.size() / 8 * 30;
 		double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
@@ -132,6 +143,8 @@ namespace gpu
 			test_sieve.get_current_chain_list_length(),
 			find_chains_elapsed_s, 1.0e6 * test_sieve.get_current_chain_list_length() / sieve_range,
 			sieve_range / find_chains_elapsed_s / 1e6);
+
+		test_sieve.gpu_sieve_free();
 
 	}
 
