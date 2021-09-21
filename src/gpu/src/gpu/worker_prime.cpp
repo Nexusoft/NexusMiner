@@ -30,8 +30,11 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	
 	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
 	PrimeTests prime_test(worker_config_gpu.m_device);
-	prime_test.fermat_performance_test();
 	prime_test.sieve_performance_test();
+	prime_test.fermat_performance_test();
+
+
+
 	m_segmented_sieve->generate_sieving_primes();
 	m_segmented_sieve->reset_stats();
 
@@ -115,6 +118,7 @@ void Worker_prime::run()
 	bool batch_sieve_mode = true;
 	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
 	m_segmented_sieve->gpu_sieve_init(worker_config_gpu.m_device);
+	m_segmented_sieve->gpu_fermat_test_init(worker_config_gpu.m_device);
 
 
 	auto start = std::chrono::steady_clock::now();
@@ -215,6 +219,7 @@ void Worker_prime::run()
 		}
 	}
 	m_segmented_sieve->gpu_sieve_free();
+	m_segmented_sieve->gpu_fermat_free();
 }
 
 double Worker_prime::getDifficulty(uint1k p)

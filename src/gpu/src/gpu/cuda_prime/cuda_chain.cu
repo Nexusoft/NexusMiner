@@ -8,7 +8,7 @@ namespace nexusminer {
     {
        
         //add a new offset to the chain
-        __device__ void cuda_chain_push_back(CudaChain& chain, int offset)
+        __device__ void cuda_chain_push_back(CudaChain& chain, uint16_t offset)
         {
             if (chain.m_offset_count < chain.m_max_chain_length)
             {

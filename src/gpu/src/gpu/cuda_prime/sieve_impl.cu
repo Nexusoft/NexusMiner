@@ -21,7 +21,7 @@
 namespace nexusminer {
     namespace gpu {
 
-        __device__ void cuda_chain_push_back(CudaChain& chain, int offset);
+        __device__ void cuda_chain_push_back(CudaChain& chain, uint16_t offset);
         __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset);
 
         __constant__ const int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };
@@ -37,7 +37,7 @@ namespace nexusminer {
         {
             
             uint64_t sieve_size = Cuda_sieve::m_sieve_total_size;
-            CudaChain current_chain;
+            
             uint64_t num_blocks = gridDim.x;
             uint64_t num_threads = blockDim.x;
             uint64_t block_id = blockIdx.x;
@@ -46,9 +46,12 @@ namespace nexusminer {
             int sieve_offset;
             int gap;
             uint64_t chain_start, prime_candidate_offset;
+            
+            
             if (index == 0)
                 *chain_index = 0;
             __syncthreads();
+           
             //search each sieve location for a possible chain
             for (uint64_t i = index; i < sieve_size; i += stride)
             {
@@ -74,10 +77,12 @@ namespace nexusminer {
                         
                         j--;
                     }
+                   
                     //this is the start of a possible chain.  search right
                     //where are we in the wheel
                     sieve_offset = sieve30_offsets[i % 8];
                     chain_start = sieve_start_offset + i / 8 * 30 + sieve_offset;
+                    CudaChain current_chain;
                     cuda_chain_open(current_chain, chain_start);
                     gap = 0;
                     j = i;
@@ -91,7 +96,7 @@ namespace nexusminer {
                             gap = 0;
                             sieve_offset = sieve30_offsets[j % 8];
                             prime_candidate_offset = sieve_start_offset + j / 8 * 30 + sieve_offset;
-                            cuda_chain_push_back(current_chain, prime_candidate_offset - chain_start);
+                            cuda_chain_push_back(current_chain, static_cast<uint16_t>(prime_candidate_offset - chain_start));
                         }
                         j++;
                     }
@@ -234,20 +239,20 @@ namespace nexusminer {
                 d_starting_multiples, d_prime_mod_inverses, d_sieve, d_multiples, d_wheel_indices);
 
             checkCudaErrors(cudaDeviceSynchronize());
-            //checkCudaErrors(cudaMemcpy(sieve, d_sieve, m_sieve_total_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
+            //checkCudaErrors(cudaMemcpy(sieve, d_sieve, Cuda_sieve::m_sieve_total_size * sizeof(uint8_t), cudaMemcpyDeviceToHost));
         }
 
         void Cuda_sieve_impl::find_chains(CudaChain chains[], uint32_t& chain_count)
         {
             int sieve_threads = 256;
-            int sieve_blocks = (Cuda_sieve::m_sieve_total_size + sieve_threads - 1)/ sieve_threads;
-            //reset the chain index
-            //checkCudaErrors(cudaMemset(d_chain_index, 0, sizeof(uint32_t)));
+            int checks_per_block = 1;
+            int sieve_blocks = (Cuda_sieve::m_sieve_total_size/checks_per_block + sieve_threads - 1)/ sieve_threads;
+            
             //run the kernel
             find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_chain_index, m_sieve_start_offset);
 
             checkCudaErrors(cudaDeviceSynchronize());
-            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_index, sizeof(uint32_t), cudaMemcpyDeviceToHost));
+            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_index, sizeof(*d_chain_index), cudaMemcpyDeviceToHost));
             checkCudaErrors(cudaMemcpy(chains, d_chains, chain_count * sizeof(CudaChain), cudaMemcpyDeviceToHost));
         }
 

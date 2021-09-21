@@ -32,7 +32,7 @@ IN THE SOFTWARE.
 #include "cgbn/utility/support.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "nppdefs.h"
+//#include "nppdefs.h"
 
 // The CGBN context uses the following three parameters:
 //   TBP             - threads per block (zero means to use the blockDim.x)
@@ -49,8 +49,11 @@ namespace nexusminer {
     namespace gpu {
 
 
-            __device__ __forceinline__ fermat_t::fermat_t(cgbn_monitor_t monitor, cgbn_error_report_t* report, int32_t instance) : _context(monitor, report, (uint32_t)instance), _env(_context), _instance(instance) {
-            }
+            __device__  fermat_t::fermat_t(cgbn_monitor_t monitor, cgbn_error_report_t* report, int32_t instance)
+               :_context(monitor, report, (uint32_t)instance),
+                _env(_context),
+                _instance(instance)
+            { }
 
             __device__ __forceinline__ void fermat_t::powm(bn_t& x, const bn_t& power, const bn_t& modulus) {
                 bn_t       t;
@@ -71,7 +74,7 @@ namespace nexusminer {
                 cgbn_set(_env, t, x);
 
                 // compute x^2, x^3, ... x^(2^window_bits-1), store into window table
-                #pragma nounroll
+                //#pragma nounroll
                 for (index = 2; index < (1 << window_bits); index++) {
                     cgbn_mont_mul(_env, x, x, t, modulus, np0);
                     cgbn_store(_env, window + index, x);
@@ -93,7 +96,7 @@ namespace nexusminer {
                 // process the remaining exponent chunks
                 while (position > 0) {
                     // square the result window_bits times
-                    #pragma nounroll
+                    //#pragma nounroll
                     for (int sqr_count = 0; sqr_count < window_bits; sqr_count++)
                         cgbn_mont_sqr(_env, x, x, modulus, np0);
 
@@ -189,8 +192,8 @@ namespace nexusminer {
             }
 
 
-        __global__ void kernel_fermat(cgbn_error_report_t* report, cgbn_mem_t<64>* offsets, uint64_t* offset_count, 
-            cgbn_mem_t<fermat_params_t::BITS>* base_int, uint8_t* results, uint64_t* test_count, uint64_t* pass_count) {
+        __global__ void kernel_fermat(cgbn_error_report_t* report, cgbn_mem_t<64>* offsets, uint64_t* offset_count,
+            cgbn_mem_t<fermat_params_t::BITS>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count) {
             int64_t instance = (blockIdx.x * blockDim.x + threadIdx.x)/ fermat_params_t::TPI;
 
             if (instance >= *offset_count)
@@ -205,24 +208,29 @@ namespace nexusminer {
             cgbn_mem_t<1024> offset;
             offset._limbs[0] = offset64._limbs[0];
             offset._limbs[1] = offset64._limbs[1];
-            for (int i = 2; i<1024/32 - 2; i++)
+            for (int i = 2; i<1024/32; i++)
                 offset._limbs[i] = 0;
-           
+            //__syncthreads();
             //add the offset to the base int
             cgbn_load(fermat_test._env, bn_offset, &offset);
             cgbn_load(fermat_test._env, bn_base_int, base_int);
             cgbn_add(fermat_test._env, bn_candidate, bn_offset, bn_base_int);
-            passed = fermat_test.fermat(bn_candidate);
 
+            //cgbn_load(fermat_test._env, bn_candidate, &(instances[instance].candidate));
+            passed = fermat_test.fermat(bn_candidate);
+            //results[instance] = passed ? 1 : 0;
+
+            //collect stats
             if (threadIdx.x % fermat_params_t::TPI == 0)
             {
                 if (passed)
                 {
-                    //atomicAdd(pass_count, 1);
+                    atomicAdd(pass_count, 1);
                 }
                 results[instance] = passed ? 1 : 0;
-                //atomicAdd(test_count, 1);
+                atomicAdd(test_count, 1);
             }
+            
             
 
         }
@@ -239,8 +247,7 @@ namespace nexusminer {
             kernel_fermat << <blocks, threads_per_block>> > (d_report, d_offsets, d_offset_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
             CUDA_CHECK(cudaDeviceSynchronize());
-
-
+            //CGBN_CHECK(d_report);
         }
 
         //allocate device memory for gpu fermat testing.  we use a fixed maximum batch size and allocate device memory once at the beginning. 
@@ -250,7 +257,7 @@ namespace nexusminer {
             m_device = device;
 
             CUDA_CHECK(cudaSetDevice(device));
-            CUDA_CHECK(cudaMalloc(&d_instances, sizeof(*d_instances) * batch_size));
+            //CUDA_CHECK(cudaMalloc(&d_instances, sizeof(*d_instances) * batch_size));
             CUDA_CHECK(cudaMalloc(&d_base_int, sizeof(*d_base_int)));
             CUDA_CHECK(cudaMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
             CUDA_CHECK(cudaMalloc(&d_results, sizeof(*d_results) * batch_size));
@@ -265,7 +272,7 @@ namespace nexusminer {
 
         void Cuda_fermat_test_impl::fermat_free()
         {
-            CUDA_CHECK(cudaFree(d_instances));
+            //CUDA_CHECK(cudaFree(d_instances));
             CUDA_CHECK(cudaFree(d_base_int));
             CUDA_CHECK(cudaFree(d_offsets));
             CUDA_CHECK(cudaFree(d_results));
@@ -281,6 +288,7 @@ namespace nexusminer {
             cgbn_mem_t<fermat_params_t::BITS> cgbn_base_int;
             from_mpz(base_big_int, cgbn_base_int._limbs, fermat_params_t::BITS / 32);
             CUDA_CHECK(cudaMemcpy(d_base_int, &cgbn_base_int, sizeof(cgbn_base_int), cudaMemcpyHostToDevice));
+            mpz_set(m_base_int, base_big_int);
         }
 
         void Cuda_fermat_test_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)

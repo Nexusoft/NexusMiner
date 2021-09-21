@@ -22,7 +22,6 @@ namespace gpu
 		int m_device = 0;
 		uint64_t m_fermat_test_count = 0;
 		uint64_t m_fermat_prime_count = 0;
-		Cuda_fermat_test m_cuda_fermat_test;
 	};
 
 }

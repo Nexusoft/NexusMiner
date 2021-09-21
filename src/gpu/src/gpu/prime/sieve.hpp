@@ -25,7 +25,10 @@ namespace nexusminer {
 			boost::multiprecision::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
 			void gpu_sieve_init(uint16_t device);
+			void gpu_fermat_test_init(uint16_t device);
 			void gpu_sieve_free();
+			void gpu_fermat_free();
+			void gpu_fermat_test_set_base_int(boost::multiprecision::uint1024_t base_big_int);
 			void sieve_segment();
 			void sieve_batch(uint64_t low);
 			void sieve_batch_cpu(uint64_t low);
@@ -33,6 +36,7 @@ namespace nexusminer {
 			std::uint32_t get_segment_batch_size();
 			void reset_sieve();
 			void reset_sieve_batch(uint64_t low);
+			void reset_batch_run_count();
 			void clear_chains();
 			void reset_stats();
 			void find_chains_cpu(uint64_t low, bool batch_sieve_mode);
@@ -50,6 +54,7 @@ namespace nexusminer {
 			double probability_is_prime_after_sieve();
 			double sieve_pass_through_rate_expected();
 			uint64_t count_prime_candidates();
+			std::vector<uint8_t> get_sieve(); //return a copy of the raw sieve
 
 		private:
 			//static constexpr uint8_t sieve30 = 0xFF;  //compressed sieve for primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
@@ -67,7 +72,7 @@ namespace nexusminer {
 			uint32_t m_sieving_prime_limit = 3e6; //3e8;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
 			int m_fermat_test_batch_size = 20000;
-			int m_fermat_test_batch_size_max = m_fermat_test_batch_size * 10;
+			int m_fermat_test_batch_size_max = 1000000;
 			int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block* Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
 			uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 
@@ -145,7 +150,7 @@ namespace nexusminer {
 			
 			void close_chain();
 			void open_chain(uint64_t base_offset);
-			uint64_t sieve_run_count = 0;
+			uint64_t m_sieve_run_count = 0;
 
 			Cuda_sieve m_cuda_sieve;
 			Cuda_fermat_test m_cuda_prime_test;

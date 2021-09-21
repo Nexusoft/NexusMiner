@@ -81,21 +81,36 @@ namespace nexusminer {
             
             m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
                 m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
-            m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
-            
-            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
+           
+            m_sieve_run_count = 0;
+
+        }
+
+        void Sieve::gpu_fermat_test_set_base_int(boost::multiprecision::uint1024_t base_big_int)
+        {
+            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(base_big_int);
             mpz_t base_as_mpz_t;
             mpz_init(base_as_mpz_t);
             mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
             m_cuda_prime_test.set_base_int(base_as_mpz_t);
             mpz_clear(base_as_mpz_t);
-            sieve_run_count = 0;
 
+        }
+
+        void Sieve::gpu_fermat_test_init(uint16_t device)
+        {
+            m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
+            gpu_fermat_test_set_base_int(m_sieve_start);
         }
 
         void Sieve::gpu_sieve_free()
         {
             m_cuda_sieve.free_sieve();
+            
+        }
+
+        void Sieve::gpu_fermat_free()
+        {
             m_cuda_prime_test.fermat_free();
         }
 
@@ -147,8 +162,8 @@ namespace nexusminer {
             
             reset_sieve_batch(low);
             uint32_t sieve_results_size = m_sieve_batch_buffer_size;
-            m_cuda_sieve.run_sieve(sieve_run_count*sieve_results_size/8*30, m_sieve_results.data());
-            sieve_run_count++;
+            m_cuda_sieve.run_sieve(m_sieve_run_count*sieve_results_size/8*30, m_sieve_results.data());
+            m_sieve_run_count++;
            
         }
 
@@ -156,6 +171,7 @@ namespace nexusminer {
         void Sieve::sieve_batch_cpu(uint64_t low)
         {
             reset_sieve_batch(low);
+            m_sieve_results = {};
             for (auto i = 0; i < m_segment_batch_size; i++)
             {
                 reset_sieve();
@@ -192,6 +208,11 @@ namespace nexusminer {
             m_long_chain_starts = {};
         }
 
+        void Sieve::reset_batch_run_count()
+        {
+            m_sieve_run_count = 0;
+        }
+
         void Sieve::clear_chains()
         {
             m_chain = {};
@@ -210,7 +231,7 @@ namespace nexusminer {
         //find chains on the gpu
         void Sieve::find_chains()
         {
-            uint32_t chain_count;
+            uint32_t chain_count = 0;
             m_cuda_chains = {};
             m_cuda_chains.resize(m_cuda_sieve.m_max_chains);
             m_cuda_sieve.find_chains(m_cuda_chains.data(), chain_count);
@@ -454,7 +475,7 @@ namespace nexusminer {
             primesieve::iterator it;
             uint64_t prime = it.next_prime();
 
-            for (; prime < m_sieving_prime_limit; prime = it.next_prime())
+            for (; prime <= m_sieving_prime_limit; prime = it.next_prime())
                 p_not_divisible_by_nth_prime *= (prime - 1.0) / prime;
 
             return p_not_divisible_by_nth_prime;
@@ -470,6 +491,11 @@ namespace nexusminer {
                 candidate_count += m_sieve_results[n];
             }
             return candidate_count;
+        }
+
+        std::vector<uint8_t> Sieve::get_sieve()
+        {
+            return m_sieve;
         }
 
         //search for winners.  delete finished or hopeless chains.
@@ -541,6 +567,7 @@ namespace nexusminer {
             uint64_t prime_count = 0;
             int low = 0;
             int tests = 0;
+            bool cpu_verify = false;
             std::vector<uint64_t> offsets;
             for (uint64_t n = 0; n < m_sieve_results.size(); n++)
             {
@@ -557,22 +584,31 @@ namespace nexusminer {
                     break;
             }
             int prime_test_actual_batch_size = offsets.size();
-            boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
-            /*mpz_t base_as_mpz_t;
-            mpz_init(base_as_mpz_t);
-            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());*/
+            
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
+                        
             m_cuda_prime_test.set_offsets(offsets.data(), prime_test_actual_batch_size);
             m_cuda_prime_test.fermat_run();
             m_cuda_prime_test.get_results(primality_test_results.data());
             for (auto i = 0; i < prime_test_actual_batch_size; i++)
             {
+                if (cpu_verify)
+                {
+                    boost::multiprecision::uint1024_t p = m_sieve_start + offsets[i];
+                    uint8_t cpu_is_prime = primality_test(p) ? 1 : 0;
+                    if (cpu_is_prime != primality_test_results[i])
+                    {
+                        m_logger->error("cpu/gpu primality test mismatch at offset {}. GPU {}/CPU {}.", offsets[i],
+                            primality_test_results[i], cpu_is_prime);
+                    }
+                }
                 if (primality_test_results[i] == 1)
+                {
                     ++prime_count;
+                }
             }
             
-            //mpz_clear(base_as_mpz_t);
 
             return prime_count;
         }

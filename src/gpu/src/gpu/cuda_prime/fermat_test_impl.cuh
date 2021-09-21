@@ -25,8 +25,8 @@ namespace nexusminer {
             cgbn_mem_t<64>* d_offsets;
             uint64_t* d_offset_count;
             uint8_t* d_results;
-            uint64_t* d_fermat_test_count;
-            uint64_t* d_fermat_pass_count;
+            unsigned long long* d_fermat_test_count;
+            unsigned long long* d_fermat_pass_count;
             fermat_t::instance_t* d_instances;
             cgbn_error_report_t* d_report;
             cgbn_mem_t<fermat_params_t::BITS>* d_base_int;
