@@ -34,7 +34,7 @@ namespace nexusminer {
 			//array of chains
 			CudaChain* d_chains;
 			uint32_t* d_chain_index;
-			uint64_t* d_prime_candidate_count;
+			unsigned long long* d_prime_candidate_count;
 			
 
 		};

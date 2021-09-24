@@ -182,7 +182,7 @@ namespace nexusminer {
         //seive kernel
         __global__ void do_sieve(uint64_t sieve_start_offset, uint32_t* sieving_primes, uint32_t sieving_prime_count,
             uint32_t* starting_multiples, uint32_t* prime_mod_inverses, Cuda_sieve::sieve_word_t* sieve_results, uint32_t* multiples,
-            uint8_t* wheel_indices, uint64_t* prime_candidate_count)
+            uint8_t* wheel_indices, unsigned long long* prime_candidate_count)
         {
             const uint32_t segment_size = Cuda_sieve::m_kernel_sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
 
@@ -284,7 +284,7 @@ namespace nexusminer {
                 
             }
             //update the global candidate count
-             atomicAdd(static_cast<unsigned long long*>(prime_candidate_count), count);
+             atomicAdd(prime_candidate_count, count);
             
         }
 
