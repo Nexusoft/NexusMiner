@@ -7,6 +7,7 @@
 #include <bitset>
 #include <sstream>
 #include <boost/integer/mod_inverse.hpp>
+#include "small_sieve_tools.hpp"
 
 
 namespace nexusminer {
@@ -36,10 +37,10 @@ namespace nexusminer {
 
         void Sieve::set_sieve_start(boost::multiprecision::uint1024_t sieve_start)
         {
-            //set the sieve start to the next highest multiple of 30
-            if (sieve_start % 30 > 0)
+            //set the sieve start to the next highest multiple of the sieve word range
+            if (sieve_start % m_sieve_range_per_word > 0)
             {
-                sieve_start += 30 - (sieve_start % 30);
+                sieve_start += m_sieve_range_per_word - (sieve_start % m_sieve_range_per_word);
             }
             m_sieve_start = sieve_start;
         }
@@ -95,6 +96,18 @@ namespace nexusminer {
             m_cuda_prime_test.set_base_int(base_as_mpz_t);
             mpz_clear(base_as_mpz_t);
 
+        }
+
+        uint64_t Sieve::gpu_get_prime_candidate_count()
+        {
+            uint64_t prime_candidate_count = 0;
+            m_cuda_sieve.get_prime_candidate_count(prime_candidate_count);
+            return prime_candidate_count;
+        }
+
+        void Sieve::gpu_get_sieve()
+        {
+            m_cuda_sieve.get_sieve(m_sieve_results.data());
         }
 
         void Sieve::gpu_fermat_test_init(uint16_t device)
@@ -161,10 +174,89 @@ namespace nexusminer {
         {
             
             reset_sieve_batch(low);
-            uint32_t sieve_results_size = m_sieve_batch_buffer_size;
-            m_cuda_sieve.run_sieve(m_sieve_run_count*sieve_results_size/8*30, m_sieve_results.data());
+            m_cuda_sieve.run_sieve(m_sieve_run_count* m_sieve_batch_buffer_size * m_sieve_range_per_word);
             m_sieve_run_count++;
            
+        }
+
+        //experimental.  bit sieve with small primes prototype for cuda port
+        //small primes hit the sieve every word.  iterate by sieve word and cross off small primes using precomputed masks
+        void Sieve::sieve_small_primes()
+        {
+            //generate "soft" prime masks.  Todo compare the performance vs hardcoding the masks.  
+            Small_sieve_tools small_sieve_tool;
+            std::vector<uint32_t> p7 = small_sieve_tool.prime_mask(7);
+            std::vector<uint32_t> p11 = small_sieve_tool.prime_mask(11);
+            std::vector<uint32_t> p13 = small_sieve_tool.prime_mask(13);
+            std::vector<uint32_t> p17 = small_sieve_tool.prime_mask(17);
+            std::vector<uint32_t> p19 = small_sieve_tool.prime_mask(19);
+            std::vector<uint32_t> p23 = small_sieve_tool.prime_mask(23);
+            std::vector<uint32_t> p29 = small_sieve_tool.prime_mask(29);
+            std::vector<uint32_t> p31 = small_sieve_tool.prime_mask(31);
+
+            //small_sieve_tool.print_code(37);
+
+            
+            //const uint32_t p7[7] = { 0x02201081, 0x08044002, 0x20108108, 0x04400220, 0x10810804, 0x40022010, 0x81080440 };
+
+            uint64_t start_offset = 0;
+            uint32_t sieve_words = m_sieve.size();
+            uint32_t increment = m_sieve_range_per_word;
+            //Equivalent offsets to the start of the sieve mode the prime.  Use to avoid bignum math in the sieve.
+            //Compute these once per block.  
+            uint32_t offset7 = static_cast<uint32_t>(((m_sieve_start / 30) % 7)) * 30;
+            uint32_t offset11 = static_cast<uint32_t>(((m_sieve_start / 30) % 11)) * 30;
+            uint32_t offset13 = static_cast<uint32_t>(((m_sieve_start / 30) % 13)) * 30;
+            uint32_t offset17 = static_cast<uint32_t>(((m_sieve_start / 30) % 17)) * 30;
+            uint32_t offset19 = static_cast<uint32_t>(((m_sieve_start / 30) % 19)) * 30;
+            uint32_t offset23 = static_cast<uint32_t>(((m_sieve_start / 30) % 23)) * 30;
+            uint32_t offset29 = static_cast<uint32_t>(((m_sieve_start / 30) % 29)) * 30;
+            uint32_t offset31 = static_cast<uint32_t>(((m_sieve_start / 30) % 31)) * 30;
+
+
+           // std::cout << "offset 7 = " << offset7 << std::endl;
+           // std::cout << "offset 11 = " << offset11 << std::endl;
+           // std::cout << "offset 31 = " << offset31 << std::endl;
+
+
+            for (uint32_t i = 0; i < sieve_words; i++)
+            {
+                //if the modulus operations cause a performance hit 
+                //we could reorder the mask words and use an increment + compare instead.
+                uint32_t inc = i * increment;
+                uint16_t index7 = (offset7 + inc) % 7;
+                uint16_t index11 = (offset11 + inc) % 11;
+                uint16_t index13 = (offset13 + inc) % 13;
+                uint16_t index17 = (offset17 + inc) % 17;
+                uint16_t index19 = (offset19 + inc) % 19;
+                uint16_t index23 = (offset23 + inc) % 23;
+                uint16_t index29 = (offset29 + inc) % 29;
+                uint16_t index31 = (offset31 + inc) % 31;
+
+
+                /*uint32_t mod7 = static_cast<uint32_t>(((m_sieve_start + i*increment) % 7));
+                std::cout << "sieve start + " << i* increment << " mod 7 = " << mod7 << std::endl;
+                std::cout << "offset7 + " << i * increment << " mod 7 = " << index7 << std::endl;
+
+                uint32_t mod11 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 11));
+                std::cout << "sieve start + " << i * increment << " mod 11 = " << mod11 << std::endl;
+                std::cout << "offset11 + " << i * increment << " mod 11 = " << index11 << std::endl;
+
+                uint32_t mod31 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 31));
+                std::cout << "sieve start + " << i * increment << " mod 31 = " << mod31 << std::endl;
+                std::cout << "offset31 + " << i * increment << " mod 31 = " << index31 << std::endl;*/
+                
+                m_sieve[i] &= p7[index7];  
+                m_sieve[i] &= p11[index11];
+                m_sieve[i] &= p13[index13];
+                m_sieve[i] &= p17[index17];
+                m_sieve[i] &= p19[index19];
+                m_sieve[i] &= p23[index23];
+                m_sieve[i] &= p29[index29];
+                m_sieve[i] &= p31[index31];
+
+            }
+            //std::cout << "here" << std::endl;
         }
 
         //batch sieve on the cpu for debug
@@ -172,6 +264,8 @@ namespace nexusminer {
         {
             reset_sieve_batch(low);
             m_sieve_results = {};
+            reset_sieve();
+            sieve_small_primes();
             for (auto i = 0; i < m_segment_batch_size; i++)
             {
                 reset_sieve();
@@ -194,7 +288,7 @@ namespace nexusminer {
         void Sieve::reset_sieve()
         {
             //fill the sieve with default values (all ones)
-            std::fill(m_sieve.begin(), m_sieve.end(), 1);
+            std::fill(m_sieve.begin(), m_sieve.end(), 0xFFFFFFFF);
             //clear the list of long chains found. 
             m_long_chain_starts = {};
         }
@@ -241,14 +335,17 @@ namespace nexusminer {
                 Chain chain(m_cuda_chains[i].m_base_offset);
                 for (auto j = 1; j < m_cuda_chains[i].m_offset_count; j++)
                     chain.push_back(m_cuda_chains[i].m_offsets[j]);
+                m_chain_candidate_max_length = std::max(chain.length(), m_chain_candidate_max_length);
+                m_chain_candidate_total_length += chain.length();
                 m_chain.push_back(chain);
             }
+            m_chain_count += chain_count;
         }
 
         //search the sieve for chains that meet the minimum length requirement.  Chains can cross segment boundaries.
         void Sieve::find_chains_cpu(uint64_t low, bool batch_sieve_mode)
         {
-            std::vector<uint8_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
+            std::vector<sieve_word_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
             uint64_t sieve_size = sieve.size();
             int previous_sieve_offset = 0;
             int sieve_offset = 0;
@@ -493,7 +590,26 @@ namespace nexusminer {
             return candidate_count;
         }
 
-        std::vector<uint8_t> Sieve::get_sieve()
+        //get a list of prime candidates from the sieve
+        std::vector<uint64_t> Sieve::get_prime_candidate_offsets()
+        {
+            std::vector<uint64_t> offsets;
+            for (uint64_t n = 0; n < m_sieve_results.size(); n++)
+            {
+                for (auto b = m_sieve_results[n]; b > 0; b &= b - 1)
+                {
+                    int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                    uint64_t prime_candidate_offset = n * m_sieve_range_per_word +
+                        (index_of_lowest_set_bit / 8) * static_cast<uint64_t>(m_sieve_range_per_byte) +
+                        sieve30_offsets[index_of_lowest_set_bit % 8];
+                    offsets.push_back(prime_candidate_offset);
+
+                }
+            }
+            return offsets;
+        }
+
+        std::vector<Sieve::sieve_word_t> Sieve::get_sieve()
         {
             return m_sieve;
         }
@@ -543,43 +659,40 @@ namespace nexusminer {
         uint64_t Sieve::count_fermat_primes_cpu(int sample_size)
         {
             uint64_t count = 0;
-            int low = 0;
             int tests = 0;
-            for (uint64_t n = 0; n < m_sieve_results.size(); n++)
+
+            std::vector<uint64_t> offsets = get_prime_candidate_offsets();
+            for (auto i = 0; i < offsets.size(); i++)
             {
-                //for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
-                //{
-                    //int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
-                    uint64_t prime_candidate_offset = low + n/8 * 30 + sieve30_offsets[n%8];
-                    boost::multiprecision::uint1024_t p = m_sieve_start + prime_candidate_offset;
-                    if (primality_test(p))
-                        count++;
-                    tests++;
-                //}
+                boost::multiprecision::uint1024_t p = m_sieve_start + offsets[i];
+                if (primality_test(p))
+                    count++;
+                tests++;
                 if (tests >= sample_size)
                     break;
             }
+
             return count;
         }
 
         uint64_t Sieve::count_fermat_primes(int sample_size, uint16_t device)
         {
             uint64_t prime_count = 0;
-            int low = 0;
             int tests = 0;
             bool cpu_verify = false;
             std::vector<uint64_t> offsets;
             for (uint64_t n = 0; n < m_sieve_results.size(); n++)
             {
-                //for (uint8_t b = m_sieve_results[n]; b > 0; b &= b - 1)
-                //{
-                if (m_sieve_results[n] == 1)
+                for (auto b = m_sieve_results[n]; b > 0; b &= b - 1)
                 {
-                    uint64_t prime_candidate_offset = low + n / 8 * 30 + sieve30_offsets[n % 8];
+                    int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                    uint64_t prime_candidate_offset = n * m_sieve_range_per_word +
+                        (index_of_lowest_set_bit / 8) * static_cast<uint64_t>(m_sieve_range_per_byte) +
+                        sieve30_offsets[index_of_lowest_set_bit % 8];
                     offsets.push_back(prime_candidate_offset);
                     tests++;
+                
                 }
-                //}
                 if (tests >= sample_size)
                     break;
             }

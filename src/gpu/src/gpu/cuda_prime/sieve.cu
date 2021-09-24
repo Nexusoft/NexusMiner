@@ -8,9 +8,9 @@ namespace nexusminer {
 
         Cuda_sieve::Cuda_sieve() : m_impl(std::make_unique<Cuda_sieve_impl>()) {}
         Cuda_sieve::~Cuda_sieve() = default;
-        void Cuda_sieve::run_sieve(uint64_t sieve_start_offset, uint8_t sieve[])
+        void Cuda_sieve::run_sieve(uint64_t sieve_start_offset)
         {
-            m_impl->run_sieve(sieve_start_offset, sieve);
+            m_impl->run_sieve(sieve_start_offset);
         }
        
         void Cuda_sieve::load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t starting_multiples[],
@@ -27,6 +27,16 @@ namespace nexusminer {
         void Cuda_sieve::find_chains(CudaChain chains[], uint32_t& chain_count)
         {
             m_impl->find_chains(chains, chain_count);
+        }
+
+        void Cuda_sieve::get_sieve(sieve_word_t sieve[])
+        {
+            m_impl->get_sieve(sieve);
+        }
+
+        void Cuda_sieve::get_prime_candidate_count(uint64_t& prime_candidate_count)
+        {
+            m_impl->get_prime_candidate_count(prime_candidate_count);
         }
 
        

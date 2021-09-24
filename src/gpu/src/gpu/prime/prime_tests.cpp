@@ -1,5 +1,6 @@
 #include "prime_tests.hpp"
 #include <gmp.h>
+#include <bitset>
 #include <boost/random.hpp>
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve.hpp"
@@ -109,6 +110,7 @@ namespace gpu
 		boost::multiprecision::uint1024_t T200("0x53bf18ac03f0adfb36fc4864b42013375ebdc0bb311f06636771e605ad731ca1383c7d9056522ed9bda4f608ef71498bc9c7dade6c56bf1534494e0ef371e79f09433e4c9e64624695a42d7920bd5022f449156d2f93f3be3a429159794ac9e49f69c706793ef249a284f9173a82379e62dffac42c0f53f155f65a784f31f42c");
 		uint64_t nonce200 = 127171;
 		double diff200 = 3.2608808;
+		boost::multiprecision::uint1024_t low_start = 30*7*11 - 30;
 		m_logger->info("Starting sieve performance test.");
 		Sieve test_sieve;
 		test_sieve.set_sieve_start(T200);
@@ -119,14 +121,18 @@ namespace gpu
 		test_sieve.reset_sieve();
 		test_sieve.reset_sieve_batch(0);
 		test_sieve.gpu_sieve_init(m_device);
+		test_sieve.sieve_small_primes();
 		//test_sieve.sieve_batch_cpu(0);
 		//std::vector<uint8_t> cpu_sieve = test_sieve.get_sieve();
-		//test_sieve.reset_sieve_batch(0);
+		test_sieve.reset_sieve_batch(0);
 		auto start = std::chrono::steady_clock::now();
 		test_sieve.sieve_batch(0);
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double sieve_elapsed_s = elapsed.count() / 1000.0;
+		uint64_t prime_candidate_count = test_sieve.gpu_get_prime_candidate_count();
+		test_sieve.gpu_get_sieve();
+		
 		start = std::chrono::steady_clock::now();
 		test_sieve.find_chains();
 		end = std::chrono::steady_clock::now();
@@ -157,8 +163,8 @@ namespace gpu
 		}*/
 
 
-		uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
-		uint64_t sieve_range = test_sieve.m_sieve_results.size() / 8 * 30;
+		//uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
+		uint64_t sieve_range = test_sieve.m_sieve_results.size() * Cuda_sieve::m_sieve_word_range;
 		double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
 		double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
 

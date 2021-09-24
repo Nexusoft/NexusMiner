@@ -4,6 +4,7 @@
 #include <boost/multiprecision/cpp_int.hpp>
 #include "../cuda_prime/fermat_test.hpp"
 
+
 namespace nexusminer {
 namespace gpu
 {

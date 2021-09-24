@@ -105,9 +105,9 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 void Worker_prime::run()
 {
 	m_segmented_sieve->calculate_starting_multiples();
-	uint32_t segment_size = m_segmented_sieve->get_segment_size();
-	uint32_t segment_batch_size = m_segmented_sieve->get_segment_batch_size();
-	uint32_t sieve_batch_range = segment_batch_size * segment_size;
+	//uint32_t segment_size = m_segmented_sieve->get_segment_size();
+	//uint32_t segment_batch_size = m_segmented_sieve->get_segment_batch_size();
+	uint64_t sieve_batch_range = m_segmented_sieve->m_sieve_range;
 	uint64_t find_chains_ms = 0;
 	uint64_t sieving_ms = 0;
 	uint64_t test_chains_ms = 0;
@@ -206,7 +206,7 @@ void Worker_prime::run()
 				1.0e6 * m_segmented_sieve->m_fermat_test_count / m_range_searched << std::endl;
 
 			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << range_searched_this_cycle / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
-			double predicted_8chain_positivity_rate = std::pow(fermat_positive_rate, 8);
+			//double predicted_8chain_positivity_rate = std::pow(fermat_positive_rate, 8);
 			//std::cout << "Predicted chains tested to find one Fermat 8-chains: " << 1 / predicted_8chain_positivity_rate << std::endl;
 			//double predicted_days_between_8chains = 1.0 / (predicted_8chain_positivity_rate * chains_per_sec * 3600 * 24);
 			//std::cout << "Predicted days between 8 chains per core: " << std::fixed << std::setprecision(2) << predicted_days_between_8chains << std::endl;
