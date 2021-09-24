@@ -59,7 +59,7 @@ namespace nexusminer {
 			double sieve_pass_through_rate_expected();
 			uint64_t count_prime_candidates();
 			std::vector<sieve_word_t> get_sieve(); //return a copy of the raw sieve
-			std::vector<uint64_t> Sieve::get_prime_candidate_offsets();
+			std::vector<uint64_t> get_prime_candidate_offsets();
 
 		private:
 			//static constexpr uint8_t sieve30 = 0xFF;  //compressed sieve for primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
