@@ -52,7 +52,7 @@ namespace nexusminer {
             //#pragma unroll 1
             for (uint32_t i = threadIdx.x; i < sieveWords; i += blockDim.x) 
             {
-                uint64_t j = i + start / 120; // 120 is 32 bits per uint32_t * 30/8 integers per bit
+                //uint64_t j = i + start / 120; // 120 is 32 bits per uint32_t * 30/8 integers per bit
                 //s_sieve[i] |= p7[j % 7];  
                 //s_sieve[i] |= p11[j % 11]; 
                 //s_sieve[i] |= p13[j % 13]; 
@@ -196,7 +196,7 @@ namespace nexusminer {
            
             const uint64_t segments = Cuda_sieve::m_kernel_segments_per_block;
             uint64_t sieve_results_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block;
-            uint64_t count = 0;
+            unsigned long long count = 0;
 
             //each block sieves a different region
             uint64_t start_offset = sieve_start_offset + block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block * Cuda_sieve::m_sieve_word_range;
@@ -284,7 +284,7 @@ namespace nexusminer {
                 
             }
             //update the global candidate count
-             atomicAdd(prime_candidate_count, count);
+             atomicAdd(static_cast<unsigned long long*>(prime_candidate_count), count);
             
         }
 
