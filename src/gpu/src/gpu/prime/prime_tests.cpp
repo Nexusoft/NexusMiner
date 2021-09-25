@@ -5,6 +5,7 @@
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve.hpp"
 #include "../cuda_prime/sieve.hpp"
+#include <cmath>
 
 
 namespace nexusminer
@@ -176,6 +177,7 @@ namespace gpu
 			(double)sieve_range, Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count-1], small_prime_sieve_elapsed_s, sieve_range / small_prime_sieve_elapsed_s / 1e6);
 		m_logger->info("Sieved {:.1E} integers using primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
 			(double)sieve_range, (double)test_sieve.m_sieving_prime_limit, sieve_elapsed_s, sieve_range / sieve_elapsed_s / 1e6);
+		m_logger->info("Combined sieve ({:.1f} MISPS).", sieve_range / (sieve_elapsed_s + small_prime_sieve_elapsed_s) / 1e6);
 		m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
 			candidate_ratio * 100, candidate_ratio_expected * 100);
 		double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve();
@@ -187,7 +189,11 @@ namespace gpu
 			test_sieve.get_current_chain_list_length(),
 			find_chains_elapsed_s, 1.0e6 * test_sieve.get_current_chain_list_length() / sieve_range,
 			sieve_range / find_chains_elapsed_s / 1e6);
-
+		double eight_chain_probability = std::pow(fermat_positive_rate_expected, 8);
+		double chains_per_eight_chain = 1.0 / eight_chain_probability;
+		double range_per_eight_chain = sieve_range * chains_per_eight_chain / test_sieve.get_current_chain_list_length();
+		m_logger->info("Approximate range to find one 8-chain: {:.1E} ", range_per_eight_chain);
+			
 		test_sieve.gpu_fermat_free();
 	}
 
