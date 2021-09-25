@@ -32,6 +32,7 @@ namespace nexusminer {
 			void gpu_fermat_test_set_base_int(boost::multiprecision::uint1024_t base_big_int);
 			uint64_t gpu_get_prime_candidate_count();
 			void gpu_get_sieve();
+			void gpu_sieve_small_primes(uint64_t sieve_start_offset);
 			void sieve_segment();
 			void sieve_small_primes();
 			void sieve_batch(uint64_t low);
@@ -80,7 +81,7 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			uint32_t m_sieving_prime_limit = 3e6; //3e8;
+			const uint32_t m_sieving_prime_limit = 3e6;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 20000;
 			const int m_fermat_test_batch_size_max = 1000000;
@@ -111,9 +112,10 @@ namespace nexusminer {
 
 			//each byte covers a range of 30 sieving primes 
 			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
-			//we start sieving at 7
-			static constexpr int sieving_start_prime = 7;
-			static constexpr int m_min_chain_length = 8;	
+			//we start sieving at 7 with the small primes.  medium primes start here.
+			static constexpr int sieving_start_prime = 11;
+			static constexpr int m_min_chain_length = 8;
+
 
 			/// Bitmasks used to unset bits 
 			static constexpr uint8_t unset_bit_mask[30] =
@@ -152,12 +154,12 @@ namespace nexusminer {
 
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve;
-			//std::vector<uint32_t> m_bit_sieve;
 			std::vector<uint32_t> m_sieving_primes;
 			std::vector<uint32_t> m_multiples;
-			std::vector<uint32_t> m_prime_mod_inverses;
+			std::vector<uint8_t> m_prime_mod_inverses;
 			std::vector<Chain> m_chain;
 			std::vector<CudaChain>m_cuda_chains;
+			std::vector<uint32_t>m_small_prime_offsets;
 
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;

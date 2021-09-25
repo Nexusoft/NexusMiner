@@ -24,7 +24,10 @@ namespace nexusminer {
 
         void Sieve::generate_sieving_primes()
         {
-            //generate sieving primes
+            //generate small sieving primes
+            //primesieve::generate_primes(sieving_start_prime, m_small_prime_end, &m_small_primes);
+
+            //generate medium sieving primes
             m_logger->info("Generating sieving primes up to {}...", m_sieving_prime_limit);
             auto start = std::chrono::steady_clock::now();
             primesieve::generate_primes(sieving_start_prime, m_sieving_prime_limit, &m_sieving_primes);
@@ -52,6 +55,16 @@ namespace nexusminer {
 
         void Sieve::calculate_starting_multiples()
         {
+
+            //calculate the starting offsets of the small primes relative to the sieve start
+            m_small_prime_offsets = {};
+            for (int i = 0; i < Cuda_sieve::m_small_prime_count; i++)
+            {
+                int s = Cuda_sieve::m_small_primes[i];
+                uint32_t offset = static_cast<uint32_t>(((m_sieve_start / m_sieve_range_per_byte) % s)) * m_sieve_range_per_byte;
+                m_small_prime_offsets.push_back(offset); 
+            }
+
             //generate starting multiples of the sieving primes.  
             //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
             //do this once at the start of a new block to initialize the sieve.
@@ -81,7 +94,7 @@ namespace nexusminer {
         {
             
             m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
-                m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
+                m_prime_mod_inverses.data(), m_small_prime_offsets.data(), m_sieve_batch_buffer_size, device);
            
             m_sieve_run_count = 0;
 
@@ -126,6 +139,12 @@ namespace nexusminer {
         {
             m_cuda_prime_test.fermat_free();
         }
+
+        void Sieve::gpu_sieve_small_primes(uint64_t sieve_start_offset)
+        {
+            m_cuda_sieve.run_small_prime_sieve(sieve_start_offset);
+        }
+
 
         //run the sieve on one segment
         void Sieve::sieve_segment()
@@ -214,7 +233,7 @@ namespace nexusminer {
             uint32_t offset31 = static_cast<uint32_t>(((m_sieve_start / 30) % 31)) * 30;
 
 
-           // std::cout << "offset 7 = " << offset7 << std::endl;
+           //std::cout << "offset 7 = " << offset7 << std::endl;
            // std::cout << "offset 11 = " << offset11 << std::endl;
            // std::cout << "offset 31 = " << offset31 << std::endl;
 
@@ -234,11 +253,11 @@ namespace nexusminer {
                 uint16_t index31 = (offset31 + inc) % 31;
 
 
-                /*uint32_t mod7 = static_cast<uint32_t>(((m_sieve_start + i*increment) % 7));
+                /*uint32_t mod7 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 7));
                 std::cout << "sieve start + " << i* increment << " mod 7 = " << mod7 << std::endl;
                 std::cout << "offset7 + " << i * increment << " mod 7 = " << index7 << std::endl;
 
-                uint32_t mod11 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 11));
+               uint32_t mod11 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 11));
                 std::cout << "sieve start + " << i * increment << " mod 11 = " << mod11 << std::endl;
                 std::cout << "offset11 + " << i * increment << " mod 11 = " << index11 << std::endl;
 
