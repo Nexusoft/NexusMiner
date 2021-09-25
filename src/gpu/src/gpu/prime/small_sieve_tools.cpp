@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <cmath>
 #include "small_sieve_tools.hpp"
 //#include "sieve_utils.hpp"
 
@@ -69,7 +70,7 @@ namespace nexusminer {
                     break;
                 ss << "__constant__ const uint32_t p";
                 ss << p << "[" << p << "] = ";
-                int digits = log10(p) + 1;
+                int digits = std::log10(p) + 1;
                 int spaces = 10 - 2 * digits;
                 ss << std::string(spaces, ' ') << "{";
                 std::vector<Small_sieve_tools::sieve_word_t> mask = prime_mask(p);
