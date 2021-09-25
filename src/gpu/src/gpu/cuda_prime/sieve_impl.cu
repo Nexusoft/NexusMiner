@@ -62,19 +62,19 @@ namespace nexusminer {
                 uint16_t index19 = (start + small_prime_offsets[4] + inc) % 19;
                 uint16_t index23 = (start + small_prime_offsets[5] + inc) % 23;
                 uint16_t index29 = (start + small_prime_offsets[6] + inc) % 29;
-                //uint16_t index31 = (start + small_prime_offsets[7] + inc) % 31;
-                //uint16_t index37 = (start + small_prime_offsets[8] + inc) % 37;
+                uint16_t index31 = (start + small_prime_offsets[7] + inc) % 31;
+                uint16_t index37 = (start + small_prime_offsets[8] + inc) % 37;
 
                 //apply the mask.  the mask for the first prime 7 is also used to initialize the sieve (hence no &).
                 sieve[i] = p7[index7];
-                //sieve[i] &= p11[index11];
-                //sieve[i] &= p13[index13];
-                //sieve[i] &= p17[index17];
-                //sieve[i] &= p19[index19];
-                //sieve[i] &= p23[index23];
-                //sieve[i] &= p29[index29];
-                //sieve[i] &= p31[index31];
-                //sieve[i] &= p37[index37];
+                sieve[i] &= p11[index11];
+                sieve[i] &= p13[index13];
+                sieve[i] &= p17[index17];
+                sieve[i] &= p19[index19];
+                sieve[i] &= p23[index23];
+                sieve[i] &= p29[index29];
+                sieve[i] &= p31[index31];
+                sieve[i] &= p37[index37];
                 
             }
         }

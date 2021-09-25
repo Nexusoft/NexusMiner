@@ -81,7 +81,7 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			const uint32_t m_sieving_prime_limit = 3e6;
+			const uint32_t m_sieving_prime_limit = 6e6;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 20000;
 			const int m_fermat_test_batch_size_max = 1000000;
@@ -113,7 +113,7 @@ namespace nexusminer {
 			//each byte covers a range of 30 sieving primes 
 			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
 			//we start sieving at 7 with the small primes.  medium primes start here.
-			static constexpr int sieving_start_prime = 11;
+			const int sieving_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
 			static constexpr int m_min_chain_length = 8;
 
 

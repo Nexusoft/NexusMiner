@@ -14,7 +14,7 @@ namespace nexusminer {
 
         std::vector<Small_sieve_tools::sieve_word_t> Small_sieve_tools::prime_mask(uint16_t prime)
         {
-            std::vector<sieve_word_t> mask;
+            std::vector<sieve_word_t> mask(prime);
             uint32_t low = 0;
             uint32_t position = prime;
             for (auto i = 0; i < prime; i++)
@@ -33,7 +33,8 @@ namespace nexusminer {
                     position += prime;
                 }
                 w = ~bits.to_ulong();
-                mask.push_back(w);
+                //put the word in the correct order (its a modular ring based on the prime)
+                mask[low % prime] = w;
                 low += sieve_span_per_word;
             }
             

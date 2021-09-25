@@ -234,7 +234,7 @@ namespace nexusminer {
 
 
            //std::cout << "offset 7 = " << offset7 << std::endl;
-           // std::cout << "offset 11 = " << offset11 << std::endl;
+           //std::cout << "offset 11 = " << offset11 << std::endl;
            // std::cout << "offset 31 = " << offset31 << std::endl;
 
 
@@ -259,23 +259,23 @@ namespace nexusminer {
 
                uint32_t mod11 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 11));
                 std::cout << "sieve start + " << i * increment << " mod 11 = " << mod11 << std::endl;
-                std::cout << "offset11 + " << i * increment << " mod 11 = " << index11 << std::endl;
+                std::cout << "offset11 + " << i * increment << " mod 11 = " << index11 << std::endl;*/
 
-                uint32_t mod31 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 31));
+                /*uint32_t mod31 = static_cast<uint32_t>(((m_sieve_start + i * increment) % 31));
                 std::cout << "sieve start + " << i * increment << " mod 31 = " << mod31 << std::endl;
                 std::cout << "offset31 + " << i * increment << " mod 31 = " << index31 << std::endl;*/
                 
-                m_sieve[i] &= p7[index7];  
+                //m_sieve[i] &= p7[index7];  
                 m_sieve[i] &= p11[index11];
-                m_sieve[i] &= p13[index13];
-                m_sieve[i] &= p17[index17];
-                m_sieve[i] &= p19[index19];
-                m_sieve[i] &= p23[index23];
-                m_sieve[i] &= p29[index29];
-                m_sieve[i] &= p31[index31];
-
+                //m_sieve[i] &= p13[index13];
+                //m_sieve[i] &= p17[index17];
+                //m_sieve[i] &= p19[index19];
+                //m_sieve[i] &= p23[index23];
+                //m_sieve[i] &= p29[index29];
+                //m_sieve[i] &= p31[index31];
+                //std::cout << "here" << std::endl;
             }
-            //std::cout << "here" << std::endl;
+           // std::cout << "here" << std::endl;
         }
 
         //batch sieve on the cpu for debug

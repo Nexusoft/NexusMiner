@@ -173,7 +173,7 @@ namespace gpu
 		double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
 		double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
 		m_logger->info("Small prime sieved {:.1E} integers using primes up to {} in {:.3f} seconds ({:.1f} MISPS).",
-			(double)sieve_range, Cuda_sieve::m_small_prime_end, small_prime_sieve_elapsed_s, sieve_range / small_prime_sieve_elapsed_s / 1e6);
+			(double)sieve_range, Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count-1], small_prime_sieve_elapsed_s, sieve_range / small_prime_sieve_elapsed_s / 1e6);
 		m_logger->info("Sieved {:.1E} integers using primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
 			(double)sieve_range, (double)test_sieve.m_sieving_prime_limit, sieve_elapsed_s, sieve_range / sieve_elapsed_s / 1e6);
 		m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
