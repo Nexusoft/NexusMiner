@@ -22,7 +22,9 @@ namespace nexusminer {
 			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
 			//list of primes starting at 7
-			std::vector<uint16_t> primes{ 7,11,13,17,19,23,29,31,37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97 };
+			std::vector<uint16_t> primes{ 7,11,13,17,19,23,29,31,37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
+			101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211 };
+
 
 			std::vector<sieve_word_t> prime_mask(uint16_t prime);
 			std::vector<uint16_t> word_index_ring(uint16_t prime);

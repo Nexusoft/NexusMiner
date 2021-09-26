@@ -213,7 +213,7 @@ namespace nexusminer {
             std::vector<uint32_t> p29 = small_sieve_tool.prime_mask(29);
             std::vector<uint32_t> p31 = small_sieve_tool.prime_mask(31);
 
-            //small_sieve_tool.print_code(97);
+            //small_sieve_tool.print_code(199);
 
             
             //const uint32_t p7[7] = { 0x02201081, 0x08044002, 0x20108108, 0x04400220, 0x10810804, 0x40022010, 0x81080440 };
