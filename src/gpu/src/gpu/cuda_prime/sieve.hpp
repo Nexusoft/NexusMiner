@@ -17,7 +17,7 @@ namespace nexusminer {
 			static const int m_sieve_word_byte_count = sizeof(sieve_word_t);
 			static const int m_kernel_sieve_size_bytes = 4096 * 8;  //this is the size of the sieve in bytes.  it should be a multiple of 8. 
 			static const int m_kernel_sieve_size_words = m_kernel_sieve_size_bytes / m_sieve_word_byte_count;
-			static const int m_kernel_segments_per_block = 32;  //number of times to run the sieve within a kernel call
+			static const int m_kernel_segments_per_block = 64;  //number of times to run the sieve within a kernel call
 			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;
 			static const int m_threads_per_block = 1024;
 			static const int m_num_blocks = 256;  //each block sieves part of the range
@@ -29,7 +29,7 @@ namespace nexusminer {
 			static const uint32_t m_max_chains = 5*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const int m_min_chain_length = 8;
 
-			static const int m_small_prime_count = 13;
+			static const int m_small_prime_count = 23;
 			static const int m_small_primes[]; //array is defined in sieve.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,
