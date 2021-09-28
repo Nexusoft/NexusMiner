@@ -6,6 +6,7 @@
 #include "config/validator.hpp"
 #include "worker_manager.hpp"
 #include "worker.hpp"
+#include "version.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -14,6 +15,7 @@
 #include <asio.hpp>
 #include <chrono>
 #include <fstream>
+#include <iostream>
 
 namespace nexusminer
 {
@@ -73,6 +75,13 @@ namespace nexusminer
 		{
 			return false;
 		}
+
+		// print header
+		std::cout << "NexusMiner Version " << NexusMiner_VERSION_MAJOR << "." << NexusMiner_VERSION_MINOR << std::endl;
+		std::cout << "Mining " << (m_config.get_mining_mode() == config::Mining_mode::HASH ? "HASH" : "PRIME") << " Channel in "
+			<< (m_config.get_use_bool() ? "POOL" : "SOLO") << " mode\n" << std::endl;
+
+		m_config.print_worker_config();
 
 		// timer initialisation
 		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);

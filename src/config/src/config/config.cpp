@@ -28,7 +28,7 @@ namespace config
 
 	bool Config::read_config(std::string const& miner_config_file)
 	{
-		m_logger->info("Reading config file {}", miner_config_file);
+	//	m_logger->info("Reading config file {}", miner_config_file);
 
 		std::ifstream config_file(miner_config_file);
 		if (!config_file.is_open())
@@ -94,7 +94,6 @@ namespace config
 			}
 
 			j.at("logfile").get_to(m_logfile);
-			print_worker_config();
 			return true;
 		}
 		catch (std::exception& e)
