@@ -94,6 +94,8 @@ namespace config
 			}
 
 			j.at("logfile").get_to(m_logfile);
+			print_global_config();
+			print_worker_config();
 			return true;
 		}
 		catch (std::exception& e)
@@ -187,6 +189,15 @@ namespace config
 			}
 			ss << worker.m_id << " mode: " << mode << std::endl;
 		}
+
+		m_logger->info(ss.str());
+	}
+
+	void Config::print_global_config() const
+	{
+		std::stringstream ss;
+		ss << "Mining " << (m_mining_mode == config::Mining_mode::HASH ? "HASH" : "PRIME") << " Channel in "
+			<< (m_use_pool ? "POOL" : "SOLO") << " mode";
 
 		m_logger->info(ss.str());
 	}

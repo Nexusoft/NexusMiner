@@ -71,17 +71,13 @@ namespace nexusminer
 
 	bool Miner::init(std::string const& miner_config_file)
 	{
+		// print header
+		std::cout << "NexusMiner Version " << NexusMiner_VERSION_MAJOR << "." << NexusMiner_VERSION_MINOR << "\n" << std::endl;
+
 		if (!m_config.read_config(miner_config_file))
 		{
 			return false;
 		}
-
-		// print header
-		std::cout << "NexusMiner Version " << NexusMiner_VERSION_MAJOR << "." << NexusMiner_VERSION_MINOR << std::endl;
-		std::cout << "Mining " << (m_config.get_mining_mode() == config::Mining_mode::HASH ? "HASH" : "PRIME") << " Channel in "
-			<< (m_config.get_use_bool() ? "POOL" : "SOLO") << " mode\n" << std::endl;
-
-		m_config.print_worker_config();
 
 		// timer initialisation
 		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);

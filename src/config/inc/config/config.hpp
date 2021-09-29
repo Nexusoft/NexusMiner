@@ -34,12 +34,13 @@ public:
 	std::vector<Worker_config>& get_worker_config() { return m_worker_config; }
 	std::vector<Stats_printer_config>& get_stats_printer_config() { return m_stats_printer_config; }
 	Pool const& get_pool_config() const { return m_pool_config; }
-	void print_worker_config() const;
 
 private:
 
 	bool read_stats_printer_config(nlohmann::json& j);
 	bool read_worker_config(nlohmann::json& j);
+	void print_global_config() const;
+	void print_worker_config() const;
 
 	std::shared_ptr<spdlog::logger> m_logger;
 	std::string  m_wallet_ip;
