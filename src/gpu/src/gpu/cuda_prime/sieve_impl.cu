@@ -194,19 +194,17 @@ namespace nexusminer {
                         return;
                     }
                     //search left for another prime less than max gap away
-                    gap = 0;
-                    int64_t j = i;
-                    j--;
-                    while (j >= 0 && gap <= maxGap)
+                    uint64_t j = i - 1;
+                    gap = sieve30_gaps[j % 8];
+                    while (j < i && gap <= maxGap)
                     {
-                        gap += sieve30_gaps[j % 8];
-                        if (gap <= maxGap && get_bit(j, sieve))
+                        if (get_bit(j, sieve))
                         {
                             //there is a valid element to the left.  this is not the first element in a chain. abort.
                             return;
                         }
-                        
                         j--;
+                        gap += sieve30_gaps[j % 8];
                     }
                    
                     //this is the start of a possible chain.  search right
@@ -215,21 +213,24 @@ namespace nexusminer {
                     chain_start = sieve_start_offset + i / 8 * 30 + sieve_offset;
                     CudaChain current_chain;
                     cuda_chain_open(current_chain, chain_start);
-                    gap = 0;
                     j = i;
+                    gap = sieve30_gaps[j % 8u];
                     j++;
                     while (j < sieve_total_bits && gap <= maxGap)
                     {
-                        gap += sieve30_gaps[j % 8u];
-                        if (gap <= maxGap && get_bit(j, sieve))
+                        if (get_bit(j, sieve))
                         {
                             //another possible candidate.  add it to the chain
                             gap = 0;
                             sieve_offset = sieve30_offsets[j % 8u];
                             prime_candidate_offset = sieve_start_offset + j / 8 * 30 + sieve_offset;
-                            cuda_chain_push_back(current_chain, static_cast<uint16_t>(prime_candidate_offset - chain_start));
+                            uint16_t offset = prime_candidate_offset - chain_start;
+                            //printf("%" PRIu64 " %u\n", chain_start, prime_candidate_offset);
+                            cuda_chain_push_back(current_chain, offset);
                         }
+                        gap += sieve30_gaps[j % 8u];
                         j++;
+                        
                     }
                     //we reached the end of the chain.  check if it meets the length requirement
                     if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
@@ -405,7 +406,7 @@ namespace nexusminer {
 
         void Cuda_sieve_impl::find_chains(CudaChain chains[], uint32_t& chain_count)
         {
-            const int sieve_threads = 256;
+            const int sieve_threads = 128;
             const int checks_per_block = 1;
             const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
             const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;

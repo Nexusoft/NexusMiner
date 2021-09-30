@@ -21,7 +21,7 @@ namespace nexusminer {
 				complete  //fermat testing is complete. 
 			};
 
-			static constexpr int m_max_chain_length = 22;  //the longest chain we can represent. 
+			static constexpr int m_max_chain_length = 40;  //22 the longest chain we can represent. 
 			int m_min_chain_length = 8;
 			int m_min_chain_report_length = 5;
 			Chain_state m_chain_state = Chain_state::open;

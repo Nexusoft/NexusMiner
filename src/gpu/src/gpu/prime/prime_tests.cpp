@@ -112,6 +112,8 @@ namespace gpu
 		uint64_t nonce200 = 127171;
 		double diff200 = 3.2608808;
 		boost::multiprecision::uint1024_t low_start = 30*7*11 - 30;
+		boost::multiprecision::uint1024_t med_start = 2;
+		med_start = boost::multiprecision::pow(med_start, 128);
 		m_logger->info("Starting sieve performance test.");
 		Sieve test_sieve;
 		test_sieve.set_sieve_start(T200);
@@ -180,11 +182,18 @@ namespace gpu
 		m_logger->info("Combined sieve ({:.1f} MISPS).", sieve_range / (sieve_elapsed_s + small_prime_sieve_elapsed_s) / 1e6);
 		m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
 			candidate_ratio * 100, candidate_ratio_expected * 100);
-		double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve();
-		int fermat_sample_size = std::min<uint64_t>(10000, prime_candidate_count);
+		double bits = static_cast<double>(boost::multiprecision::log2(static_cast<boost::multiprecision::mpf_float>(test_sieve.get_sieve_start())));
+		double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve(bits);
+		int fermat_sample_size = std::min<uint64_t>(100000, prime_candidate_count);
 		uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size, m_device);
 		m_logger->info("Got {:.3f}% fermat positive rate. Expected about {:.3f}%",
 			100.0 * fermat_count / fermat_sample_size, fermat_positive_rate_expected * 100.0);
+		//how many chains we expect to find is equal to the density at the bit width we stop sieving,
+		//which is equivalent to the square of the max sieving prime or twice the max sieving prime bit width
+		//this is not precise for low bit widths.   9 chains contain 2 or more 8 chains etc.
+		//int effective_bit_width = std::log2(test_sieve.m_sieving_prime_limit) * 2;
+		//double expected_chain_density = test_sieve.expected_chain_density(test_sieve.m_min_chain_length, effective_bit_width);
+		//double expected_chain_count = expected_chain_density * sieve_range;
 		m_logger->info("Found {} chains in {:.4f} seconds ({:.2f} chains/MIS @ {:.1f} MISPS).",
 			test_sieve.get_current_chain_list_length(),
 			find_chains_elapsed_s, 1.0e6 * test_sieve.get_current_chain_list_length() / sieve_range,
@@ -192,7 +201,16 @@ namespace gpu
 		double eight_chain_probability = std::pow(fermat_positive_rate_expected, 8);
 		double chains_per_eight_chain = 1.0 / eight_chain_probability;
 		double range_per_eight_chain = sieve_range * chains_per_eight_chain / test_sieve.get_current_chain_list_length();
-		m_logger->info("Approximate range to find one 8-chain: {:.1E} ", range_per_eight_chain);
+		double expected_chain_density = test_sieve.expected_chain_density(test_sieve.m_min_chain_length, bits);
+		//range_per_eight_chain = 1 / expected_chain_density;
+		//m_logger->info("Approximate range to find one 8-chain: {:.1E} ", range_per_eight_chain);
+		//process chains
+		while (test_sieve.get_current_chain_list_length() > 0)
+		{
+			test_sieve.primality_batch_test(0);
+			test_sieve.clean_chains();
+		}
+		//m_logger->info("Found {} 8 chains.  Expected {}", test_sieve.m_chain_histogram[8], sieve_range/range_per_eight_chain);
 			
 		test_sieve.gpu_fermat_free();
 	}

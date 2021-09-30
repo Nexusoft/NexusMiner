@@ -565,9 +565,8 @@ namespace nexusminer {
 
         //calculates the probability than a random unsigned number that passed through the sieve is actually prime
         //compare with primality test stats to verify the sieve is working. 
-        double Sieve::probability_is_prime_after_sieve()
+        double Sieve::probability_is_prime_after_sieve(double bits)
         {
-            int bits = 1024;
             double p_not_divisible_by_nth_prime = sieve_pass_through_rate_expected();
            
             //the probability that a large random unsieved number is prime
@@ -595,6 +594,16 @@ namespace nexusminer {
                 p_not_divisible_by_nth_prime *= (prime - 1.0) / prime;
 
             return p_not_divisible_by_nth_prime;
+        }
+
+        //calculate the probability of finding a chain of length n at bitwidth bits
+        double Sieve::expected_chain_density(int n, int bits)
+        {
+            double density = 0;
+            if (n >= 1 && n <= 11)
+                density = hardy_littlewood_constants[n] / std::pow((log(2.0) * bits), n);
+            
+            return density;
         }
 
         //count prime candidates in the sieve

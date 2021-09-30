@@ -56,8 +56,9 @@ namespace nexusminer {
 			uint64_t get_current_chain_list_length();
 			uint64_t get_cuda_chain_list_length();
 			int get_fermat_test_batch_size() { return m_fermat_test_batch_size; }
-			double probability_is_prime_after_sieve();
+			double probability_is_prime_after_sieve(double bits = 1024);
 			double sieve_pass_through_rate_expected();
+			double expected_chain_density(int n, int bits);
 			uint64_t count_prime_candidates();
 			std::vector<sieve_word_t> get_sieve(); //return a copy of the raw sieve
 			std::vector<uint64_t> get_prime_candidate_offsets();
@@ -81,13 +82,14 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			const uint32_t m_sieving_prime_limit = 4e6;
+			const uint32_t m_sieving_prime_limit = 1<<22;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 20000;
 			const int m_fermat_test_batch_size_max = 1000000;
 			const int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
 			const uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 			const uint64_t m_sieve_range = Cuda_sieve::m_sieve_range;
+			static constexpr int m_min_chain_length = 8;
 
 			
 
@@ -98,6 +100,7 @@ namespace nexusminer {
 			uint64_t m_chain_count = 0;
 			int m_chain_candidate_max_length = 0;
 			uint64_t m_chain_candidate_total_length = 0;
+			
 
 		private:
 			class Fermat_test_candidate {
@@ -114,7 +117,7 @@ namespace nexusminer {
 			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
 			//we start sieving at 7 with the small primes.  medium primes start here.
 			const int sieving_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
-			static constexpr int m_min_chain_length = 8;
+			
 
 
 			/// Bitmasks used to unset bits 

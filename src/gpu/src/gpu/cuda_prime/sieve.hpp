@@ -25,8 +25,8 @@ namespace nexusminer {
 			static const int m_sieve_byte_range = 30;
 			static const int m_sieve_word_range = m_sieve_byte_range * m_sieve_word_byte_count;
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
-			static const int m_estimated_chains_per_million = 12;
-			static const uint32_t m_max_chains = 5*m_estimated_chains_per_million*m_sieve_range/1e6;
+			static const int m_estimated_chains_per_million = 30;
+			static const uint32_t m_max_chains = 10*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const int m_min_chain_length = 8;
 
 			static const int m_small_prime_count = 23;
