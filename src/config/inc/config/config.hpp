@@ -27,6 +27,7 @@ public:
 	std::string const& get_local_ip() const { return m_local_ip; }
 	Mining_mode get_mining_mode() const { return m_mining_mode; }
 	bool get_use_bool() const { return m_use_pool; }
+	std::uint8_t get_log_level() const { return m_log_level; }
 	std::string const& get_logfile() const { return m_logfile; }
 	std::uint16_t get_connection_retry_interval() const { return m_connection_retry_interval; }
 	std::uint16_t get_print_statistics_interval() const { return m_print_statistics_interval; }
@@ -49,6 +50,7 @@ private:
 	Mining_mode	 m_mining_mode;
 	bool		 m_use_pool;
 	Pool 		 m_pool_config; 
+	std::uint8_t m_log_level;
 	std::string  m_logfile;
 
 	// stats printers

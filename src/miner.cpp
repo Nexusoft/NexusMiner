@@ -79,6 +79,8 @@ namespace nexusminer
 			return false;
 		}
 
+		m_logger->set_level(static_cast<spdlog::level::level_enum>(m_config.get_log_level()));
+
 		// timer initialisation
 		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);
 

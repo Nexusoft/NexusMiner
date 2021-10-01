@@ -19,6 +19,7 @@ namespace config
 		, m_mining_mode{ Mining_mode::HASH}
 		, m_use_pool{false}
 		, m_pool_config{}
+		, m_log_level{2}	// info level
 		, m_logfile{""}		// no logfile usage, default
 		, m_connection_retry_interval{5}
 		, m_print_statistics_interval{5}
@@ -91,6 +92,11 @@ namespace config
 			if (j.count("get_height_interval") != 0)
 			{
 				j.at("get_height_interval").get_to(m_get_height_interval);
+			}
+
+			if (j.count("log_level") != 0)
+			{
+				j.at("log_level").get_to(m_log_level);
 			}
 
 			j.at("logfile").get_to(m_logfile);

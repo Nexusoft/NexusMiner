@@ -124,6 +124,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
 network::Shared_payload Pool::extract_nbits_from_block(network::Shared_payload data, std::uint32_t& nbits)
 {
     nbits = bytes2uint(std::vector<unsigned char>(data->begin(), data->begin() + 4));
+    m_logger->debug("Pool nbits: {}", nbits);
     return std::make_shared<network::Payload>(data->begin() + 4, data->end());
 }
 
