@@ -33,6 +33,7 @@ namespace nexusminer {
 			uint64_t gpu_get_prime_candidate_count();
 			void gpu_get_sieve();
 			void gpu_sieve_small_primes(uint64_t sieve_start_offset);
+			void gpu_sieve_large_primes(uint64_t sieve_start_offset);
 			void sieve_segment();
 			void sieve_small_primes();
 			void sieve_batch(uint64_t low);
@@ -82,7 +83,7 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			const uint32_t m_sieving_prime_limit = 1<<22;
+			const uint32_t m_sieving_prime_limit = 6e6;//1<<22;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 20000;
 			const int m_fermat_test_batch_size_max = 1000000;

@@ -138,9 +138,14 @@ namespace gpu
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double sieve_elapsed_s = elapsed.count() / 1000.0;
+		start = std::chrono::steady_clock::now();
+		test_sieve.gpu_sieve_large_primes(0);
+		end = std::chrono::steady_clock::now();
+		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		double large_prime_sieve_elapsed_s = elapsed.count() / 1000.0;
 		uint64_t prime_candidate_count = test_sieve.gpu_get_prime_candidate_count();
 		test_sieve.gpu_get_sieve();
-		uint64_t candidate_count = test_sieve.count_prime_candidates();
+		//uint64_t candidate_count = test_sieve.count_prime_candidates();
 		start = std::chrono::steady_clock::now();
 		test_sieve.find_chains();
 		end = std::chrono::steady_clock::now();

@@ -128,6 +128,16 @@ namespace nexusminer {
 
             }
         }
+
+        __global__ void sieveLargePrimes(Cuda_sieve::sieve_word_t* sieve, uint64_t start, uint32_t* small_prime_offsets)
+        {
+
+            uint64_t num_blocks = gridDim.x;
+            uint64_t num_threads = blockDim.x;
+            uint64_t block_id = blockIdx.x;
+            uint64_t index = block_id * num_threads + threadIdx.x;
+            uint64_t stride = num_blocks * num_threads;
+        }
         
         //get the nth bit from the sieve.
         __device__ __forceinline__ bool get_bit(uint64_t bit_position, Cuda_sieve::sieve_word_t* sieve)
@@ -166,81 +176,80 @@ namespace nexusminer {
             //search each sieve location for a possible chain
             for (uint64_t i = index; i < sieve_total_bits; i += stride)
             {
-                if (i < sieve_total_bits)
+              
+                //gross checks to ensure its possible to form a chain
+                uint64_t word = i / sieve_bits_per_word;
+                if (sieve[word] == 0)
+                    return;
+                //check if the next 4 bytes (4*30 = range of 120 integers) has enough prime candidates to form a chain 
+                //this is only valid up to min chain length 9.  above 9 requires 5 bytes.
+                if (word < Cuda_sieve::m_sieve_total_size - 1)
                 {
-                    //gross checks to ensure its possible to form a chain
-                    uint64_t word = i / sieve_bits_per_word;
-                    if (sieve[word] == 0)
-                        return;
-                    //check if the next 4 bytes (4*30 = range of 120 integers) has enough prime candidates to form a chain 
-                    //caution this is only valid for min chain length 8.  
-                    if (word < Cuda_sieve::m_sieve_total_size - 1)
-                    {
-                        unsigned int next_4_bytes = 0;
-                        unsigned int byte_index = (i/8) % 4;
-                        next_4_bytes = (sieve[word] >> (byte_index * 8)) & 0xFF;
-                        next_4_bytes |= (((sieve[word + (byte_index >= 3 ? 1 : 0)] >> ((byte_index + 1) % 4) * 8) & 0xFF) << 8);
-                        next_4_bytes |= (((sieve[word + (byte_index >= 2 ? 1 : 0)] >> ((byte_index + 2) % 4) * 8) & 0xFF) << 16);
-                        next_4_bytes |= (((sieve[word + (byte_index >= 1 ? 1 : 0)] >> ((byte_index + 3) % 4) * 8) & 0xFF) << 24);
+                    unsigned int next_4_bytes = 0;
+                    unsigned int byte_index = (i/8) % 4;
+                    next_4_bytes = (sieve[word] >> (byte_index * 8)) & 0xFF;
+                    next_4_bytes |= (((sieve[word + (byte_index >= 3 ? 1 : 0)] >> ((byte_index + 1) % 4) * 8) & 0xFF) << 8);
+                    next_4_bytes |= (((sieve[word + (byte_index >= 2 ? 1 : 0)] >> ((byte_index + 2) % 4) * 8) & 0xFF) << 16);
+                    next_4_bytes |= (((sieve[word + (byte_index >= 1 ? 1 : 0)] >> ((byte_index + 3) % 4) * 8) & 0xFF) << 24);
 
-                        int popc = __popc(next_4_bytes);
-                        if (popc < Cuda_sieve::m_min_chain_length)
-                            return;
-                    }
-
-                    //chain must start with a prime
-                    if (!get_bit(i, sieve))
-                    {
+                    int popc = __popc(next_4_bytes);
+                    if (popc < Cuda_sieve::m_min_chain_length)
                         return;
-                    }
-                    //search left for another prime less than max gap away
-                    uint64_t j = i - 1;
-                    gap = sieve30_gaps[j % 8];
-                    while (j < i && gap <= maxGap)
-                    {
-                        if (get_bit(j, sieve))
-                        {
-                            //there is a valid element to the left.  this is not the first element in a chain. abort.
-                            return;
-                        }
-                        j--;
-                        gap += sieve30_gaps[j % 8];
-                    }
-                   
-                    //this is the start of a possible chain.  search right
-                    //where are we in the wheel
-                    sieve_offset = sieve30_offsets[i % 8u];
-                    chain_start = sieve_start_offset + i / 8 * 30 + sieve_offset;
-                    CudaChain current_chain;
-                    cuda_chain_open(current_chain, chain_start);
-                    j = i;
-                    gap = sieve30_gaps[j % 8u];
-                    j++;
-                    while (j < sieve_total_bits && gap <= maxGap)
-                    {
-                        if (get_bit(j, sieve))
-                        {
-                            //another possible candidate.  add it to the chain
-                            gap = 0;
-                            sieve_offset = sieve30_offsets[j % 8u];
-                            prime_candidate_offset = sieve_start_offset + j / 8 * 30 + sieve_offset;
-                            uint16_t offset = prime_candidate_offset - chain_start;
-                            //printf("%" PRIu64 " %u\n", chain_start, prime_candidate_offset);
-                            cuda_chain_push_back(current_chain, offset);
-                        }
-                        gap += sieve30_gaps[j % 8u];
-                        j++;
-                        
-                    }
-                    //we reached the end of the chain.  check if it meets the length requirement
-                    if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
-                    {
-                        //increment the chain list index
-                        uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
-                        //copy the current chain to the global list
-                        chains[chain_idx] = current_chain;
-                    }
                 }
+
+                //chain must start with a prime
+                if (!get_bit(i, sieve))
+                {
+                    return;
+                }
+                //search left for another prime less than max gap away
+                uint64_t j = i - 1;
+                gap = sieve30_gaps[j % 8];
+                while (j < i && gap <= maxGap)
+                {
+                    if (get_bit(j, sieve))
+                    {
+                        //there is a valid element to the left.  this is not the first element in a chain. abort.
+                        return;
+                    }
+                    j--;
+                    gap += sieve30_gaps[j % 8];
+                }
+                   
+                //this is the start of a possible chain.  search right
+                //where are we in the wheel
+                sieve_offset = sieve30_offsets[i % 8u];
+                chain_start = sieve_start_offset + i / 8 * 30 + sieve_offset;
+                CudaChain current_chain;
+                cuda_chain_open(current_chain, chain_start);
+                j = i;
+                gap = sieve30_gaps[j % 8u];
+                j++;
+                while (j < sieve_total_bits && gap <= maxGap)
+                {
+                    if (get_bit(j, sieve))
+                    {
+                        //another possible candidate.  add it to the chain
+                        gap = 0;
+                        sieve_offset = sieve30_offsets[j % 8u];
+                        prime_candidate_offset = sieve_start_offset + j / 8 * 30 + sieve_offset;
+                        uint16_t offset = prime_candidate_offset - chain_start;
+                        //printf("%" PRIu64 " %u\n", chain_start, prime_candidate_offset);
+                        cuda_chain_push_back(current_chain, offset);
+                    }
+                    gap += sieve30_gaps[j % 8u];
+                    j++;
+                        
+                }
+                //we reached the end of the chain.  check if it meets the length requirement
+                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
+                {
+                    //increment the chain list index
+                    uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
+                    //copy the current chain to the global list
+                    chains[chain_idx] = current_chain;
+                }
+               
             }
             
 
@@ -250,7 +259,7 @@ namespace nexusminer {
         //return the offset from x to the next integer multiple of n greater than x that is not divisible by 2, 3, or 5.  
         //x must be a multiple of the primorial 30 and n must be a prime greater than 5.
         template <typename T1, typename T2>
-        __device__ T2 get_offset_to_next_multiple(T1 x, T2 n)
+        __device__ __forceinline__ T2 get_offset_to_next_multiple(T1 x, T2 n)
         {
             T2 m = n - static_cast<T2>(x % n);
             if (m % 2 == 0)
@@ -286,7 +295,7 @@ namespace nexusminer {
             //each block sieves a different region
             uint64_t start_offset = sieve_start_offset + block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block * Cuda_sieve::m_sieve_word_range;
             
-            unsigned int wheel_index;
+            uint64_t wheel_index;
             unsigned int next_wheel_gap;
             uint64_t j;
             uint64_t k;
@@ -313,15 +322,15 @@ namespace nexusminer {
                             j = get_offset_to_next_multiple(start_offset - j, sieving_primes[i]);
                         else
                             j -= start_offset;
-                            
-                        //where are we in the wheel
-                        wheel_index = sieve30_index[(prime_mod_inverses[i] * j) % 30];
+                        
                     }
                     else
                     {
                         j = multiples[block_id* sieving_prime_count +i];
-                        wheel_index = wheel_indices[block_id * sieving_prime_count + i];
+                        //calculating the wheel index each time is faster than saving and retrieving it from global memory each loop
+                        //wheel_index = wheel_indices[block_id * sieving_prime_count + i];
                     }
+                    wheel_index = sieve30_index[(prime_mod_inverses[i] * j) % 30];
                     next_wheel_gap = sieve30_gaps[wheel_index];
                         
                     while (j < segment_size)
@@ -337,15 +346,14 @@ namespace nexusminer {
                         //printf("%" PRIu64 " %u\n", j, bitmask);
                             
                         atomicAnd(&sieve[sieve_index], bitmask);
-                        //sieve[sieve_index] &= ~static_cast<unsigned int>(~unset_bit_mask[j % 30]) << (j % 4);
+                        
                         //increment the next multiple of the current prime (rotate the wheel).
                         j += k * next_wheel_gap;
-                        wheel_index = (wheel_index + 1u) % 8u;
-                        next_wheel_gap = sieve30_gaps[wheel_index];
+                        wheel_index++;
+                        next_wheel_gap = sieve30_gaps[wheel_index % 8];
                     }
-                    //save the starting multiple and wheel index for the next segment
+                    //save the starting multiple for this prime for the next segment
                     multiples[block_id * sieving_prime_count + i] = j - segment_size;
-                    wheel_indices[block_id * sieving_prime_count + i] = wheel_index;
                     
                 }
                 __syncthreads();
@@ -370,6 +378,16 @@ namespace nexusminer {
             //update the global candidate count
              atomicAdd(prime_candidate_count, count);
             
+        }
+
+        void Cuda_sieve_impl::run_large_prime_sieve(uint64_t sieve_start_offset)
+        {
+            const int threads = 256;
+            const int blocks = (Cuda_sieve::m_sieve_total_size + threads - 1) / threads;
+
+            sieveLargePrimes << <blocks, threads >> > (d_sieve, sieve_start_offset, d_small_prime_offsets);
+
+            checkCudaErrors(cudaDeviceSynchronize());
         }
 
         void Cuda_sieve_impl::run_small_prime_sieve(uint64_t sieve_start_offset)

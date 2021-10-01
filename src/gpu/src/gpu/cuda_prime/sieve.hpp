@@ -42,6 +42,7 @@ namespace nexusminer {
 				uint8_t prime_mod_inverses[], uint32_t small_prime_offsets[], uint32_t sieve_size, uint16_t device);
 			void free_sieve();
 			void run_small_prime_sieve(uint64_t sieve_start_offset);
+			void run_large_prime_sieve(uint64_t sieve_start_offset);
 			void run_sieve(uint64_t sieve_start_offset);
 			void find_chains(CudaChain chains[], uint32_t& chain_count);
 			void get_sieve(sieve_word_t sieve[]);

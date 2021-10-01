@@ -49,6 +49,11 @@ namespace nexusminer {
             m_impl->get_prime_candidate_count(prime_candidate_count);
         }
 
+        void Cuda_sieve::run_large_prime_sieve(uint64_t sieve_start_offset)
+        {
+            m_impl->run_large_prime_sieve(sieve_start_offset);
+        }
+
        
 
     }

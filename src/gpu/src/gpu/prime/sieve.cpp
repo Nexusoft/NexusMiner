@@ -145,6 +145,11 @@ namespace nexusminer {
             m_cuda_sieve.run_small_prime_sieve(sieve_start_offset);
         }
 
+        void Sieve::gpu_sieve_large_primes(uint64_t sieve_start_offset)
+        {
+            m_cuda_sieve.run_large_prime_sieve(sieve_start_offset);
+        }
+
 
         //run the sieve on one segment
         void Sieve::sieve_segment()

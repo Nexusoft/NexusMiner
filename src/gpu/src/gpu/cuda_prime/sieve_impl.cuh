@@ -18,6 +18,7 @@ namespace nexusminer {
 			void free_sieve();
 
 			void run_small_prime_sieve(uint64_t sieve_start_offset);
+			void run_large_prime_sieve(uint64_t sieve_start_offset);
 			void run_sieve(uint64_t sieve_start_offset);
 			void get_sieve(Cuda_sieve::sieve_word_t sieve[]);
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);
