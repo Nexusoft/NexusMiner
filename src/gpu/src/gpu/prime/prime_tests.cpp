@@ -182,9 +182,17 @@ namespace gpu
 		double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
 		m_logger->info("Small prime sieved {:.1E} integers using primes up to {} in {:.3f} seconds ({:.1f} MISPS).",
 			(double)sieve_range, Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count-1], small_prime_sieve_elapsed_s, sieve_range / small_prime_sieve_elapsed_s / 1e6);
-		m_logger->info("Sieved {:.1E} integers using primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
-			(double)sieve_range, (double)test_sieve.m_sieving_prime_limit, sieve_elapsed_s, sieve_range / sieve_elapsed_s / 1e6);
-		m_logger->info("Combined sieve ({:.1f} MISPS).", sieve_range / (sieve_elapsed_s + small_prime_sieve_elapsed_s) / 1e6);
+		auto sieving_primes = test_sieve.get_sieving_primes();
+		uint32_t medium_prime_index = std::min(static_cast<size_t>(Cuda_sieve::m_large_prime_cutoff_index), sieving_primes.size());
+		double medium_prime_limit = sieving_primes[medium_prime_index-1];
+		
+		m_logger->info("Medium prime sieved {:.1E} integers using {} primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
+			(double)sieve_range, medium_prime_index, medium_prime_limit, sieve_elapsed_s, sieve_range / sieve_elapsed_s / 1e6);
+
+		m_logger->info("Large prime sieved {:.1E} integers using {} primes up to {:.1E} in {:.3f} seconds ({:.1f} MISPS).",
+			(double)sieve_range, sieving_primes.size() - medium_prime_index, (double)test_sieve.m_sieving_prime_limit, large_prime_sieve_elapsed_s, sieve_range / large_prime_sieve_elapsed_s / 1e6);
+		
+		m_logger->info("Combined sieve ({:.1f} MISPS).", sieve_range / (sieve_elapsed_s + small_prime_sieve_elapsed_s + large_prime_sieve_elapsed_s) / 1e6);
 		m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
 			candidate_ratio * 100, candidate_ratio_expected * 100);
 		double bits = static_cast<double>(boost::multiprecision::log2(static_cast<boost::multiprecision::mpf_float>(test_sieve.get_sieve_start())));

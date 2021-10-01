@@ -642,6 +642,11 @@ namespace nexusminer {
             return offsets;
         }
 
+        std::vector<uint32_t> Sieve::get_sieving_primes()
+        {
+            return m_sieving_primes;
+        }
+
         std::vector<Sieve::sieve_word_t> Sieve::get_sieve()
         {
             return m_sieve;

@@ -33,7 +33,7 @@ namespace nexusminer {
 			uint32_t* d_small_prime_offsets;
 			Cuda_sieve::sieve_word_t* d_sieve;
 			uint32_t* d_multiples;
-			uint8_t* d_wheel_indices;
+			//uint8_t* d_wheel_indices;
 			//array of chains
 			CudaChain* d_chains;
 			uint32_t* d_chain_index;
