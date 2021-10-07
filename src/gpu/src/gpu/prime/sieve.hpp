@@ -64,9 +64,11 @@ namespace nexusminer {
 			std::vector<sieve_word_t> get_sieve(); //return a copy of the raw sieve
 			std::vector<uint64_t> get_prime_candidate_offsets();
 			std::vector<uint32_t> get_sieving_primes();
+			bool chain_trial_division(Chain& chain);
+			void Sieve::do_chain_trial_division_check();
 
 		private:
-			//static constexpr uint8_t sieve30 = 0xFF;  //compressed sieve for primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
+			//mod 30 wheel using primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
 			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
 			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
@@ -86,12 +88,13 @@ namespace nexusminer {
 			uint64_t m_sieve_batch_start_offset;
 			const uint32_t m_sieving_prime_limit = 4e6;//1<<22;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
-			const int m_fermat_test_batch_size = 20000;
+			const int m_fermat_test_batch_size = 200000;
 			const int m_fermat_test_batch_size_max = 1000000;
 			const int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
 			const uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
 			const uint64_t m_sieve_range = Cuda_sieve::m_sieve_range;
 			static constexpr int m_min_chain_length = 8;
+			const uint32_t large_prime_count = 0;
 
 			
 
@@ -102,6 +105,7 @@ namespace nexusminer {
 			uint64_t m_chain_count = 0;
 			int m_chain_candidate_max_length = 0;
 			uint64_t m_chain_candidate_total_length = 0;
+			uint64_t m_trial_division_chains_busted = 0;
 			
 
 		private:
@@ -160,11 +164,14 @@ namespace nexusminer {
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve;
 			std::vector<uint32_t> m_sieving_primes;
+			std::vector<uint32_t> m_large_sieving_primes;
 			std::vector<uint32_t> m_multiples;
+			std::vector<uint32_t> m_large_multiples;
 			std::vector<uint8_t> m_prime_mod_inverses;
 			std::vector<Chain> m_chain;
 			std::vector<CudaChain>m_cuda_chains;
 			std::vector<uint32_t>m_small_prime_offsets;
+			std::vector<double>m_large_prime_mod_constants;
 
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;

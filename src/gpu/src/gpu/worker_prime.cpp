@@ -146,6 +146,7 @@ void Worker_prime::run()
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
+		m_segmented_sieve->do_chain_trial_division_check();
 		if (m_segmented_sieve->get_current_chain_list_length() >= m_segmented_sieve->get_fermat_test_batch_size())
 		{
 			//m_logger->debug("Batch primality testing {} candidates.", m_segmented_sieve->get_current_chain_list_length());

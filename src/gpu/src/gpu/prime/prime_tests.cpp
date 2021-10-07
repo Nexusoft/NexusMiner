@@ -151,10 +151,15 @@ namespace gpu
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double find_chains_elapsed_s = elapsed.count() / 1000.0;
+		uint64_t chain_count_before = test_sieve.get_current_chain_list_length();
 		//test_sieve.clear_chains();
 		//test_sieve.find_chains_cpu(0, true);
 		//test_sieve.reset_batch_run_count();
 		//test_sieve.sieve_batch(0);
+		test_sieve.do_chain_trial_division_check();
+		uint64_t chain_count_after = test_sieve.get_current_chain_list_length();
+		uint32_t busted_chain_count = chain_count_before - chain_count_after;
+
 		test_sieve.gpu_sieve_free();
 
 		test_sieve.gpu_fermat_test_init(m_device);
@@ -211,6 +216,8 @@ namespace gpu
 			test_sieve.get_current_chain_list_length(),
 			find_chains_elapsed_s, 1.0e6 * test_sieve.get_current_chain_list_length() / sieve_range,
 			sieve_range / find_chains_elapsed_s / 1e6);
+		m_logger->info("Busted {} chains ({:.3f}%) with trial division", busted_chain_count, (double)busted_chain_count / chain_count_before);
+
 		double eight_chain_probability = std::pow(fermat_positive_rate_expected, 8);
 		double chains_per_eight_chain = 1.0 / eight_chain_probability;
 		double range_per_eight_chain = sieve_range * chains_per_eight_chain / test_sieve.get_current_chain_list_length();
