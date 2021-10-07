@@ -65,7 +65,7 @@ namespace nexusminer {
 			std::vector<uint64_t> get_prime_candidate_offsets();
 			std::vector<uint32_t> get_sieving_primes();
 			bool chain_trial_division(Chain& chain);
-			void Sieve::do_chain_trial_division_check();
+			void do_chain_trial_division_check();
 
 		private:
 			//mod 30 wheel using primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
