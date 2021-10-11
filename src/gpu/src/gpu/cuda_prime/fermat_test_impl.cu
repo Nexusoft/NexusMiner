@@ -343,6 +343,7 @@ namespace nexusminer {
 
         void Cuda_fermat_test_impl::fermat_free()
         {
+            CUDA_CHECK(cudaSetDevice(m_device));
             //CUDA_CHECK(cudaFree(d_instances));
             CUDA_CHECK(cudaFree(d_base_int));
             CUDA_CHECK(cudaFree(d_offsets));
@@ -356,6 +357,7 @@ namespace nexusminer {
 
         void Cuda_fermat_test_impl::set_base_int(mpz_t base_big_int)
         {
+            CUDA_CHECK(cudaSetDevice(m_device));
             cgbn_mem_t<fermat_params_t::BITS> cgbn_base_int;
             from_mpz(base_big_int, cgbn_base_int._limbs, fermat_params_t::BITS / 32);
             CUDA_CHECK(cudaMemcpy(d_base_int, &cgbn_base_int, sizeof(cgbn_base_int), cudaMemcpyHostToDevice));
