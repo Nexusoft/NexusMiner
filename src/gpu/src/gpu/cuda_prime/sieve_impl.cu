@@ -662,6 +662,7 @@ namespace nexusminer {
         {
           
             m_sieving_prime_count = prime_count;
+            m_device = device;
             checkCudaErrors(cudaSetDevice(device));
             //allocate memory on the gpu
             checkCudaErrors(cudaMalloc(&d_sieving_primes, prime_count * sizeof(*d_sieving_primes)));
@@ -694,6 +695,7 @@ namespace nexusminer {
         //reset sieve with new starting offsets
         void Cuda_sieve_impl::init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[])
         {
+            checkCudaErrors(cudaSetDevice(m_device));
             checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples, m_sieving_prime_count * sizeof(*d_starting_multiples), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_small_prime_offsets, small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
@@ -710,6 +712,7 @@ namespace nexusminer {
 
         void Cuda_sieve_impl::free_sieve()
         {
+            checkCudaErrors(cudaSetDevice(m_device));
             checkCudaErrors(cudaFree(d_sieving_primes));
             checkCudaErrors(cudaFree(d_starting_multiples));
             checkCudaErrors(cudaFree(d_multiples));

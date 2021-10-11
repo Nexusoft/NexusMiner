@@ -34,6 +34,7 @@ namespace nexusminer {
 			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
 
 		private:
+			int m_device = 0;
 			//device memory pointers
 			uint32_t* d_sieving_primes;
 			uint32_t* d_starting_multiples;
