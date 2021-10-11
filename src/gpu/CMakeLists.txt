@@ -32,7 +32,7 @@ target_include_directories(gpu
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
 
-target_link_libraries(gpu LLC worker LLP stats config)
+target_link_libraries(gpu LLC worker LLP stats config TAO)
 
 if(WITH_PRIME)
     target_link_libraries(gpu libprimesieve-static)

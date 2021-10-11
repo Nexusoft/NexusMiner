@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <gmp.h>
 #include "fermat.cuh"
+#include "cuda_chain.cuh"
 
 namespace nexusminer {
 	namespace gpu {
@@ -13,6 +14,7 @@ namespace nexusminer {
 		public:
            
 			void fermat_run();
+            void fermat_chain_run();
             void fermat_init(uint64_t batch_size, int device);
             void fermat_free();
             void set_base_int(mpz_t base_big_int);
@@ -20,6 +22,8 @@ namespace nexusminer {
             void get_results(uint8_t results[]);
             void get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes);
             void reset_stats();
+            void set_chain_ptr(CudaChain* chains, uint32_t* chain_count);
+
 
         private:
             cgbn_mem_t<64>* d_offsets;
@@ -33,6 +37,9 @@ namespace nexusminer {
             int m_device = 0;
             mpz_t m_base_int;
             uint64_t m_offset_count;
+            CudaChain* d_chains;
+            uint32_t* d_chain_count;
+            
 
 		};
 	}

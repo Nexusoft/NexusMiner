@@ -8,6 +8,7 @@
 #include "LLC/hash/SK.h"
 #include "LLC/types/uint1024.h"
 #include "LLC/types/bignum.h"
+#include "TAO/Ledger/difficulty.h"
 
 namespace nexusminer
 {
@@ -80,6 +81,10 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 
     /* Get the target difficulty. */
     auto const nbits_cuda = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
+
+    double mainnet_difficulty = TAO::Ledger::GetDifficulty(m_block.nBits, m_block.nChannel);
+    double pool_difficulty = TAO::Ledger::GetDifficulty(m_pool_nbits, m_block.nChannel);
+    m_logger->debug("Leading zeros required mainnet:{}  pool:{}", log2(mainnet_difficulty)+34, log2(pool_difficulty)+34);
 
     /* Get the target difficulty. */
     LLC::CBigNum target;

@@ -136,8 +136,16 @@ namespace nexusminer {
 
         void Sieve::gpu_fermat_test_init(uint16_t device)
         {
+            
             m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
             gpu_fermat_test_set_base_int(m_sieve_start);
+            //pass a device pointer to the list of chains to the fermat test
+            //do this after initializing the gpu sieve so the pointer is valid
+            CudaChain* chains;
+            uint32_t* chain_count;
+            m_cuda_sieve.get_chain_pointer(chains, chain_count);
+            m_cuda_prime_test.set_chain_ptr(chains, chain_count);
+
         }
 
         void Sieve::gpu_sieve_free()
@@ -349,7 +357,7 @@ namespace nexusminer {
 
         void Sieve::reset_stats()
         {
-            m_chain_histogram = std::vector<std::uint32_t>(10, 0);
+            m_chain_histogram = std::vector<std::uint32_t>(Cuda_sieve::chain_histogram_max, 0);
             m_fermat_test_count = 0;
             m_fermat_prime_count = 0;
             m_chain_count = 0;
@@ -361,21 +369,88 @@ namespace nexusminer {
         //find chains on the gpu
         void Sieve::find_chains()
         {
+            m_cuda_sieve.find_chains();
+        }
+
+        void Sieve::get_chains()
+        {
             uint32_t chain_count = 0;
             m_cuda_chains = {};
             m_cuda_chains.resize(m_cuda_sieve.m_max_chains);
-            m_cuda_sieve.find_chains(m_cuda_chains.data(), chain_count);
+            m_cuda_sieve.get_chains(m_cuda_chains.data(), chain_count);
             //convert gpu chains to cpu chains
-            for (auto i=0; i< chain_count;i++)
+            for (auto i = 0; i < chain_count; i++)
             {
                 Chain chain(m_cuda_chains[i].m_base_offset);
-                for (auto j = 1; j < m_cuda_chains[i].m_offset_count; j++)
-                    chain.push_back(m_cuda_chains[i].m_offsets[j]);
+                for (auto j = 0; j < m_cuda_chains[i].m_offset_count; j++)
+                {
+                    if (j>0)
+                        chain.push_back(m_cuda_chains[i].m_offsets[j]);
+                    chain.m_offsets[j].m_fermat_test_status = m_cuda_chains[i].m_fermat_test_status[j];
+                }
+                chain.m_untested_count = m_cuda_chains[i].m_untested_count;
+                chain.m_prime_count = m_cuda_chains[i].m_prime_count;
                 m_chain_candidate_max_length = std::max(chain.length(), m_chain_candidate_max_length);
                 m_chain_candidate_total_length += chain.length();
                 m_chain.push_back(chain);
             }
             m_chain_count += chain_count;
+        
+        }
+
+        void Sieve::get_long_chains()
+        {
+            uint32_t chain_count = 0;
+            m_cuda_chains = {};
+            m_cuda_chains.resize(m_cuda_sieve.m_max_chains);
+            m_cuda_sieve.get_long_chains(m_cuda_chains.data(), chain_count);
+            //convert gpu chains to cpu chains
+            for (auto i = 0; i < chain_count; i++)
+            {
+                Chain chain(m_cuda_chains[i].m_base_offset);
+                for (auto j = 0; j < m_cuda_chains[i].m_offset_count; j++)
+                {
+                    if (j > 0)
+                        chain.push_back(m_cuda_chains[i].m_offsets[j]);
+                    chain.m_offsets[j].m_fermat_test_status = m_cuda_chains[i].m_fermat_test_status[j];
+                    
+                }
+                chain.m_untested_count = m_cuda_chains[i].m_untested_count;
+                chain.m_prime_count = m_cuda_chains[i].m_prime_count;
+                uint64_t base_offset;
+                int offset, length;
+                chain.get_best_fermat_chain(base_offset, offset, length);
+                m_logger->info("Found a fermat chain of length {}.", length);
+                //std::cout << chain.str() << std::endl;
+                m_long_chain_starts.push_back(base_offset + offset);
+            }
+        }
+
+        void Sieve::gpu_clean_chains()
+        {
+            m_cuda_sieve.clean_chains();
+        }
+
+        void Sieve::gpu_run_fermat_chain_test()
+        {
+            m_cuda_prime_test.fermat_chain_run();
+        }
+
+        void Sieve::gpu_get_fermat_stats(uint64_t& tests, uint64_t& passes)
+        {
+            m_cuda_prime_test.get_stats(tests, passes);
+        }
+
+        void Sieve::gpu_reset_fermat_stats()
+        {
+            m_cuda_prime_test.reset_stats();
+        }
+
+        uint32_t Sieve::get_chain_count()
+        {
+            uint32_t chain_count;
+            m_cuda_sieve.get_chain_count(chain_count);
+            return chain_count;
         }
 
         //search the sieve for chains that meet the minimum length requirement.  Chains can cross segment boundaries.
@@ -695,6 +770,16 @@ namespace nexusminer {
             return true;
         }
 
+        void Sieve::gpu_get_stats()
+        {
+            uint32_t histogram[Cuda_sieve::chain_histogram_max];
+            m_cuda_sieve.get_stats(histogram);
+            for (auto i = 0; i < m_chain_histogram.size(); i++)
+            {
+                m_chain_histogram[i] += histogram[i];
+            }
+        }
+
         void Sieve::do_chain_trial_division_check()
         {
             for (auto& chain : m_chain)
@@ -727,6 +812,7 @@ namespace nexusminer {
                     //chain is tested.  mark as complete.
                     chain.m_chain_state = Chain::Chain_state::complete;
                     chain.get_best_fermat_chain(base_offset, offset, length);
+                    //std::cout << chain.str() << std::endl;
                     if (length > 0)
                     {
                         //collect stats

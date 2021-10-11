@@ -146,17 +146,18 @@ void Worker_prime::run()
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
-		m_segmented_sieve->do_chain_trial_division_check();
-		if (m_segmented_sieve->get_current_chain_list_length() >= m_segmented_sieve->get_fermat_test_batch_size())
-		{
-			//m_logger->debug("Batch primality testing {} candidates.", m_segmented_sieve->get_current_chain_list_length());
-			auto test_chains_start = std::chrono::steady_clock::now();
-			m_segmented_sieve->primality_batch_test(worker_config_gpu.m_device);
-			auto test_chains_stop = std::chrono::steady_clock::now();
-			auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
-			test_chains_ms += test_chains_elapsed.count();
-			m_segmented_sieve->clean_chains();
-		}
+		//m_segmented_sieve->get_chains();
+		//m_segmented_sieve->do_chain_trial_division_check();
+		
+		auto test_chains_start = std::chrono::steady_clock::now();
+		m_segmented_sieve->gpu_run_fermat_chain_test();
+		auto test_chains_stop = std::chrono::steady_clock::now();
+		auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
+		test_chains_ms += test_chains_elapsed.count();
+		m_segmented_sieve->gpu_clean_chains();
+
+		m_segmented_sieve->get_long_chains();
+		m_segmented_sieve->gpu_get_stats();
 
 		//check difficulty of any chains that passed through the filter
 		for (auto x : m_segmented_sieve->m_long_chain_starts)

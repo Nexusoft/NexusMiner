@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "gpu/prime_common.hpp"
+
 //A class representing a chain of nexus prime candidates.
 //We avoid the standard library (no vectors or std::strings) so we can use this with cuda.
 namespace nexusminer {

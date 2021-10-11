@@ -113,6 +113,7 @@ namespace nexusminer {
             return false;
         }
 
+
         //set the fermat test status of an offset.  if the offset is not found return false.
         __device__  bool update_fermat_status(CudaChain& chain, bool is_prime)
         {

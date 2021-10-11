@@ -14,6 +14,11 @@ namespace nexusminer {
             m_impl->fermat_run();
         }
 
+        void Cuda_fermat_test::fermat_chain_run()
+        {
+            m_impl->fermat_chain_run();
+        }
+
         void Cuda_fermat_test::fermat_init(uint32_t batch_size, int device)
         {
             m_impl->fermat_init(batch_size, device);
@@ -27,6 +32,11 @@ namespace nexusminer {
         void Cuda_fermat_test::set_base_int(mpz_t base_big_int)
         {
             m_impl->set_base_int(base_big_int);
+        }
+
+        void Cuda_fermat_test::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
+        {
+            m_impl->set_chain_ptr(chains, chain_count);
         }
 
         void Cuda_fermat_test::set_offsets(uint64_t offsets[], uint64_t offset_count)

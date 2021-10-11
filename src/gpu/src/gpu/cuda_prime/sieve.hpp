@@ -28,6 +28,7 @@ namespace nexusminer {
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
 			static const int m_estimated_chains_per_million = 30;
 			static const uint32_t m_max_chains = 10*m_estimated_chains_per_million*m_sieve_range/1e6;
+			static const uint32_t m_max_long_chains = 32;
 			static const int m_min_chain_length = 8;
 
 			static const int m_small_prime_count = 23;
@@ -36,7 +37,7 @@ namespace nexusminer {
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,
 
 			static const int m_large_prime_cutoff_index = 500000;  //prime 78500 is about 1e6.  prime 283145 is about 4e6
-
+			static const int chain_histogram_max = 10;  
 			
 
 			Cuda_sieve();
@@ -47,9 +48,17 @@ namespace nexusminer {
 			void run_small_prime_sieve(uint64_t sieve_start_offset);
 			void run_large_prime_sieve(uint64_t sieve_start_offset);
 			void run_sieve(uint64_t sieve_start_offset);
-			void find_chains(CudaChain chains[], uint32_t& chain_count);
+			void find_chains();
+			void clean_chains();
+			void get_chains(CudaChain chains[], uint32_t& chain_count);
+			void get_long_chains(CudaChain chains[], uint32_t& chain_count);
+
+			void get_chain_count(uint32_t& chain_count);
+
+			void get_chain_pointer(CudaChain*& chains_ptr, uint32_t*& chain_count_ptr);
 			void get_sieve(sieve_word_t sieve[]);
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);
+			void get_stats(uint32_t chain_histogram[]);
 
 		private:
 			std::unique_ptr<Cuda_sieve_impl> m_impl;

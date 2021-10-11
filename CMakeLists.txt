@@ -81,6 +81,7 @@ add_subdirectory(src/stats)
 add_subdirectory(src/protocol)
 add_subdirectory(src/cpu)
 add_subdirectory(src/fpga)
+add_subdirectory(src/TAO)
 
 
 if(WITH_GPU_CUDA)
@@ -94,7 +95,7 @@ add_executable(NexusMiner
                 src/timer_manager.cpp)
 
 target_include_directories(NexusMiner PUBLIC "${PROJECT_BINARY_DIR}")
-target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker)
+target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker TAO)
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()

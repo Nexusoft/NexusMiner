@@ -135,6 +135,7 @@ __device__ const uint32_t p59[59] =       {0xffff7fff, 0xffffffff, 0xffffffff, 0
                                              0xfffffffd, 0xffffffff, 0xffffffff, 0xffffffff,
                                              0xffffffff, 0xfffeffff, 0x7ffffffe};
 
+
 __device__ const uint32_t p61[61] =       {0xfffeffff, 0xffffffff, 0xffff7fff, 0x7fffffff,
                                              0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
                                              0xffffbfff, 0xbfffffff, 0xffffffff, 0xffffffff,
@@ -151,6 +152,83 @@ __device__ const uint32_t p61[61] =       {0xfffeffff, 0xffffffff, 0xffff7fff, 0
                                              0xffffffff, 0xffffffff, 0xfffffffd, 0xfffdffff,
                                              0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
                                              0xfffffffe};
+
+//61 is the first array to have only one bit set max per word.  This is an experimental function to return the same thing as the array
+__device__ uint32_t p_61(uint16_t index)
+{
+    /*switch (index)
+    {
+    case 0:
+        return 0xfffeffff;
+    case 2:
+        return 0xffff7fff;
+    case 3:
+        return 0x7fffffff;
+    case 8:
+        return 0xffffbfff;
+    case 9:
+        return 0xbfffffff;
+    case 12:
+        return 0xffffdfff;
+    case 13:
+        return 0xdfffffff;
+    case 14:
+        return 0xffffefff;
+    case 15:
+        return 0xefffffff;
+    case 18:
+        return 0xfffff7ff;
+    case 19:
+        return 0xf7ffffff;
+    case 20:
+        return 0xfffffbff;
+    case 21:
+        return 0xfbffffff;
+    case 24:
+        return 0xfffffdff;
+    case 25:
+        return 0xfdffffff;
+    case 30:
+        return 0xfffffeff;
+    case 31:
+        return 0xfeffffff;
+    case 32:
+        return 0xffffff7f;
+    case 33:
+        return 0xff7fffff;
+    case 38:
+        return 0xffffffbf;
+    case 39:
+        return 0xffbfffff;
+    case 42:
+        return 0xffffffdf;
+    case 43:
+        return 0xffdfffff;
+    case 44:
+        return 0xffffffef;
+    case 45:
+        return 0xffefffff;
+    case 48:
+        return 0xfffffff7;
+    case 49:
+        return 0xfff7ffff;
+    case 50:
+        return 0xfffffffb;
+    case 51:
+        return 0xfffbffff;
+    case 54:
+        return 0xfffffffd;
+    case 55:
+        return 0xfffdffff;
+    case 60:
+        return 0xfffffffe;
+    default:
+        return 0xffffffff;
+    }*/
+    return p61[index];
+
+}
+
 
 __device__ const uint32_t p67[67] =       {0xfffdffff, 0xffffffff, 0xffffffff, 0xffffffff,
                                              0xffffffff, 0xffffffff, 0xfffeffff, 0xffffffff,

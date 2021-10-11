@@ -32,6 +32,7 @@ IN THE SOFTWARE.
 #include "cgbn/utility/support.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include "cuda_chain.cuh"
 //#include "nppdefs.h"
 
 // The CGBN context uses the following three parameters:
@@ -48,6 +49,8 @@ IN THE SOFTWARE.
 namespace nexusminer {
     namespace gpu {
 
+            __device__  bool get_next_fermat_candidate(CudaChain& chain, uint64_t& base_offset, int& offset);
+            __device__  bool update_fermat_status(CudaChain& chain, bool is_prime);
 
             __device__  fermat_t::fermat_t(cgbn_monitor_t monitor, cgbn_error_report_t* report, int32_t instance)
                :_context(monitor, report, (uint32_t)instance),
@@ -191,6 +194,54 @@ namespace nexusminer {
                 printf("Based on an approximation of the prime gap, we would expect %0.1f primes\n", ((float)instance_count) * 2 / (0.69315f * fermat_params_t::BITS));
             }
 
+            __global__ void fermat_test_chains(cgbn_error_report_t* report, CudaChain* chains, uint32_t* chain_count,
+                cgbn_mem_t<fermat_params_t::BITS>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count) {
+                int64_t instance = (blockIdx.x * blockDim.x + threadIdx.x) / fermat_params_t::TPI;
+
+                if (instance >= *chain_count)
+                    return;
+
+                fermat_t            fermat_test(cgbn_report_monitor, report, instance);
+                fermat_t::bn_t      bn_candidate, bn_base_int, bn_offset;
+                bool                passed;
+
+                //convert 64 bit bignum to 1024 bit bignum by padding with zeros.
+                
+                uint64_t offset64, base_offset;
+                int relative_offset;
+                get_next_fermat_candidate(chains[instance], base_offset, relative_offset);
+                offset64 = base_offset + relative_offset;
+                cgbn_mem_t<1024> offset;
+                offset._limbs[0] = offset64 & 0xFFFFFFFF;
+                offset._limbs[1] = (offset64 >> 32) & 0xFFFFFFFF;
+                for (int i = 2; i < 1024 / 32; i++)
+                    offset._limbs[i] = 0;
+                //__syncthreads();
+                //add the offset to the base int
+                cgbn_load(fermat_test._env, bn_offset, &offset);
+                cgbn_load(fermat_test._env, bn_base_int, base_int);
+                cgbn_add(fermat_test._env, bn_candidate, bn_offset, bn_base_int);
+
+                //cgbn_load(fermat_test._env, bn_candidate, &(instances[instance].candidate));
+                passed = fermat_test.fermat(bn_candidate);
+                //results[instance] = passed ? 1 : 0;
+                update_fermat_status(chains[instance], passed);
+
+                //collect stats
+                if (threadIdx.x % fermat_params_t::TPI == 0)
+                {
+                    if (passed)
+                    {
+                        atomicAdd(pass_count, 1);
+                    }
+                    results[instance] = passed ? 1 : 0;
+                    atomicAdd(test_count, 1);
+                }
+
+
+
+            }
+
 
         __global__ void kernel_fermat(cgbn_error_report_t* report, cgbn_mem_t<64>* offsets, uint64_t* offset_count,
             cgbn_mem_t<fermat_params_t::BITS>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count) {
@@ -246,6 +297,26 @@ namespace nexusminer {
 
             kernel_fermat << <blocks, threads_per_block>> > (d_report, d_offsets, d_offset_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
+            
+
+            CUDA_CHECK(cudaDeviceSynchronize());
+            //CGBN_CHECK(d_report);
+        }
+
+        void Cuda_fermat_test_impl::fermat_chain_run()
+        {
+
+            int32_t threads_per_block = (fermat_params_t::TPB == 0) ? 64 : fermat_params_t::TPB;
+            int32_t threads_per_instance = fermat_params_t::TPI;
+            int32_t instances_per_block = threads_per_block / threads_per_instance;
+
+            uint32_t chain_count;
+            CUDA_CHECK(cudaMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
+
+            fermat_test_chains << <blocks, threads_per_block >> > (d_report, d_chains, d_chain_count, d_base_int,
+                d_results, d_fermat_test_count, d_fermat_pass_count);
+
             CUDA_CHECK(cudaDeviceSynchronize());
             //CGBN_CHECK(d_report);
         }
@@ -316,6 +387,14 @@ namespace nexusminer {
         {
             CUDA_CHECK(cudaMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
             CUDA_CHECK(cudaMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
+        }
+
+        void Cuda_fermat_test_impl::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
+        {
+            d_chains = chains;
+            d_chain_count = chain_count;
+            uint32_t chain_count_test;
+            CUDA_CHECK(cudaMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
         }
 
     }
