@@ -238,8 +238,6 @@ namespace nexusminer {
                     atomicAdd(test_count, 1);
                 }
 
-
-
             }
 
 
@@ -281,8 +279,6 @@ namespace nexusminer {
                 results[instance] = passed ? 1 : 0;
                 atomicAdd(test_count, 1);
             }
-            
-            
 
         }
 
@@ -328,7 +324,6 @@ namespace nexusminer {
             m_device = device;
 
             CUDA_CHECK(cudaSetDevice(device));
-            //CUDA_CHECK(cudaMalloc(&d_instances, sizeof(*d_instances) * batch_size));
             CUDA_CHECK(cudaMalloc(&d_base_int, sizeof(*d_base_int)));
             CUDA_CHECK(cudaMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
             CUDA_CHECK(cudaMalloc(&d_results, sizeof(*d_results) * batch_size));
@@ -344,14 +339,12 @@ namespace nexusminer {
         void Cuda_fermat_test_impl::fermat_free()
         {
             CUDA_CHECK(cudaSetDevice(m_device));
-            //CUDA_CHECK(cudaFree(d_instances));
             CUDA_CHECK(cudaFree(d_base_int));
             CUDA_CHECK(cudaFree(d_offsets));
             CUDA_CHECK(cudaFree(d_results));
             CUDA_CHECK(cudaFree(d_offset_count));
             CUDA_CHECK(cudaFree(d_fermat_test_count));
             CUDA_CHECK(cudaFree(d_fermat_pass_count));
-
             CUDA_CHECK(cgbn_error_report_free(d_report));
         }
 

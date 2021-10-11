@@ -151,7 +151,6 @@ void Worker_prime::run()
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
 		uint32_t chain_count = m_segmented_sieve->get_chain_count();
-		//m_segmented_sieve->get_chains();
 		//m_segmented_sieve->do_chain_trial_division_check();
 		auto test_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_run_fermat_chain_test();
@@ -198,21 +197,23 @@ void Worker_prime::run()
 		bool print_debug = true;
 		if (print_debug && interval_elapsed.count() > 10000)
 		{
+			uint64_t fermat_test_count, fermat_prime_count;
+			m_segmented_sieve->gpu_get_fermat_stats(fermat_test_count, fermat_prime_count);
 			std::cout << "--debug--" << std::endl;
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 			elapsed_ms = elapsed.count();
 			double chains_per_mm = 1.0e6 * m_segmented_sieve->m_chain_count / m_range_searched;
 			double chains_per_sec = 1.0e3 * m_segmented_sieve->m_chain_count / elapsed_ms;
-			double fermat_positive_rate = 1.0 * m_segmented_sieve->m_fermat_prime_count / m_segmented_sieve->m_fermat_test_count;
-			double fermat_tests_per_chain = 1.0 * m_segmented_sieve->m_fermat_test_count / m_segmented_sieve->m_chain_count;
+			double fermat_positive_rate = 1.0 * fermat_prime_count / fermat_test_count;
+			double fermat_tests_per_chain = 1.0 * fermat_test_count / m_segmented_sieve->m_chain_count;
 			std::cout << std::fixed << std::setprecision(2) << m_range_searched /1.0e9 << " billion integers searched." <<
 				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
 			/*std::cout << "Avg chain length: " << std::fixed << std::setprecision(2) << 1.0 * m_segmented_sieve->m_chain_candidate_total_length / m_segmented_sieve->m_chain_count
 				<< " Max chain: " << m_segmented_sieve->m_chain_candidate_max_length << std::endl;*/
-			std::cout << "Fermat Tests: " << m_segmented_sieve->m_fermat_test_count << " Fermat Primes: " << m_segmented_sieve->m_fermat_prime_count <<
+			std::cout << "Fermat Tests: " << fermat_test_count << " Fermat Primes: " << fermat_prime_count <<
 				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
-				1.0e6 * m_segmented_sieve->m_fermat_test_count / m_range_searched << std::endl;
+				1.0e6 * fermat_test_count / m_range_searched << std::endl;
 
 			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << range_searched_this_cycle / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
 			//double predicted_8chain_positivity_rate = std::pow(fermat_positive_rate, 8);
