@@ -42,8 +42,10 @@ namespace nexusminer {
 
 			Cuda_sieve();
 			~Cuda_sieve();
-			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t starting_multiples[],
-				uint8_t prime_mod_inverses[], uint32_t small_prime_offsets[], uint32_t sieve_size, uint16_t device);
+			void load_sieve(uint32_t primes[], uint32_t prime_count, 
+				uint8_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device);
+			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[]);
+			void reset_stats();
 			void free_sieve();
 			void run_small_prime_sieve(uint64_t sieve_start_offset);
 			void run_large_prime_sieve(uint64_t sieve_start_offset);
@@ -58,7 +60,7 @@ namespace nexusminer {
 			void get_chain_pointer(CudaChain*& chains_ptr, uint32_t*& chain_count_ptr);
 			void get_sieve(sieve_word_t sieve[]);
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);
-			void get_stats(uint32_t chain_histogram[]);
+			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
 
 		private:
 			std::unique_ptr<Cuda_sieve_impl> m_impl;

@@ -38,6 +38,14 @@ namespace nexusminer {
             ss << "Done. " << m_sieving_primes.size() << " primes generated in " << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds.";
             m_logger->info(ss.str());
             primesieve::generate_n_primes(large_prime_count, m_sieving_prime_limit, &m_large_sieving_primes);
+            //prime mod inverses
+            m_prime_mod_inverses = {};
+            for (auto s : m_sieving_primes)
+            {
+                int64_t prime_mod_inverse = boost::integer::mod_inverse((int64_t)s, (int64_t)30);
+                m_prime_mod_inverses.push_back(prime_mod_inverse);
+            }
+
 
         }
 
@@ -72,7 +80,7 @@ namespace nexusminer {
             //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
             //do this once at the start of a new block to initialize the sieve.
             m_multiples = {};
-            m_prime_mod_inverses = {};
+           
             m_logger->info("Calculating starting multiples.");
             auto start = std::chrono::steady_clock::now();
             for (auto s : m_sieving_primes)
@@ -82,9 +90,6 @@ namespace nexusminer {
                 //where is the starting multiple relative to the wheel
                 //int64_t wheel_index = (boost::integer::mod_inverse((int64_t)s, (int64_t)30) * m) % 30;
                 //int wheel_lookup = sieve30_index[wheel_index];
-                int64_t prime_mod_inverse = boost::integer::mod_inverse((int64_t)s, (int64_t)30);
-
-                m_prime_mod_inverses.push_back(prime_mod_inverse);
             }
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -101,14 +106,20 @@ namespace nexusminer {
             }
         }
 
-        void Sieve::gpu_sieve_init(uint16_t device=0)
+        void Sieve::gpu_sieve_load(uint16_t device=0)
         {
             
-            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_multiples.data(),
-                m_prime_mod_inverses.data(), m_small_prime_offsets.data(), m_sieve_batch_buffer_size, device);
+            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(),
+                m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
            
-            m_sieve_run_count = 0;
+            m_cuda_sieve_allocated = true;
 
+        }
+
+        void Sieve::gpu_sieve_init()
+        {
+            m_cuda_sieve.init_sieve(m_multiples.data(), m_small_prime_offsets.data());
+            m_sieve_run_count = 0;
         }
 
         void Sieve::gpu_fermat_test_set_base_int(boost::multiprecision::uint1024_t base_big_int)
@@ -151,6 +162,7 @@ namespace nexusminer {
         void Sieve::gpu_sieve_free()
         {
             m_cuda_sieve.free_sieve();
+            m_cuda_sieve_allocated = false;
             
         }
 
@@ -364,6 +376,8 @@ namespace nexusminer {
             m_chain_candidate_max_length = 0;
             m_chain_candidate_total_length = 0;
             m_trial_division_chains_busted = 0;
+            if(m_cuda_sieve_allocated)
+                m_cuda_sieve.reset_stats();
         }
 
         //find chains on the gpu
@@ -772,12 +786,7 @@ namespace nexusminer {
 
         void Sieve::gpu_get_stats()
         {
-            uint32_t histogram[Cuda_sieve::chain_histogram_max];
-            m_cuda_sieve.get_stats(histogram);
-            for (auto i = 0; i < m_chain_histogram.size(); i++)
-            {
-                m_chain_histogram[i] += histogram[i];
-            }
+            m_cuda_sieve.get_stats(m_chain_histogram.data(), m_chain_count);
         }
 
         void Sieve::do_chain_trial_division_check()

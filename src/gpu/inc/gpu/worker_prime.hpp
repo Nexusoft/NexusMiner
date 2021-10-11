@@ -49,7 +49,7 @@ private:
     std::thread m_run_thread;
     Worker::Block_found_handler m_found_nonce_callback;
     std::unique_ptr<Sieve> m_segmented_sieve;
-
+    bool m_gpu_initialized = false;
     Block_data m_block;
     std::mutex m_mtx;
     std::uint64_t m_starting_nonce = 0;

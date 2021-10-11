@@ -121,18 +121,16 @@ namespace gpu
 		//test_sieve.m_segment_batch_size = 100;
 		test_sieve.generate_sieving_primes();
 		test_sieve.calculate_starting_multiples();
-		test_sieve.reset_sieve();
-		test_sieve.reset_sieve_batch(0);
-		test_sieve.gpu_sieve_init(m_device);
+		//test_sieve.reset_sieve();
+		//test_sieve.reset_sieve_batch(0);
+		test_sieve.gpu_sieve_load(m_device);
+		test_sieve.gpu_sieve_init();
 		test_sieve.sieve_small_primes();
 		auto start = std::chrono::steady_clock::now();
 		test_sieve.gpu_sieve_small_primes(0);
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double small_prime_sieve_elapsed_s = elapsed.count() / 1000.0;
-		//test_sieve.sieve_batch_cpu(0);
-		//std::vector<uint8_t> cpu_sieve = test_sieve.get_sieve();
-		//test_sieve.reset_sieve_batch(0);
 		start = std::chrono::steady_clock::now();
 		test_sieve.sieve_batch(0);
 		end = std::chrono::steady_clock::now();
@@ -144,7 +142,7 @@ namespace gpu
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double large_prime_sieve_elapsed_s = elapsed.count() / 1000.0;
 		uint64_t prime_candidate_count = test_sieve.gpu_get_prime_candidate_count();
-		test_sieve.gpu_get_sieve();
+		//test_sieve.gpu_get_sieve();
 		//uint64_t candidate_count = test_sieve.count_prime_candidates();
 		start = std::chrono::steady_clock::now();
 		test_sieve.find_chains();
@@ -152,36 +150,17 @@ namespace gpu
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double find_chains_elapsed_s = elapsed.count() / 1000.0;
 		uint32_t gpu_chain_count = test_sieve.get_chain_count();
-		test_sieve.get_chains();
-		uint64_t chain_count_before = test_sieve.get_current_chain_list_length();
+		//test_sieve.get_chains();
+		//uint64_t chain_count_before = test_sieve.get_current_chain_list_length();
 		//test_sieve.clear_chains();
 		//test_sieve.find_chains_cpu(0, true);
 		//test_sieve.reset_batch_run_count();
 		//test_sieve.sieve_batch(0);
 		//test_sieve.do_chain_trial_division_check();
-		uint64_t chain_count_after = test_sieve.get_current_chain_list_length();
-		uint32_t busted_chain_count = chain_count_before - chain_count_after;
-
-		
+		//uint64_t chain_count_after = test_sieve.get_current_chain_list_length();
+		//uint32_t busted_chain_count = chain_count_before - chain_count_after;
 
 		test_sieve.gpu_fermat_test_init(m_device);
-
-		//std::vector<uint8_t> gpu_sieve = test_sieve.get_sieve();
-		/*if (cpu_sieve.size() != gpu_sieve.size())
-		{
-			m_logger->info("Unexpected sieve size.");
-		}
-		else
-		{
-			for (auto i=0; i<cpu_sieve.size(); i++)
-			{
-				if (cpu_sieve[i] != gpu_sieve[i])
-				{
-					m_logger->info("Sieve mismatch at index {}. CPU[{}]={}, GPU[{}]={}.", i,i,cpu_sieve[i],i,gpu_sieve[i]);
-				}
-			}
-		}*/
-
 
 		//uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
 		uint64_t sieve_range = test_sieve.m_sieve_results.size() * Cuda_sieve::m_sieve_word_range;
@@ -204,10 +183,9 @@ namespace gpu
 			candidate_ratio * 100, candidate_ratio_expected * 100);
 		double bits = static_cast<double>(boost::multiprecision::log2(static_cast<boost::multiprecision::mpf_float>(test_sieve.get_sieve_start())));
 		double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve(bits);
-		int fermat_sample_size = std::min<uint64_t>(100000, prime_candidate_count);
-		uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size, m_device);
-		m_logger->info("Got {:.3f}% fermat positive rate. Expected about {:.3f}%",
-			100.0 * fermat_count / fermat_sample_size, fermat_positive_rate_expected * 100.0);
+		//int fermat_sample_size = std::min<uint64_t>(100000, prime_candidate_count);
+		//uint64_t fermat_count = test_sieve.count_fermat_primes(fermat_sample_size, m_device);
+		
 		//how many chains we expect to find is equal to the density at the bit width we stop sieving,
 		//which is equivalent to the square of the max sieving prime or twice the max sieving prime bit width
 		//this is not precise for low bit widths.   9 chains contain 2 or more 8 chains etc.
@@ -218,7 +196,7 @@ namespace gpu
 			gpu_chain_count,
 			find_chains_elapsed_s, 1.0e6 * gpu_chain_count / sieve_range,
 			sieve_range / find_chains_elapsed_s / 1e6);
-		m_logger->info("Busted {} chains ({:.3f}%) with trial division", busted_chain_count, (double)busted_chain_count / chain_count_before);
+		//m_logger->info("Busted {} chains ({:.3f}%) with trial division", busted_chain_count, (double)busted_chain_count / chain_count_before);
 
 		double eight_chain_probability = std::pow(fermat_positive_rate_expected, 8);
 		double chains_per_eight_chain = 1.0 / eight_chain_probability;
@@ -231,20 +209,21 @@ namespace gpu
 		test_sieve.gpu_run_fermat_chain_test();
 		uint64_t test_attempts, passes;
 		test_sieve.gpu_get_fermat_stats(test_attempts, passes);
-		m_logger->info("Fermat tests after one round of fermat testing {}/{} ({:.3f}%)", passes, test_attempts, 100.0*passes/test_attempts);
-		test_sieve.clear_chains();
-		test_sieve.get_chains();
-		test_sieve.clean_chains();
-		uint32_t gpu_chain_count_after = test_sieve.get_current_chain_list_length();
-		m_logger->info("Chain count after one round of fermat testing and cpu clean chains {}", gpu_chain_count_after);
+		m_logger->info("Fermat primes: {}/{} ({:.3f}%). Expected about {:.3f}%.",
+			passes, test_attempts, 100.0*passes/test_attempts, fermat_positive_rate_expected * 100.0);
+		//test_sieve.clear_chains();
+		//test_sieve.get_chains();
+		//test_sieve.clean_chains();
+		//uint32_t gpu_chain_count_after = test_sieve.get_current_chain_list_length();
+		//m_logger->info("Chain count after one round of fermat testing and cpu clean chains {}", gpu_chain_count_after);
 		test_sieve.gpu_clean_chains();
 		gpu_chain_count = test_sieve.get_chain_count();
 		m_logger->info("Chain count after gpu clean chains {}", gpu_chain_count);
-		test_sieve.clear_chains();
-		test_sieve.get_chains();
-		test_sieve.clean_chains();
-		chain_count_after = test_sieve.get_current_chain_list_length();
-		m_logger->info("Chain count after cpu clean chains {}", chain_count_after);
+		//test_sieve.clear_chains();
+		//test_sieve.get_chains();
+		//test_sieve.clean_chains();
+		//chain_count_after = test_sieve.get_current_chain_list_length();
+		//m_logger->info("Chain count after cpu clean chains {}", chain_count_after);
 		test_sieve.get_long_chains();
 		while (test_sieve.get_chain_count() > 0)
 		{

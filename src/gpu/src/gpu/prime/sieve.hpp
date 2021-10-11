@@ -25,7 +25,8 @@ namespace nexusminer {
 			void set_sieve_start(boost::multiprecision::uint1024_t);
 			boost::multiprecision::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
-			void gpu_sieve_init(uint16_t device);
+			void gpu_sieve_load(uint16_t device);
+			void gpu_sieve_init();
 			void gpu_fermat_test_init(uint16_t device);
 			void gpu_sieve_free();
 			void gpu_fermat_free();
@@ -189,6 +190,7 @@ namespace nexusminer {
 
 			Cuda_sieve m_cuda_sieve;
 			Cuda_fermat_test m_cuda_prime_test;
+			bool m_cuda_sieve_allocated = false;
 
 		};
 	}

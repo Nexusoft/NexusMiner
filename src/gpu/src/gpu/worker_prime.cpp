@@ -26,6 +26,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_chains{ 0 }
 	, m_difficulty{ 0 }
 	, m_pool_nbits{ 0 }
+	, m_gpu_initialized{false}
 {
 	
 	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
@@ -46,6 +47,12 @@ Worker_prime::~Worker_prime() noexcept
 	m_stop = true;
 	if (m_run_thread.joinable())
 		m_run_thread.join();
+	//free gpu memory
+	if (m_gpu_initialized)
+	{
+		m_segmented_sieve->gpu_sieve_free();
+		m_segmented_sieve->gpu_fermat_free();
+	}
 }
 
 void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
@@ -99,66 +106,65 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 	}
 	//restart the mining loop
 	m_stop = false;
+	//The first time prior to running allocate memory on the gpu
+	
+	if (!m_gpu_initialized)
+	{
+		auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
+		m_segmented_sieve->gpu_sieve_load(worker_config_gpu.m_device);
+		m_segmented_sieve->gpu_fermat_test_init(worker_config_gpu.m_device);
+		m_gpu_initialized = true;
+	}
 	m_run_thread = std::thread(&Worker_prime::run, this);
 }
 
 void Worker_prime::run()
 {
 	m_segmented_sieve->calculate_starting_multiples();
-	//uint32_t segment_size = m_segmented_sieve->get_segment_size();
-	//uint32_t segment_batch_size = m_segmented_sieve->get_segment_batch_size();
+	//copy starting multiples to the sieve
+	m_segmented_sieve->gpu_sieve_init();
+	m_segmented_sieve->gpu_fermat_test_set_base_int(m_segmented_sieve->get_sieve_start());
 	uint64_t sieve_batch_range = m_segmented_sieve->m_sieve_range;
 	uint64_t find_chains_ms = 0;
 	uint64_t sieving_ms = 0;
 	uint64_t test_chains_ms = 0;
 	uint64_t elapsed_ms = 0;
-	//uint64_t high = 0;
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
-	bool batch_sieve_mode = true;
-	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
-	m_segmented_sieve->gpu_sieve_init(worker_config_gpu.m_device);
-	m_segmented_sieve->gpu_fermat_test_init(worker_config_gpu.m_device);
-
 
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
 	{
-		//m_segmented_sieve->reset_sieve();
-		// current segment = [low, high]
-		//high = low + segment_size - 1;
-		//uint64_t sieve_size = (high - low) / 30 + 1;
 		m_range_searched += sieve_batch_range;
 		range_searched_this_cycle += sieve_batch_range;
 
 		auto sieve_start = std::chrono::steady_clock::now();
-		//m_segmented_sieve->sieve_segment();
-		//m_segmented_sieve->sieve_batch_cpu(low);
 		m_segmented_sieve->gpu_sieve_small_primes(low);
 		m_segmented_sieve->sieve_batch(low);
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
 		auto find_chains_start = std::chrono::steady_clock::now();
-		//m_segmented_sieve->find_chains_cpu(low, batch_sieve_mode);
 		m_segmented_sieve->find_chains();
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
+		uint32_t chain_count = m_segmented_sieve->get_chain_count();
 		//m_segmented_sieve->get_chains();
 		//m_segmented_sieve->do_chain_trial_division_check();
-		
 		auto test_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_run_fermat_chain_test();
 		auto test_chains_stop = std::chrono::steady_clock::now();
 		auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
 		test_chains_ms += test_chains_elapsed.count();
+		auto clean_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_clean_chains();
-
+		auto clean_chains_stop = std::chrono::steady_clock::now();
+		auto clean_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(clean_chains_stop - clean_chains_start);
+		//check for winners
 		m_segmented_sieve->get_long_chains();
 		m_segmented_sieve->gpu_get_stats();
-
 		//check difficulty of any chains that passed through the filter
 		for (auto x : m_segmented_sieve->m_long_chain_starts)
 		{
@@ -201,8 +207,8 @@ void Worker_prime::run()
 			double fermat_tests_per_chain = 1.0 * m_segmented_sieve->m_fermat_test_count / m_segmented_sieve->m_chain_count;
 			std::cout << std::fixed << std::setprecision(2) << m_range_searched /1.0e9 << " billion integers searched." <<
 				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
-			std::cout << "Avg chain length: " << std::fixed << std::setprecision(2) << 1.0 * m_segmented_sieve->m_chain_candidate_total_length / m_segmented_sieve->m_chain_count
-				<< " Max chain: " << m_segmented_sieve->m_chain_candidate_max_length << std::endl;
+			/*std::cout << "Avg chain length: " << std::fixed << std::setprecision(2) << 1.0 * m_segmented_sieve->m_chain_candidate_total_length / m_segmented_sieve->m_chain_count
+				<< " Max chain: " << m_segmented_sieve->m_chain_candidate_max_length << std::endl;*/
 			std::cout << "Fermat Tests: " << m_segmented_sieve->m_fermat_test_count << " Fermat Primes: " << m_segmented_sieve->m_fermat_prime_count <<
 				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
@@ -221,8 +227,7 @@ void Worker_prime::run()
 			std::cout << std::endl;
 		}
 	}
-	m_segmented_sieve->gpu_sieve_free();
-	m_segmented_sieve->gpu_fermat_free();
+	
 }
 
 double Worker_prime::getDifficulty(uint1k p)

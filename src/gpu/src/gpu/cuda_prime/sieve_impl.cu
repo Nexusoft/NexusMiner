@@ -149,6 +149,7 @@ namespace nexusminer {
             return m;
         }
 
+        //this is slow. 
         //large primes hit the sieve infrequently with large gaps (> 1 segment) between hits.  The optimizations for
         //medium primes hurts more than helps.  For large primes we simply iterate through multiples of the primes and cross 
         //them off one by one in global memory using atomicAnd.  The memory conflicts between primes should be few because
@@ -217,7 +218,8 @@ namespace nexusminer {
         }
 
         //search the sieve for chains that meet the minimum length requirement.  
-        __global__ void find_chain_kernel(Cuda_sieve::sieve_word_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset)
+        __global__ void find_chain_kernel(Cuda_sieve::sieve_word_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset,
+            unsigned long long* chain_stat_count)
         {
 
             //const uint64_t sieve_size = Cuda_sieve::m_sieve_total_size;
@@ -237,7 +239,8 @@ namespace nexusminer {
             //shared copies of lookup tables
             __shared__ unsigned int sieve30_offsets_shared[8];
             __shared__ unsigned int sieve30_gaps_shared[8];
-            __shared__ unsigned int sieve30_index_shared[30];
+            //local stats
+            __shared__ uint32_t chain_count_shared;
             
             if (threadIdx.x < 8)
             {
@@ -245,14 +248,9 @@ namespace nexusminer {
                 sieve30_offsets_shared[i] = sieve30_offsets[i];
                 sieve30_gaps_shared[i] = sieve30_gaps[i];
             }
-            if (threadIdx.x < 30)
-            {
-                int i = threadIdx.x;
-                sieve30_index_shared[i] = sieve30_index[i];
-            }
             
-            //if (index == 0)
-             //   *chain_index = 0;
+            if (threadIdx.x == 0)
+                chain_count_shared = 0;
             __syncthreads();
            
             //search each sieve location for a possible chain
@@ -331,16 +329,15 @@ namespace nexusminer {
                     uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
                     //copy the current chain to the global list
                     chains[chain_idx] = current_chain;
+                    //updated block level stats
+                    atomicInc(&chain_count_shared, 0xFFFFFFFF);
                 }
-
-               
             }
-            
-
+            //update global chain stats
+            __syncthreads();
+            if (threadIdx.x == 0)
+                atomicAdd(chain_stat_count, chain_count_shared);
         }
-
-       
-       
 
         //medium prime sieve.  We use a block of shared memory to sieve in segments.  Each block sieves a different range. 
         //the final results are merged with the global sieve at the end using atomicAnd. 
@@ -355,7 +352,6 @@ namespace nexusminer {
             //shared mem lookup tables
             __shared__ unsigned int sieve120_index_shared[120];
             __shared__  Cuda_sieve::sieve_word_t unset_bit_mask_shared[32];
-            __shared__ unsigned int sieve30_offsets_shared[8];
             __shared__ unsigned int sieve30_gaps_shared[8];
             __shared__ unsigned int sieve30_index_shared[30];
 
@@ -375,7 +371,6 @@ namespace nexusminer {
             }
             for (int i = index; i < 8; i += stride)
             {
-                sieve30_offsets_shared[i] = sieve30_offsets[i];
                 sieve30_gaps_shared[i] = sieve30_gaps[i];
             }
             for (int i = index; i < 30; i += stride)
@@ -497,7 +492,6 @@ namespace nexusminer {
         __global__ void filter_busted_chains(CudaChain* chains, uint32_t* chain_index, CudaChain* surviving_chains,
             uint32_t* surviving_chain_index, CudaChain* long_chains, uint32_t* long_chain_index, uint32_t* histogram)
         {
-            uint32_t num_blocks = gridDim.x;
             uint32_t num_threads = blockDim.x;
             uint32_t block_id = blockIdx.x;
             uint32_t index = block_id * num_threads + threadIdx.x;
@@ -600,7 +594,7 @@ namespace nexusminer {
             const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
             const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;
             const int sieve_blocks = (sieve_total_bits /checks_per_block + sieve_threads - 1)/ sieve_threads;
-            find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset);
+            find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
 
             checkCudaErrors(cudaDeviceSynchronize());
             
@@ -615,7 +609,6 @@ namespace nexusminer {
         void Cuda_sieve_impl::get_chain_count(uint32_t& chain_count)
         {
             checkCudaErrors(cudaMemcpy(&chain_count, d_last_chain_index, sizeof(*d_last_chain_index), cudaMemcpyDeviceToHost));
-            //printf("chain count in sieve %i\n", chain_count);
         }
 
         //get a pointer to the chain array.  fermat test uses the chain array as input. 
@@ -644,8 +637,6 @@ namespace nexusminer {
             //update the chain count
             checkCudaErrors(cudaMemcpy(d_last_chain_index, d_good_chain_index, sizeof(*d_last_chain_index), cudaMemcpyDeviceToDevice));
 
-
-           
         }
 
         void Cuda_sieve_impl::get_long_chains(CudaChain chains[], uint32_t& chain_count)
@@ -653,19 +644,21 @@ namespace nexusminer {
             checkCudaErrors(cudaMemcpy(&chain_count, d_last_long_chain_index, sizeof(*d_last_long_chain_index), cudaMemcpyDeviceToHost));
             if (chain_count > 0)
                 checkCudaErrors(cudaMemcpy(chains, d_long_chains, chain_count * sizeof(*d_long_chains), cudaMemcpyDeviceToHost));
+            //clear the long chain list
             checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
         }
 
-        //read the histogram and clear
-        void Cuda_sieve_impl::get_stats(uint32_t chain_histogram[])
+        //read the histogram
+        void Cuda_sieve_impl::get_stats(uint32_t chain_histogram[], uint64_t& chain_count)
         {
             checkCudaErrors(cudaMemcpy(chain_histogram, d_chain_histogram, Cuda_sieve::chain_histogram_max * sizeof(*d_chain_histogram), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemset(d_chain_histogram, 0, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
+            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_stat_count, sizeof(*d_chain_stat_count), cudaMemcpyDeviceToHost));
+
         }
 
         //allocate global memory and load values used by the sieve to the gpu 
-        void Cuda_sieve_impl::load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t starting_multiples_host[],
-            uint8_t prime_mod_inverses_host[], uint32_t small_prime_offsets[], uint32_t sieve_size, uint16_t device)
+        void Cuda_sieve_impl::load_sieve(uint32_t primes[], uint32_t prime_count, 
+            uint8_t prime_mod_inverses_host[], uint32_t sieve_size, uint16_t device)
         {
           
             m_sieving_prime_count = prime_count;
@@ -685,17 +678,33 @@ namespace nexusminer {
             checkCudaErrors(cudaMalloc(&d_good_chain_index, sizeof(*d_good_chain_index)));
             checkCudaErrors(cudaMalloc(&d_good_chains, Cuda_sieve::m_max_chains/2 * sizeof(*d_good_chains)));
             checkCudaErrors(cudaMalloc(&d_chain_histogram, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
+            checkCudaErrors(cudaMalloc(&d_chain_stat_count, sizeof(*d_chain_stat_count)));
+
 
             //copy data to the gpu
             checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, prime_count * sizeof(*d_sieving_primes), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples_host, prime_count * sizeof(*d_starting_multiples), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_small_prime_offsets, small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_prime_mod_inverses, prime_mod_inverses_host, prime_count * sizeof(*d_prime_mod_inverses), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
             checkCudaErrors(cudaMemset(d_prime_candidate_count, 0, sizeof(*d_prime_candidate_count)));
-            checkCudaErrors(cudaMemset(d_chain_histogram, 0, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
             checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+            checkCudaErrors(cudaMemset(d_chain_stat_count, 0, sizeof(*d_chain_stat_count)));
 
+        }
+
+        //reset sieve with new starting offsets
+        void Cuda_sieve_impl::init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[])
+        {
+            checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples, m_sieving_prime_count * sizeof(*d_starting_multiples), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemcpy(d_small_prime_offsets, small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
+            checkCudaErrors(cudaMemset(d_prime_candidate_count, 0, sizeof(*d_prime_candidate_count)));
+            checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+        }
+
+        void Cuda_sieve_impl::reset_stats()
+        {
+            checkCudaErrors(cudaMemset(d_chain_histogram, 0, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
+            checkCudaErrors(cudaMemset(d_chain_stat_count, 0, sizeof(*d_chain_stat_count)));
 
         }
 
