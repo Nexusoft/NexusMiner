@@ -225,12 +225,12 @@ namespace gpu
 		//chain_count_after = test_sieve.get_current_chain_list_length();
 		//m_logger->info("Chain count after cpu clean chains {}", chain_count_after);
 		test_sieve.get_long_chains();
-		while (test_sieve.get_chain_count() > 0)
+		/*while (test_sieve.get_chain_count() > 0)
 		{
 			test_sieve.gpu_run_fermat_chain_test();
 			test_sieve.gpu_clean_chains();
 			test_sieve.get_long_chains();
-		}
+		}*/
 		//m_logger->info("Found {} 8 chains.  Expected {}", test_sieve.m_chain_histogram[8], sieve_range/range_per_eight_chain);
 		test_sieve.gpu_get_stats();
 		test_sieve.gpu_sieve_free();

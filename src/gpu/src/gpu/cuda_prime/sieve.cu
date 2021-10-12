@@ -19,7 +19,7 @@ namespace nexusminer {
         }
        
         void Cuda_sieve::load_sieve(uint32_t primes[], uint32_t prime_count,
-            uint8_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device)
+            uint32_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device)
         {
             m_impl->load_sieve(primes, prime_count, prime_mod_inverses, sieve_size, device);
         }

@@ -113,6 +113,7 @@ namespace nexusminer {
                 m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
            
             m_cuda_sieve_allocated = true;
+            reset_stats();
 
         }
 

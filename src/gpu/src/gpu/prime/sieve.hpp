@@ -95,7 +95,7 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			const uint32_t m_sieving_prime_limit = 5e6;//1<<22;
+			const uint32_t m_sieving_prime_limit = 4e6;//1<<22;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 200000;
 			const int m_fermat_test_batch_size_max = 1000000;
@@ -174,7 +174,7 @@ namespace nexusminer {
 			std::vector<uint32_t> m_large_sieving_primes;
 			std::vector<uint32_t> m_multiples;
 			std::vector<uint32_t> m_large_multiples;
-			std::vector<uint8_t> m_prime_mod_inverses;
+			std::vector<uint32_t> m_prime_mod_inverses;
 			std::vector<Chain> m_chain;
 			std::vector<CudaChain>m_cuda_chains;
 			std::vector<uint32_t>m_small_prime_offsets;

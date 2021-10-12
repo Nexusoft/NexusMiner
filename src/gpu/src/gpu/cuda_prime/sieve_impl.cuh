@@ -14,7 +14,7 @@ namespace nexusminer {
 			uint64_t m_sieve_start_offset;
 			
 			void load_sieve(uint32_t primes[], uint32_t prime_count,
-				uint8_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device);
+				uint32_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device);
 			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[]);
 			void reset_stats();
 			void free_sieve();
@@ -38,7 +38,7 @@ namespace nexusminer {
 			//device memory pointers
 			uint32_t* d_sieving_primes;
 			uint32_t* d_starting_multiples;
-			uint8_t* d_prime_mod_inverses;
+			uint32_t* d_prime_mod_inverses;
 			uint32_t* d_small_prime_offsets;
 			Cuda_sieve::sieve_word_t* d_sieve;
 			uint32_t* d_multiples;
