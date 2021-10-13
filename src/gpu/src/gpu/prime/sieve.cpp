@@ -370,7 +370,7 @@ namespace nexusminer {
 
         void Sieve::reset_stats()
         {
-            m_chain_histogram = std::vector<std::uint32_t>(Cuda_sieve::chain_histogram_max, 0);
+            m_chain_histogram = std::vector<std::uint32_t>(Cuda_sieve::chain_histogram_max+1, 0);
             m_fermat_test_count = 0;
             m_fermat_prime_count = 0;
             m_chain_count = 0;

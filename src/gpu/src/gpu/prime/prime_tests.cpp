@@ -235,6 +235,7 @@ namespace gpu
 		test_sieve.gpu_get_stats();
 		test_sieve.gpu_sieve_free();
 		test_sieve.gpu_fermat_free();
+		m_logger->info("Sieve test complete.");
 	}
 
 	bool PrimeTests::primality_test_cpu(boost::multiprecision::uint1024_t p)
