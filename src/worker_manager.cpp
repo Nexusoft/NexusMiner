@@ -276,9 +276,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 
     if (packet.m_header == Packet::PING)
     {
-        Packet response;
-        response = response.get_packet(Packet::PING);
-        m_connection->transmit(response.get_bytes());
+        m_logger->trace("PING received");
     }
     else
     {
