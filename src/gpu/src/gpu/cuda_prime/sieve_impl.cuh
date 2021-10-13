@@ -32,6 +32,8 @@ namespace nexusminer {
 			void clean_chains();
 			void get_long_chains(CudaChain chains[], uint32_t& chain_count);
 			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
+			void synchronize();
+
 
 		private:
 			int m_device = 0;

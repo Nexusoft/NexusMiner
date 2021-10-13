@@ -23,6 +23,7 @@ namespace nexusminer {
             void get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes);
             void reset_stats();
             void set_chain_ptr(CudaChain* chains, uint32_t* chain_count);
+            void synchronize();
 
 
         private:

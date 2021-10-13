@@ -313,7 +313,7 @@ namespace nexusminer {
             fermat_test_chains << <blocks, threads_per_block >> > (d_report, d_chains, d_chain_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
-            CUDA_CHECK(cudaDeviceSynchronize());
+            //CUDA_CHECK(cudaDeviceSynchronize());
             //CGBN_CHECK(d_report);
         }
 
@@ -390,6 +390,11 @@ namespace nexusminer {
             d_chain_count = chain_count;
             uint32_t chain_count_test;
             CUDA_CHECK(cudaMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+        }
+
+        void Cuda_fermat_test_impl::synchronize()
+        {
+            CUDA_CHECK(cudaDeviceSynchronize());
         }
 
     }

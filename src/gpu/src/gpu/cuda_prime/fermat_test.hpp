@@ -29,6 +29,7 @@ namespace nexusminer {
 			void get_results(uint8_t results[]);
 			void get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes);
 			void reset_stats();
+			void synchronize();
 
 		};
 	}

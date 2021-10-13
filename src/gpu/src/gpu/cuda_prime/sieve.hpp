@@ -61,6 +61,7 @@ namespace nexusminer {
 			void get_sieve(sieve_word_t sieve[]);
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);
 			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
+			void synchronize();
 
 		private:
 			std::unique_ptr<Cuda_sieve_impl> m_impl;

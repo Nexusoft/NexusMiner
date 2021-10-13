@@ -605,7 +605,7 @@ namespace nexusminer {
             
             sieveSmallPrimes << <blocks, threads >> > (d_sieve, sieve_start_offset, d_small_prime_offsets);
 
-            checkCudaErrors(cudaDeviceSynchronize());
+            //checkCudaErrors(cudaDeviceSynchronize());
         }
 
         void Cuda_sieve_impl::run_sieve(uint64_t sieve_start_offset)
@@ -615,7 +615,7 @@ namespace nexusminer {
             do_sieve <<<Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block >>> (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
                 d_starting_multiples, d_sieve, d_multiples);
 
-            checkCudaErrors(cudaDeviceSynchronize());
+            //checkCudaErrors(cudaDeviceSynchronize());
         }
 
         void Cuda_sieve_impl::get_sieve(Cuda_sieve::sieve_word_t sieve[])
@@ -644,7 +644,7 @@ namespace nexusminer {
             const int sieve_blocks = (sieve_total_bits /checks_per_block + sieve_threads - 1)/ sieve_threads;
             find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
 
-            checkCudaErrors(cudaDeviceSynchronize());
+            //checkCudaErrors(cudaDeviceSynchronize());
             
         }
 
@@ -676,12 +676,12 @@ namespace nexusminer {
             //copy surviving chains to a temporary location. 
             filter_busted_chains << <blocks, threads >> > (d_chains, d_last_chain_index, d_good_chains, d_good_chain_index,
                 d_long_chains, d_last_long_chain_index, d_chain_histogram);
-            checkCudaErrors(cudaDeviceSynchronize());
+            //checkCudaErrors(cudaDeviceSynchronize());
             uint32_t good_chain_count;
             //get the count of good chains from device memory
             checkCudaErrors(cudaMemcpy(&good_chain_count, d_good_chain_index, sizeof(*d_good_chain_index), cudaMemcpyDeviceToHost));
             //copy the temporary good chain list back to the chain list
-            checkCudaErrors(cudaMemcpy(d_chains, d_good_chains, good_chain_count*sizeof(*d_chains), cudaMemcpyDeviceToDevice));
+            checkCudaErrors(cudaMemcpyAsync(d_chains, d_good_chains, good_chain_count*sizeof(*d_chains), cudaMemcpyDeviceToDevice));
             //update the chain count
             checkCudaErrors(cudaMemcpy(d_last_chain_index, d_good_chain_index, sizeof(*d_last_chain_index), cudaMemcpyDeviceToDevice));
 
@@ -691,9 +691,11 @@ namespace nexusminer {
         {
             checkCudaErrors(cudaMemcpy(&chain_count, d_last_long_chain_index, sizeof(*d_last_long_chain_index), cudaMemcpyDeviceToHost));
             if (chain_count > 0)
+            {
                 checkCudaErrors(cudaMemcpy(chains, d_long_chains, chain_count * sizeof(*d_long_chains), cudaMemcpyDeviceToHost));
-            //clear the long chain list
-            checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+                //clear the long chain list
+                checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+            }
         }
 
         //read the histogram
@@ -702,6 +704,11 @@ namespace nexusminer {
             checkCudaErrors(cudaMemcpy(chain_histogram, d_chain_histogram, (Cuda_sieve::chain_histogram_max+1) * sizeof(*d_chain_histogram), cudaMemcpyDeviceToHost));
             checkCudaErrors(cudaMemcpy(&chain_count, d_chain_stat_count, sizeof(*d_chain_stat_count), cudaMemcpyDeviceToHost));
 
+        }
+
+        void Cuda_sieve_impl::synchronize()
+        {
+            checkCudaErrors(cudaDeviceSynchronize());
         }
 
         //allocate global memory and load values used by the sieve to the gpu 

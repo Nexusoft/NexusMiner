@@ -75,6 +75,8 @@ namespace nexusminer {
 			bool chain_trial_division(Chain& chain);
 			void do_chain_trial_division_check();
 			void gpu_get_stats();
+			void gpu_sieve_synchronize();
+			void gpu_fermat_synchronize();
 
 		private:
 			//mod 30 wheel using primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
@@ -95,7 +97,7 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			const uint32_t m_sieving_prime_limit = 4e6;//1<<22;
+			const uint32_t m_sieving_prime_limit = 5e6;//1<<22;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 200000;
 			const int m_fermat_test_batch_size_max = 1000000;

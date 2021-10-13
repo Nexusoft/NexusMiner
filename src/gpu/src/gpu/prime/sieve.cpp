@@ -417,7 +417,7 @@ namespace nexusminer {
         {
             uint32_t chain_count = 0;
             m_cuda_chains = {};
-            m_cuda_chains.resize(m_cuda_sieve.m_max_chains);
+            m_cuda_chains.resize(m_cuda_sieve.m_max_long_chains);
             m_cuda_sieve.get_long_chains(m_cuda_chains.data(), chain_count);
             //convert gpu chains to cpu chains
             for (auto i = 0; i < chain_count; i++)
@@ -788,6 +788,16 @@ namespace nexusminer {
         void Sieve::gpu_get_stats()
         {
             m_cuda_sieve.get_stats(m_chain_histogram.data(), m_chain_count);
+        }
+
+        void Sieve::gpu_sieve_synchronize()
+        {
+            m_cuda_sieve.synchronize();
+        }
+
+        void Sieve::gpu_fermat_synchronize()
+        {
+            m_cuda_prime_test.synchronize();
         }
 
         void Sieve::do_chain_trial_division_check()

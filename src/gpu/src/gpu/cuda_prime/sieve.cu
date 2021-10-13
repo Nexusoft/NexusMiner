@@ -89,6 +89,11 @@ namespace nexusminer {
             m_impl->get_stats(chain_histogram, chain_count);
         }
 
+        void Cuda_sieve::synchronize()
+        {
+            m_impl->synchronize();
+        }
+
         void Cuda_sieve::run_large_prime_sieve(uint64_t sieve_start_offset)
         {
             m_impl->run_large_prime_sieve(sieve_start_offset);

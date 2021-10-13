@@ -124,10 +124,12 @@ void Worker_prime::run()
 	uint64_t find_chains_ms = 0;
 	uint64_t sieving_ms = 0;
 	uint64_t test_chains_ms = 0;
+	uint64_t clean_chains_ms = 0;
 	uint64_t elapsed_ms = 0;
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
 
+	bool debug = false;
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
@@ -138,28 +140,31 @@ void Worker_prime::run()
 		auto sieve_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_sieve_small_primes(low);
 		m_segmented_sieve->sieve_batch(low);
+		if (debug) m_segmented_sieve->gpu_sieve_synchronize();
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
 		auto find_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->find_chains();
+		if (debug) m_segmented_sieve->gpu_sieve_synchronize();
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
-		uint32_t chain_count = m_segmented_sieve->get_chain_count();
 		//m_segmented_sieve->do_chain_trial_division_check();
 		auto test_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_run_fermat_chain_test();
+		if (debug) m_segmented_sieve->gpu_fermat_synchronize();
 		auto test_chains_stop = std::chrono::steady_clock::now();
 		auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
 		test_chains_ms += test_chains_elapsed.count();
 		auto clean_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_clean_chains();
+		if (debug) m_segmented_sieve->gpu_sieve_synchronize();
 		auto clean_chains_stop = std::chrono::steady_clock::now();
 		auto clean_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(clean_chains_stop - clean_chains_start);
+		clean_chains_ms += clean_chains_elapsed.count();
 		//check for winners
 		m_segmented_sieve->get_long_chains();
-		m_segmented_sieve->gpu_get_stats();
 		//check difficulty of any chains that passed through the filter
 		for (auto x : m_segmented_sieve->m_long_chain_starts)
 		{
@@ -184,14 +189,16 @@ void Worker_prime::run()
 				}
 			}
 		}
+		m_segmented_sieve->gpu_get_stats();
 		m_segmented_sieve->m_long_chain_starts = {};
 		low += sieve_batch_range;
+		
 
 		//debug
 		auto end = std::chrono::steady_clock::now();
 		auto interval_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - interval_start); 
-		bool print_debug = true;
-		if (print_debug && interval_elapsed.count() > 10000)
+		
+		if (debug && interval_elapsed.count() > 10000)
 		{
 			uint64_t fermat_test_count, fermat_prime_count;
 			m_segmented_sieve->gpu_get_fermat_stats(fermat_test_count, fermat_prime_count);
@@ -212,14 +219,10 @@ void Worker_prime::run()
 				1.0e6 * fermat_test_count / m_range_searched << std::endl;
 
 			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << range_searched_this_cycle / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
-			//double predicted_8chain_positivity_rate = std::pow(fermat_positive_rate, 8);
-			//std::cout << "Predicted chains tested to find one Fermat 8-chains: " << 1 / predicted_8chain_positivity_rate << std::endl;
-			//double predicted_days_between_8chains = 1.0 / (predicted_8chain_positivity_rate * chains_per_sec * 3600 * 24);
-			//std::cout << "Predicted days between 8 chains per core: " << std::fixed << std::setprecision(2) << predicted_days_between_8chains << std::endl;
 			std::cout << "Elapsed time: " << std::fixed << std::setprecision(2) << elapsed_ms / 1000.0 << "s. Sieving: " <<
 				100.0 * sieving_ms / elapsed_ms << "% Chain filtering: " << 100.0 * find_chains_ms / elapsed_ms
-				<< "% Fermat testing: " << 100.0 * test_chains_ms / elapsed_ms << "% Other: " <<
-				100.0 * (elapsed_ms - (sieving_ms + find_chains_ms + test_chains_ms)) / elapsed_ms << "%" << std::endl;
+				<< "% Fermat testing: " << 100.0 * test_chains_ms / elapsed_ms << "% Clean chains: " << 100.0 * clean_chains_ms / elapsed_ms <<
+				"% Other: " << 100.0 * (elapsed_ms - (sieving_ms + find_chains_ms + test_chains_ms + clean_chains_ms)) / elapsed_ms << "%" << std::endl;
 			interval_start = std::chrono::steady_clock::now();
 			std::cout << std::endl;
 		}

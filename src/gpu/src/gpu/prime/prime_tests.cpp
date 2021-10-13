@@ -126,18 +126,22 @@ namespace gpu
 		test_sieve.gpu_sieve_load(m_device);
 		test_sieve.gpu_sieve_init();
 		test_sieve.sieve_small_primes();
+		
 		auto start = std::chrono::steady_clock::now();
 		test_sieve.gpu_sieve_small_primes(0);
+		test_sieve.gpu_sieve_synchronize();
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double small_prime_sieve_elapsed_s = elapsed.count() / 1000.0;
 		start = std::chrono::steady_clock::now();
 		test_sieve.sieve_batch(0);
+		test_sieve.gpu_sieve_synchronize();
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double sieve_elapsed_s = elapsed.count() / 1000.0;
 		start = std::chrono::steady_clock::now();
 		test_sieve.gpu_sieve_large_primes(0);
+		test_sieve.gpu_sieve_synchronize();
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double large_prime_sieve_elapsed_s = elapsed.count() / 1000.0;
@@ -146,6 +150,7 @@ namespace gpu
 		//uint64_t candidate_count = test_sieve.count_prime_candidates();
 		start = std::chrono::steady_clock::now();
 		test_sieve.find_chains();
+		test_sieve.gpu_sieve_synchronize();
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double find_chains_elapsed_s = elapsed.count() / 1000.0;
@@ -207,6 +212,7 @@ namespace gpu
 		//process chains
 		test_sieve.gpu_reset_fermat_stats();
 		test_sieve.gpu_run_fermat_chain_test();
+		test_sieve.gpu_fermat_synchronize();
 		uint64_t test_attempts, passes;
 		test_sieve.gpu_get_fermat_stats(test_attempts, passes);
 		m_logger->info("Fermat primes: {}/{} ({:.3f}%). Expected about {:.3f}%.",

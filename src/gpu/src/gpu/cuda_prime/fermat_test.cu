@@ -58,6 +58,11 @@ namespace nexusminer {
         {
             m_impl->reset_stats();
         }
+
+        void Cuda_fermat_test::synchronize()
+        {
+            m_impl->synchronize();
+        }
          
     }
 }
