@@ -24,6 +24,7 @@ namespace config
 		, m_connection_retry_interval{5}
 		, m_print_statistics_interval{5}
 		, m_get_height_interval{2}
+		, m_ping_interval{10}
 	{
 	}
 
@@ -92,6 +93,10 @@ namespace config
 			if (j.count("get_height_interval") != 0)
 			{
 				j.at("get_height_interval").get_to(m_get_height_interval);
+			}
+			if (j.count("ping_interval") != 0)
+			{
+				j.at("ping_interval").get_to(m_ping_interval);
 			}
 
 			if (j.count("log_level") != 0)

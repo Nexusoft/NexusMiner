@@ -14,6 +14,7 @@ Timer_manager::Timer_manager(chrono::Timer_factory::Sptr timer_factory)
 {
     m_connection_retry_timer = m_timer_factory->create_timer();
     m_get_height_timer = m_timer_factory->create_timer();
+    m_ping_timer = m_timer_factory->create_timer();
     m_stats_collector_timer = m_timer_factory->create_timer();
     m_stats_printer_timer = m_timer_factory->create_timer();
 }
@@ -28,6 +29,11 @@ void Timer_manager::start_connection_retry_timer(std::uint16_t timer_interval, s
 void Timer_manager::start_get_height_timer(std::uint16_t timer_interval, std::weak_ptr<network::Connection> connection)
 {
     m_get_height_timer->start(chrono::Seconds(timer_interval), get_height_handler(timer_interval, std::move(connection)));
+}
+
+void Timer_manager::start_ping_timer(std::uint16_t timer_interval, std::weak_ptr<network::Connection> connection)
+{
+    m_ping_timer->start(chrono::Seconds(timer_interval), ping_handler(timer_interval, std::move(connection)));
 }
 
 void Timer_manager::start_stats_collector_timer(std::uint16_t timer_interval, std::vector<std::shared_ptr<Worker>> workers, 
@@ -46,6 +52,7 @@ void Timer_manager::stop()
 {
     m_connection_retry_timer->cancel();
     m_get_height_timer->cancel();
+    m_ping_timer->cancel();
     m_stats_collector_timer->cancel();
     m_stats_printer_timer->cancel();
 }
@@ -89,6 +96,28 @@ chrono::Timer::Handler Timer_manager::get_height_handler(std::uint16_t get_heigh
                 get_height_handler(get_height_interval, std::move(connection_shared)));
         }
     }; 
+}
+
+chrono::Timer::Handler Timer_manager::ping_handler(std::uint16_t ping_interval, std::weak_ptr<network::Connection> connection)
+{
+    return[this, connection, ping_interval](bool canceled)
+    {
+        if (canceled)	// don't do anything if the timer has been canceled
+        {
+            return;
+        }
+
+        auto connection_shared = connection.lock();
+        if (connection_shared)
+        {
+            Packet packet;
+            packet.m_header = Packet::PING;
+            connection_shared->transmit(packet.get_bytes());
+
+            // restart timer
+            m_ping_timer->start(chrono::Seconds(ping_interval), ping_handler(ping_interval, std::move(connection_shared)));
+        }
+    };
 }
 
 chrono::Timer::Handler Timer_manager::stats_collector_handler(std::uint16_t stats_collector_interval, 

@@ -185,11 +185,18 @@ bool Validator::check(std::string const& config_file)
 		}
 		if (j.count("get_height_interval") != 0)
 		{
-                        if(!j.at("get_height_interval").is_number())
+            if(!j.at("get_height_interval").is_number())
             {
                 m_optional_fields.push_back(Validator_error{"get_height_interval", "Not a number"});
             }
 		}
+        if (j.count("ping_interval") != 0)
+        {
+            if (!j.at("ping_interval").is_number())
+            {
+                m_optional_fields.push_back(Validator_error{ "ping_interval", "Not a number" });
+            }
+        }
     }
     catch(const std::exception& e)
     {
