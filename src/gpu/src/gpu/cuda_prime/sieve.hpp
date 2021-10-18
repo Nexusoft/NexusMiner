@@ -35,8 +35,8 @@ namespace nexusminer {
 			static const int m_small_primes[]; //array is defined in sieve.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,
-			static const int m_medium_prime_count = 1u << 17;
-			static const int m_large_prime_count = 1u << 21;
+			static constexpr int m_medium_prime_count = 1u << 17;
+			static constexpr int m_large_prime_count = 1u << 21;
 			static const int chain_histogram_max = 10;  
 			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /16;
 			
