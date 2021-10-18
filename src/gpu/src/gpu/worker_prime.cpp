@@ -128,6 +128,9 @@ void Worker_prime::run()
 	uint64_t elapsed_ms = 0;
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
+	uint64_t fermat_tests_this_cycle_start;
+	uint64_t fermat_passes_this_cycle_start;
+	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start);
 
 	bool debug = true;
 	auto start = std::chrono::steady_clock::now();
@@ -201,8 +204,9 @@ void Worker_prime::run()
 		
 		if (debug && interval_elapsed.count() > 10000)
 		{
-			uint64_t fermat_test_count, fermat_prime_count;
+			uint64_t fermat_test_count, fermat_prime_count, fermat_tests_this_cycle;
 			m_segmented_sieve->gpu_get_fermat_stats(fermat_test_count, fermat_prime_count);
+			fermat_tests_this_cycle = fermat_test_count - fermat_tests_this_cycle_start;
 			std::cout << "--debug--" << std::endl;
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 			elapsed_ms = elapsed.count();
@@ -214,8 +218,7 @@ void Worker_prime::run()
 				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
 			/*std::cout << "Avg chain length: " << std::fixed << std::setprecision(2) << 1.0 * m_segmented_sieve->m_chain_candidate_total_length / m_segmented_sieve->m_chain_count
 				<< " Max chain: " << m_segmented_sieve->m_chain_candidate_max_length << std::endl;*/
-			std::cout << "Fermat Tests: " << fermat_test_count << " Fermat Primes: " << fermat_prime_count <<
-				" Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
+			std::cout << "Fermat test rate: " << 1.0* fermat_tests_this_cycle /(double)test_chains_ms << "k tests/s. Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
 				1.0e6 * fermat_test_count / m_range_searched << std::endl;
 
