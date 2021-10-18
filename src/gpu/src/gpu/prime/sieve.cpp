@@ -25,27 +25,26 @@ namespace nexusminer {
 
         void Sieve::generate_sieving_primes()
         {
-            //generate small sieving primes
-            //primesieve::generate_primes(sieving_start_prime, m_small_prime_end, &m_small_primes);
-
-            //generate medium sieving primes
-            m_logger->info("Generating sieving primes up to {}...", m_sieving_prime_limit);
+            //small primes are hardcoded in sieve.cu
+            m_logger->info("Generating sieving primes...");
             auto start = std::chrono::steady_clock::now();
-            primesieve::generate_primes(sieving_start_prime, m_sieving_prime_limit, &m_sieving_primes);
+            //generate medium sieving primes
+            primesieve::generate_n_primes(Cuda_sieve::m_medium_prime_count, m_sieving_start_prime, &m_sieving_primes);
+            //the largest medium sieving prime
+            if (m_sieving_primes.size() > 0)
+                m_sieving_prime_limit = m_sieving_primes.back();
+            else
+                m_sieving_prime_limit = 0;
+            primesieve::generate_n_primes(Cuda_sieve::m_large_prime_count, m_sieving_prime_limit + 1ull, &m_large_sieving_primes);
+            if (m_large_sieving_primes.size() > 0)
+                m_large_prime_limit = m_large_sieving_primes.back();
+            else
+                m_large_prime_limit = m_sieving_prime_limit;
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::stringstream ss;
-            ss << "Done. " << m_sieving_primes.size() << " primes generated in " << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds.";
+            ss << "Done. " << m_sieving_primes.size() + m_large_sieving_primes.size() << " primes generated in " << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds.";
             m_logger->info(ss.str());
-            primesieve::generate_n_primes(large_prime_count, m_sieving_prime_limit, &m_large_sieving_primes);
-            //prime mod inverses
-            m_prime_mod_inverses = {};
-            for (auto s : m_sieving_primes)
-            {
-                int64_t prime_mod_inverse = boost::integer::mod_inverse((int64_t)s, (int64_t)30);
-                m_prime_mod_inverses.push_back(prime_mod_inverse);
-            }
-
 
         }
 
@@ -80,7 +79,6 @@ namespace nexusminer {
             //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
             //do this once at the start of a new block to initialize the sieve.
             m_multiples = {};
-           
             m_logger->info("Calculating starting multiples.");
             auto start = std::chrono::steady_clock::now();
             for (auto s : m_sieving_primes)
@@ -96,7 +94,7 @@ namespace nexusminer {
             //std::stringstream ss;
             //ss << "Done. (" << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds)";
             //m_logger->info(ss.str());
-
+            m_large_multiples = {};
             for (const auto& p : m_large_sieving_primes)
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, p);
@@ -109,9 +107,7 @@ namespace nexusminer {
         void Sieve::gpu_sieve_load(uint16_t device=0)
         {
             
-            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(),
-                m_prime_mod_inverses.data(), m_sieve_batch_buffer_size, device);
-           
+            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(), m_sieve_batch_buffer_size, device);
             m_cuda_sieve_allocated = true;
             reset_stats();
 
@@ -119,7 +115,7 @@ namespace nexusminer {
 
         void Sieve::gpu_sieve_init()
         {
-            m_cuda_sieve.init_sieve(m_multiples.data(), m_small_prime_offsets.data());
+            m_cuda_sieve.init_sieve(m_multiples.data(), m_small_prime_offsets.data(), m_large_multiples.data());
             m_sieve_run_count = 0;
         }
 
@@ -183,46 +179,7 @@ namespace nexusminer {
         }
 
 
-        //run the sieve on one segment
-        void Sieve::sieve_segment()
-        {
-            for (std::size_t i = 0; i < m_sieving_primes.size(); i++)
-            {
-                uint64_t j = m_multiples[i];
-                uint64_t k = m_sieving_primes[i];
-                //where are we in the wheel
-                int wheel_index = sieve30_index[(m_prime_mod_inverses[i]*j) % 30];
-                int next_wheel_gap = sieve30_gaps[wheel_index];
-                while (j < m_segment_size)
-                {
-                    //cross off a multiple of the sieving prime
-                    //m_sieve[j / 30] &= unset_bit_mask[j % 30];
-                    uint64_t sieve_index = (j / 30) * 8 + sieve30_index[j % 30];
-                    
-                    m_sieve[sieve_index] = 0;
-                    
-                    //increment the next multiple of the current prime (rotate the wheel).
-                    j += k * next_wheel_gap;  
-                    wheel_index = (wheel_index + 1) % 8;
-                    next_wheel_gap = sieve30_gaps[wheel_index];
-                }
-                //save the starting multiple and wheel index for the next segment
-                //experiment to calculate future multiples
-                uint32_t t = 0;
-                if (m_segment_size >= m_multiples[i])
-                    t = get_offset_to_next_multiple(m_segment_size - m_multiples[i], k);
-                else
-                    t = m_multiples[i] - m_segment_size;
-                if (t != j - m_segment_size)
-                {
-                    std::cout << t << " " << j - m_segment_size << std::endl;
-                }
-                
-                //end experiment
-                m_multiples[i] = j - m_segment_size;
-                
-            }
-        }
+       
        
 
         //run the sieve on the gpu
@@ -313,22 +270,6 @@ namespace nexusminer {
                 //std::cout << "here" << std::endl;
             }
            // std::cout << "here" << std::endl;
-        }
-
-        //batch sieve on the cpu for debug
-        void Sieve::sieve_batch_cpu(uint64_t low)
-        {
-            reset_sieve_batch(low);
-            m_sieve_results = {};
-            reset_sieve();
-            sieve_small_primes();
-            for (auto i = 0; i < m_segment_batch_size; i++)
-            {
-                reset_sieve();
-                sieve_segment();
-                //save the results of the sieve
-                m_sieve_results.insert(m_sieve_results.end(), m_sieve.begin(), m_sieve.end());
-            }
         }
 
         std::uint32_t Sieve::get_segment_size()
@@ -468,103 +409,7 @@ namespace nexusminer {
             return chain_count;
         }
 
-        //search the sieve for chains that meet the minimum length requirement.  Chains can cross segment boundaries.
-        void Sieve::find_chains_cpu(uint64_t low, bool batch_sieve_mode)
-        {
-            std::vector<sieve_word_t>& sieve = batch_sieve_mode?m_sieve_results:m_sieve;
-            uint64_t sieve_size = sieve.size();
-            int previous_sieve_offset = 0;
-            int sieve_offset = 0;
-            uint64_t prime_candidate_offset = 0;
-
-            //look ahead to do a basic density check to ensure there are enough candidates to form a chain
-            //get count of the first  bytes
-            int look_ahead_by = (((m_min_chain_length - 1) * maxGap + 30 - 1) / 30) * 8;
-            int hits_in_look_ahead_region = 0;
-            std::queue<int> look_ahead;
-            look_ahead.push(0);
-            for (int i = 0; i < look_ahead_by - 1; i++)
-            {
-                look_ahead.push(sieve[i]);
-                hits_in_look_ahead_region += sieve[i];
-            }
-            
-            for (uint64_t n = 0; n < sieve_size; n++)
-            {
-                //remove the oldest value from the look ahead region running sum.
-                hits_in_look_ahead_region -= look_ahead.front();
-                look_ahead.pop();
-                //add the next look ahead byte
-                if (n + look_ahead_by-1 < sieve_size)
-                {
-                    look_ahead.push(sieve[n + look_ahead_by - 1]);
-                    hits_in_look_ahead_region += look_ahead.back();
-                }
-                else
-                {
-                    //we are at the end of the sieve. since we don't know what comes next, assume it is a prime candidate
-                    look_ahead.push(1);
-                    hits_in_look_ahead_region += look_ahead.back();
-                }
-                if (!m_chain_in_process && hits_in_look_ahead_region < m_min_chain_length)
-                {
-                    //not enough prime candidates in the next region of numbers to make a long enough chain
-
-                }
-                else
-                {
-                    sieve_offset = sieve30_offsets[n % 8];
-                    prime_candidate_offset = low + n / 8 * 30 + sieve_offset;
-                    if (sieve[n] == 1)
-                    {
-                        
-                        if (m_chain_in_process)
-                        {
-                            uint64_t previous_prime_candidate_offset = 
-                                m_current_chain.m_base_offset + m_current_chain.m_offsets[m_current_chain.length() - 1].m_offset;
-
-                            if (prime_candidate_offset - previous_prime_candidate_offset > maxGap)
-                            {
-                                //max gap exceeded.  close open chain and start a new one.
-                                close_chain();
-                                open_chain(prime_candidate_offset);
-                                
-                            }
-                            else
-                            {
-                                //continue chain
-                                m_current_chain.push_back(prime_candidate_offset - m_current_chain.m_base_offset);
-                                m_current_chain.m_gap_in_process = 0;
-                                
-                            }
-                        }
-                        else
-                        {
-                            //start a new chain
-                            open_chain(prime_candidate_offset);
-                        }
-                    }
-                    else
-                    {
-                        if (m_chain_in_process)
-                        {
-                            //accumulate the gap
-                            int sieve_offset = sieve30_offsets[n % 8];
-                            uint64_t prime_candidate_offset = low + n / 8 * 30 + sieve_offset;
-                            uint64_t previous_prime_candidate_offset =
-                                m_current_chain.m_base_offset + m_current_chain.m_offsets[m_current_chain.length() - 1].m_offset;
-                            m_current_chain.m_gap_in_process = prime_candidate_offset - previous_prime_candidate_offset;
-                            //only keep the chain going if the current gap is smaller than the max
-                            if (m_current_chain.m_gap_in_process > maxGap)
-                            {
-                                close_chain();
-                            }
-                        }
-                    }
-                }
-            }
-            
-        }
+        
 
         void Sieve::close_chain()
         {
@@ -697,7 +542,7 @@ namespace nexusminer {
             primesieve::iterator it;
             uint64_t prime = it.next_prime();
 
-            for (; prime <= m_sieving_prime_limit; prime = it.next_prime())
+            for (; prime <= m_large_prime_limit; prime = it.next_prime())
                 p_not_divisible_by_nth_prime *= (prime - 1.0) / prime;
 
             return p_not_divisible_by_nth_prime;

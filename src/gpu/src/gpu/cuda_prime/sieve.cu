@@ -18,15 +18,14 @@ namespace nexusminer {
             m_impl->run_sieve(sieve_start_offset);
         }
        
-        void Cuda_sieve::load_sieve(uint32_t primes[], uint32_t prime_count,
-            uint32_t prime_mod_inverses[], uint32_t sieve_size, uint16_t device)
+        void Cuda_sieve::load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t sieve_size, uint16_t device)
         {
-            m_impl->load_sieve(primes, prime_count, prime_mod_inverses, sieve_size, device);
+            m_impl->load_sieve(primes, prime_count, large_primes, sieve_size, device);
         }
 
-        void Cuda_sieve::init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[])
+        void Cuda_sieve::init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[])
         {
-            m_impl->init_sieve(starting_multiples, small_prime_offsets);
+            m_impl->init_sieve(starting_multiples, small_prime_offsets, large_prime_starting_multiples);
         }
 
         void Cuda_sieve::reset_stats()

@@ -129,7 +129,7 @@ void Worker_prime::run()
 	uint64_t low = 0;
 	uint64_t range_searched_this_cycle = 0;
 
-	bool debug = false;
+	bool debug = true;
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
@@ -140,6 +140,7 @@ void Worker_prime::run()
 		auto sieve_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_sieve_small_primes(low);
 		m_segmented_sieve->sieve_batch(low);
+		m_segmented_sieve->gpu_sieve_large_primes(low);
 		if (debug) m_segmented_sieve->gpu_sieve_synchronize();
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);

@@ -35,7 +35,7 @@ namespace nexusminer {
 			void gpu_get_sieve();
 			void gpu_sieve_small_primes(uint64_t sieve_start_offset);
 			void gpu_sieve_large_primes(uint64_t sieve_start_offset);
-			void sieve_segment();
+			//void sieve_segment();
 			void sieve_small_primes();
 			void sieve_batch(uint64_t low);
 			void sieve_batch_cpu(uint64_t low);
@@ -46,7 +46,7 @@ namespace nexusminer {
 			void reset_batch_run_count();
 			void clear_chains();
 			void reset_stats();
-			void find_chains_cpu(uint64_t low, bool batch_sieve_mode);
+			//void find_chains_cpu(uint64_t low, bool batch_sieve_mode);
 			void find_chains();
 			void get_chains();
 			void get_long_chains();
@@ -83,8 +83,8 @@ namespace nexusminer {
 			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
 			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
-			static constexpr int L1_CACHE_SIZE = 32768;
-			static constexpr int L2_CACHE_SIZE = 262144;
+			//static constexpr int L1_CACHE_SIZE = 32768;
+			//static constexpr int L2_CACHE_SIZE = 262144;
 
 		public:
 			
@@ -97,7 +97,8 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
-			const uint32_t m_sieving_prime_limit = 5e6;//1<<22;
+			uint32_t m_sieving_prime_limit;
+			uint32_t m_large_prime_limit;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 200000;
 			const int m_fermat_test_batch_size_max = 1000000;
@@ -131,7 +132,7 @@ namespace nexusminer {
 			//each byte covers a range of 30 sieving primes 
 			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
 			//we start sieving at 7 with the small primes.  medium primes start here.
-			const int sieving_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
+			const int m_sieving_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
 			
 
 
@@ -176,7 +177,7 @@ namespace nexusminer {
 			std::vector<uint32_t> m_large_sieving_primes;
 			std::vector<uint32_t> m_multiples;
 			std::vector<uint32_t> m_large_multiples;
-			std::vector<uint32_t> m_prime_mod_inverses;
+			//std::vector<uint32_t> m_prime_mod_inverses;
 			std::vector<Chain> m_chain;
 			std::vector<CudaChain>m_cuda_chains;
 			std::vector<uint32_t>m_small_prime_offsets;
