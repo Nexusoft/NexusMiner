@@ -99,8 +99,7 @@ namespace nexusminer {
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, p);
                 m_large_multiples.push_back(m);
-                double mod_constant = 1.0/p;
-                m_large_prime_mod_constants.push_back(mod_constant);
+
             }
         }
 
