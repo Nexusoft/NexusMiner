@@ -382,6 +382,7 @@ namespace nexusminer {
             uint32_t block_id = blockIdx.x;
             uint32_t index = threadIdx.x;
             uint32_t stride = blockDim.x;
+            uint32_t num_threads = blockDim.x;
 
             //initialize shared lookup tables.  lookup tables in shared memory are faster than global memory lookup tables.
             for (int i = index; i < 120; i += stride)
@@ -406,7 +407,7 @@ namespace nexusminer {
            
             const uint32_t segments = Cuda_sieve::m_kernel_segments_per_block;
             uint32_t sieve_results_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block;
-
+            const uint32_t primes_per_thread = (sieving_prime_count + num_threads - 1) / num_threads;
             //each block sieves a different region
             uint64_t start_offset = sieve_start_offset + static_cast<uint64_t>(block_id) * Cuda_sieve::m_kernel_sieve_size_words_per_block * Cuda_sieve::m_sieve_word_range;
             
@@ -425,7 +426,12 @@ namespace nexusminer {
                 __syncthreads();
 
                 for (uint32_t i = index; i < sieving_prime_count; i += stride)
+                //for (uint32_t prime_index_offset = 0; prime_index_offset < primes_per_thread; prime_index_offset++)
                 {
+                    //uint32_t i = primes_per_thread * index + prime_index_offset;
+                    /*if (i >= sieving_prime_count)
+                        break;*/
+
                     k = sieving_primes[i];
                     
                     //get aligned to this region
@@ -676,9 +682,7 @@ namespace nexusminer {
                     const uint32_t ymax = segments;
                     const uint32_t xmax = Cuda_sieve::m_large_prime_bucket_size;
                     large_prime_buckets[z*xmax*ymax + y*xmax + x] = sieve_segment_hit;
-                    //if (sieve_word == 216)
-                    //    printf("found 216. Block %i Prime %u start offset %" PRIu64 " j %u next segment %u sieve word %u sieve bit %u bucket data %x bucket_index %u\n",
-                    //        block_id, k, start_offset, j, next_segment, sieve_word, sieve_bit, sieve_segment_hit, bucket_index);
+                    
                     //if (/*k == 821999 &&*/ block_id == 1)
                     //    printf("Block %i Prime %u start offset %" PRIu64 " j %u next segment %u sieve word %u sieve bit %u bucket data %x bucket_index %u\n",
                     //        block_id, k, start_offset, j, next_segment, sieve_word, sieve_bit, sieve_segment_hit, bucket_index);

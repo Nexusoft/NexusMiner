@@ -35,6 +35,17 @@ namespace nexusminer {
                 m_sieving_prime_limit = m_sieving_primes.back();
             else
                 m_sieving_prime_limit = 0;
+            //reorder the primes
+            /*std::vector<Cuda_sieve::sieve_word_t> temp_primes;
+            uint32_t index = 0;
+            const uint32_t primes_per_thread = (m_sieving_primes.size() + Cuda_sieve::m_threads_per_block - 1) / Cuda_sieve::m_threads_per_block;
+
+            for (auto i = 0; i < m_sieving_primes.size(); i++)
+            {
+                index = (i % primes_per_thread) * Cuda_sieve::m_threads_per_block + i / primes_per_thread;
+                temp_primes.push_back(m_sieving_primes[index]);
+            }
+            m_sieving_primes = temp_primes;*/
             primesieve::generate_n_primes(Cuda_sieve::m_large_prime_count, m_sieving_prime_limit + 1ull, &m_large_sieving_primes);
             if (m_large_sieving_primes.size() > 0)
                 m_large_prime_limit = m_large_sieving_primes.back();
