@@ -16,7 +16,7 @@ namespace nexusminer {
 		public:
 			using sieve_word_t = uint32_t;
 			static const int m_sieve_word_byte_count = sizeof(sieve_word_t);
-			static const int m_kernel_sieve_size_bytes = 4096 * 8;  //this is the size of the sieve in bytes.  it should be a multiple of 8. 
+			static const int m_kernel_sieve_size_bytes = 6000 * 8;  //this is the size of the sieve in bytes.  it should be a multiple of 8. 
 			static const int m_kernel_sieve_size_words = m_kernel_sieve_size_bytes / m_sieve_word_byte_count;
 			static const int m_kernel_segments_per_block = 32;  //number of times to run the sieve within a kernel call
 			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;

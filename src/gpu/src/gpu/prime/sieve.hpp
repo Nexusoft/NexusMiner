@@ -83,8 +83,6 @@ namespace nexusminer {
 			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
 			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
-			//static constexpr int L1_CACHE_SIZE = 32768;
-			//static constexpr int L2_CACHE_SIZE = 262144;
 
 		public:
 			

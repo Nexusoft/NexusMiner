@@ -715,7 +715,7 @@ namespace nexusminer {
 
             //one kernel block per sieve segment
             blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
-            threads = 512;
+            threads = 1024;
             sieveLargePrimes << <blocks, threads >> > (sieve_start_offset, d_large_primes, d_large_prime_starting_multiples, 
                 d_large_prime_buckets, d_bucket_indices, d_sieve);
             
