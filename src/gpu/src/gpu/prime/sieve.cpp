@@ -61,11 +61,12 @@ namespace nexusminer {
 
         void Sieve::set_sieve_start(boost::multiprecision::uint1024_t sieve_start)
         {
-            //set the sieve start to the next highest multiple of the sieve word range
-            if (sieve_start % m_sieve_range_per_word > 0)
+            //set the sieve start to the next highest multiple of the sieve alignment value
+            if (sieve_start % Cuda_sieve::m_sieve_alignment > 0)
             {
-                sieve_start += m_sieve_range_per_word - (sieve_start % m_sieve_range_per_word);
+                sieve_start += Cuda_sieve::m_sieve_alignment - (sieve_start % Cuda_sieve::m_sieve_alignment);
             }
+            sieve_start += Cuda_sieve::m_sieve_alignment_offset;
             m_sieve_start = sieve_start;
         }
 
@@ -96,9 +97,6 @@ namespace nexusminer {
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
                 m_multiples.push_back(m);
-                //where is the starting multiple relative to the wheel
-                //int64_t wheel_index = (boost::integer::mod_inverse((int64_t)s, (int64_t)30) * m) % 30;
-                //int wheel_lookup = sieve30_index[wheel_index];
             }
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -110,17 +108,14 @@ namespace nexusminer {
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, p);
                 m_large_multiples.push_back(m);
-
             }
         }
 
         void Sieve::gpu_sieve_load(uint16_t device=0)
         {
-            
             m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(), m_sieve_batch_buffer_size, device);
             m_cuda_sieve_allocated = true;
             reset_stats();
-
         }
 
         void Sieve::gpu_sieve_init()
@@ -362,6 +357,17 @@ namespace nexusminer {
             }
             m_chain_count += chain_count;
         
+        }
+
+        //sort chains in order of base offset for debug
+        void Sieve::sort_chains()
+        {
+            std::sort(m_chain.begin(), m_chain.end(),
+                [](const Chain& a, const Chain& b)
+                {
+                    return a.m_base_offset < b.m_base_offset;
+                });
+
         }
 
         void Sieve::get_long_chains()

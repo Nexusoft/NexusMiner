@@ -35,7 +35,6 @@ namespace nexusminer {
 			void gpu_get_sieve();
 			void gpu_sieve_small_primes(uint64_t sieve_start_offset);
 			void gpu_sieve_large_primes(uint64_t sieve_start_offset);
-			//void sieve_segment();
 			void sieve_small_primes();
 			void sieve_batch(uint64_t low);
 			void sieve_batch_cpu(uint64_t low);
@@ -46,9 +45,9 @@ namespace nexusminer {
 			void reset_batch_run_count();
 			void clear_chains();
 			void reset_stats();
-			//void find_chains_cpu(uint64_t low, bool batch_sieve_mode);
 			void find_chains();
 			void get_chains();
+			void sort_chains();
 			void get_long_chains();
 			void gpu_clean_chains();
 			void gpu_run_fermat_chain_test();

@@ -23,7 +23,10 @@ namespace nexusminer {
         {
             chain.m_base_offset = base_offset;
             chain.m_chain_state = CudaChain::Chain_state::open;
-            cuda_chain_push_back(chain, 0);  //the first offset is always zero
+            chain.m_offsets[0] = 0; //the first offset is always zero
+            chain.m_fermat_test_status[0] = Fermat_test_status::untested;
+            chain.m_untested_count = 1;
+            chain.m_offset_count = 1;
             chain.m_gap_in_process = 0;
             chain.m_prime_count = 0;
         }

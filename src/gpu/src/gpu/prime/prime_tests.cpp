@@ -171,6 +171,7 @@ namespace gpu
 		double find_chains_elapsed_s = elapsed.count() / 1000.0;
 		uint32_t gpu_chain_count = test_sieve.get_chain_count();
 		//test_sieve.get_chains();
+		//test_sieve.sort_chains();
 		//uint64_t chain_count_before = test_sieve.get_current_chain_list_length();
 		//test_sieve.clear_chains();
 		//test_sieve.find_chains_cpu(0, true);

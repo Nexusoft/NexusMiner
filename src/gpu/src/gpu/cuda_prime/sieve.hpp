@@ -2,7 +2,6 @@
 #define NEXUSMINER_GPU_CUDA_SIEVE_HPP
 
 #include "cuda_chain.cuh"
-//#include "fermat_test.hpp"
 #include <stdint.h>
 #include <memory>
 #include <cmath>
@@ -14,23 +13,35 @@ namespace nexusminer {
 		class Cuda_sieve
 		{
 		public:
+			//We choose to use a 32 bit word as the smallest unit of the sieve. Cuda works natively with 32 bit words. 
+			//Using a 64 bit words is slower and byte operations are not natively supported by builtin cuda functions (atomics, popcount, etc).
+			//One 32 bit sieve word represents a span of 30*4 = 120 integers.  
 			using sieve_word_t = uint32_t;
 			static const int m_sieve_word_byte_count = sizeof(sieve_word_t);
-			static const int m_kernel_sieve_size_bytes = 6000 * 8;  //this is the size of the sieve in bytes.  it should be a multiple of 8. 
+			static const int m_sieve_byte_range = 30;
+			static const int m_sieve_word_range = m_sieve_byte_range * m_sieve_word_byte_count;
+			//The wheel formed by primorial 2*3*5*7*11 = 2310 has two gaps of 14.  If we align the sieve start/stop to one of these gaps, 
+			// we guarantee that no chains can cross through the segment boundary.
+			static const int m_sieve_chain_search_boundary = 2310;
+			static const int m_sieve_alignment = m_sieve_chain_search_boundary * m_sieve_word_byte_count;  //ensure the segment ends on a word boundary
+			static const int m_sieve_alignment_offset = 120;  //offset from the wheel start to the first gap greater than 12.  Coincidentally its span 120 is a whole word.
+			//The span of the primorial 30030 is represented by 30030/30 = 1001 bytes which conveniently is just below 1KB
+			//We size the sieve segment to fill the block shared memory which is 48KB minimum.  Newer hardware supports larger shared memory.   
+			//TODO: set the sieve size based on hardware capability.
+			static const int m_kernel_sieve_size_bytes = 1001 * 48;  //this is the size of the sieve segment in bytes. It should be a multiple of 4 for a 32 bit word sieve.
 			static const int m_kernel_sieve_size_words = m_kernel_sieve_size_bytes / m_sieve_word_byte_count;
-			static const int m_kernel_segments_per_block = 32;  //number of times to run the sieve within a kernel call
+			static const int m_segment_range = m_kernel_sieve_size_words * m_sieve_word_range;
+			static const int m_kernel_segments_per_block = 32;  //number of times to repeat the sieve within a kernel call
 			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;
+			static const uint64_t m_block_range = m_segment_range * m_kernel_segments_per_block;
 			static const int m_threads_per_block = 1024;
 			static const int m_num_blocks = 256;  //each block sieves part of the range
 			static const uint64_t m_sieve_total_size = m_kernel_sieve_size_words_per_block * m_num_blocks; //size of the sieve in words
-			static const int m_sieve_byte_range = 30;
-			static const int m_sieve_word_range = m_sieve_byte_range * m_sieve_word_byte_count;
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
 			static const int m_estimated_chains_per_million = 11;
 			static const uint32_t m_max_chains = 2*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const uint32_t m_max_long_chains = 32;
 			static const int m_min_chain_length = 8;
-
 			static const int m_small_prime_count = 23;
 			static const int m_small_primes[]; //array is defined in sieve.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
@@ -54,9 +65,7 @@ namespace nexusminer {
 			void clean_chains();
 			void get_chains(CudaChain chains[], uint32_t& chain_count);
 			void get_long_chains(CudaChain chains[], uint32_t& chain_count);
-
 			void get_chain_count(uint32_t& chain_count);
-
 			void get_chain_pointer(CudaChain*& chains_ptr, uint32_t*& chain_count_ptr);
 			void get_sieve(sieve_word_t sieve[]);
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);

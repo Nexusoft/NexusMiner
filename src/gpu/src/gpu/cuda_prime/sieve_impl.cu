@@ -247,8 +247,6 @@ namespace nexusminer {
             //const uint64_t sieve_size = Cuda_sieve::m_sieve_total_size;
             const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
             const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;
-
-            
             uint64_t num_blocks = gridDim.x;
             uint64_t num_threads = blockDim.x;
             uint64_t block_id = blockIdx.x;
@@ -359,6 +357,132 @@ namespace nexusminer {
             __syncthreads();
             if (threadIdx.x == 0)
                 atomicAdd(chain_stat_count, chain_count_shared);
+        }
+
+        //experimental chain finder
+        //each kernel block is a sieve segment.  Each thread searches a range of 2310*4 within a segment.   
+        __global__ void find_chain_kernel2(Cuda_sieve::sieve_word_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset,
+            unsigned long long* chain_stat_count)
+        {
+            const unsigned int search_range = Cuda_sieve::m_sieve_chain_search_boundary * Cuda_sieve::m_sieve_word_byte_count;
+            const unsigned int search_words = search_range / Cuda_sieve::m_sieve_word_range;
+            const unsigned int total_search_regions = Cuda_sieve::m_sieve_range / search_range;
+            unsigned int num_blocks = gridDim.x;
+            unsigned int num_threads = blockDim.x;
+            unsigned int block_id = blockIdx.x / Cuda_sieve::m_kernel_segments_per_block;
+            unsigned int segment_id = blockIdx.x % Cuda_sieve::m_kernel_segments_per_block;
+            unsigned int index = threadIdx.x;
+            unsigned int search_regions_per_kernel_block = (total_search_regions + num_blocks - 1) / num_blocks;
+            unsigned int search_regions_per_thread = (search_regions_per_kernel_block + num_threads - 1) / num_threads;
+            unsigned int stride = num_threads;
+            unsigned int gap;
+            uint32_t chain_start;
+            uint64_t segment_offset = sieve_start_offset + block_id * Cuda_sieve::m_block_range + segment_id * Cuda_sieve::m_segment_range;
+            uint32_t sieve_segment_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block + segment_id * Cuda_sieve::m_kernel_sieve_size_words;
+            uint32_t sieve_index;
+            //shared copies of lookup tables
+            __shared__ unsigned int sieve30_offsets_shared[8];
+            __shared__ unsigned int sieve30_gaps_shared[8];
+            //local stats
+            __shared__ uint32_t chain_count_shared;
+
+            if (threadIdx.x < 8)
+            {
+                int i = threadIdx.x;
+                sieve30_offsets_shared[i] = sieve30_offsets[i];
+                sieve30_gaps_shared[i] = sieve30_gaps[i];
+            }
+
+            if (threadIdx.x == 0)
+            {
+                chain_count_shared = 0;
+            }
+                
+            __syncthreads();
+
+            for (unsigned int region = index; region < search_regions_per_kernel_block; region += stride)
+            {
+                bool chain_in_process = false;
+                CudaChain current_chain;
+                uint64_t region_offset = segment_offset + region * search_range;
+                chain_start = 0;
+                sieve_index = sieve_segment_index + region * search_words;
+                uint32_t last_offset = 0;
+                //iterate through each word in the search region
+                for (unsigned int word = 0; word < search_words; word++)
+                {
+                    //iterate through each set bit in the sieve word
+                    for (unsigned int b = sieve[sieve_index + word]; b > 0; b &= b - 1)
+                    {
+                        //determine the position of the set bit in the sieve word.
+                        int lowest_set_bit = __ffs(b) - 1;  //__ffs is a cuda primitive that finds the index of the lowest set bit in a word (ones based).
+                        int byte_index = lowest_set_bit / 8;
+                        unsigned int sieve30_offset = sieve30_offsets_shared[lowest_set_bit % 8];
+                        uint32_t local_offset = word * Cuda_sieve::m_sieve_word_range +
+                            byte_index * Cuda_sieve::m_sieve_byte_range + sieve30_offset;
+                        gap = local_offset - last_offset;
+                        /*if (region_offset + local_offset == 2055301)
+                            printf("sieve word %u %x region offset %llu local offset % u\n", sieve_index + word, sieve[sieve_index + word], region_offset, local_offset);*/
+                        if (chain_in_process)
+                        {
+                            if (gap > maxGap)
+                            {
+                                //We reached the end of the chain.  
+                                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
+                                {
+                                    //increment the chain list index
+                                    uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
+                                    //copy the current chain to the global list
+                                    chains[chain_idx] = current_chain;
+                                    //updated block level stats
+                                    atomicInc(&chain_count_shared, 0xFFFFFFFF);
+                                }
+                                /*if (current_chain.m_base_offset ==  2055301)
+                                    printf("close. gap: %u len: %u block: %u segment %u: thread: %u word: %u byte: %u bit: %u offset30: %u local offset: %u\n ",
+                                        gap, current_chain.m_offset_count, block_id, segment_id, index, word, byte_index, lowest_set_bit, sieve30_offset, local_offset);*/
+                                //start a new chain
+                                cuda_chain_open(current_chain, region_offset + local_offset);
+                                chain_start = local_offset;
+                                last_offset = local_offset;
+                            }
+                            else
+                            {
+                                //grow the chain
+                                uint16_t offset_from_chain_start = local_offset - chain_start;
+                                cuda_chain_push_back(current_chain, offset_from_chain_start);
+                                last_offset = local_offset;
+                            }
+                        }
+                        else
+                        {
+                            //start a new chain
+                            cuda_chain_open(current_chain, region_offset + local_offset);
+                            last_offset = local_offset;
+                            chain_start = local_offset;
+                            chain_in_process = true;
+                        }
+                    }
+                    
+                }
+                //we reached the end of the search region.  do a final check on the chain in process
+                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
+                {
+                    //increment the chain list index
+                    uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
+                    //copy the current chain to the global list
+                    chains[chain_idx] = current_chain;
+                    //updated block level stats
+                    atomicInc(&chain_count_shared, 0xFFFFFFFF);
+          
+                }
+            }
+            
+            //update global chain stats
+            __syncthreads();
+            if (threadIdx.x == 0)
+            {
+                atomicAdd(chain_stat_count, chain_count_shared);
+            }
         }
 
         //medium prime sieve.  We use a block of shared memory to sieve in segments.  Each block sieves a different range. 
@@ -761,12 +885,19 @@ namespace nexusminer {
 
         void Cuda_sieve_impl::find_chains()
         {
-            const int sieve_threads = 128;
-            const int checks_per_block = 32;
+            const int sieve_threads = 64;
+            const int checks_per_block = 64;
             const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
             const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;
             const int sieve_blocks = (sieve_total_bits /checks_per_block + sieve_threads - 1)/ sieve_threads;
-            find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
+            //find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
+
+            const int blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
+            const int search_regions_per_thread = 1;
+            const unsigned int search_range = Cuda_sieve::m_sieve_chain_search_boundary * Cuda_sieve::m_sieve_word_byte_count;
+            const unsigned int search_regions_per_segment = (Cuda_sieve::m_segment_range + search_range - 1) / search_range;
+            const unsigned int threads = (search_regions_per_segment + search_regions_per_thread - 1) / search_regions_per_thread;
+            find_chain_kernel2 << <blocks, threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
 
             //checkCudaErrors(cudaDeviceSynchronize());
             
