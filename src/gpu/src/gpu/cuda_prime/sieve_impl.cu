@@ -107,6 +107,7 @@ namespace nexusminer {
                 uint16_t index89 = (start + small_prime_offsets[20] + inc) % 89;
                 uint16_t index97 = (start + small_prime_offsets[21] + inc) % 97;
                 uint16_t index101 = (start + small_prime_offsets[22] + inc) % 101;
+                uint16_t index103 = (start + small_prime_offsets[23] + inc) % 103;
 
                
 
@@ -135,6 +136,7 @@ namespace nexusminer {
                 word &= p89[index89];
                 word &= p97[index97];
                 word &= p101[index101];
+                word &= p103[index103];
 
                 //save to global memory
                 sieve[i] = word;
@@ -502,6 +504,7 @@ namespace nexusminer {
             __shared__ unsigned int sieve30_index_shared[30];
             __shared__ unsigned int prime_mod30_inverse_shared[30];
             //__shared__ unsigned int next_multiple_mod30_offset_shared[30];
+            __shared__ unsigned int prime_index;
            
             uint32_t block_id = blockIdx.x;
             uint32_t index = threadIdx.x;
@@ -527,7 +530,7 @@ namespace nexusminer {
                 prime_mod30_inverse_shared[i] = prime_mod30_inverse[i];
                 //next_multiple_mod30_offset_shared[i] = next_multiple_mod30_offset[i];
             }
-
+            
            
             const uint32_t segments = Cuda_sieve::m_kernel_segments_per_block;
             uint32_t sieve_results_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block;
@@ -540,6 +543,7 @@ namespace nexusminer {
             uint32_t j;
             uint32_t k;
             uint32_t prime_mod_inv;          
+            uint64_t loop_count = 0;
             for (int s = 0; s < segments; s++)
             {
                 //everyone in the block initialize part of the shared sieve
@@ -547,15 +551,20 @@ namespace nexusminer {
                 {
                     sieve[j1] = ~0;
                 }
+                if (index == 0)
+                {
+                    prime_index = num_threads;
+                }
                 __syncthreads();
 
-                for (uint32_t i = index; i < sieving_prime_count; i += stride)
+                for(uint32_t i=index; i < sieving_prime_count; i = atomicInc(&prime_index, 0xFFFFFFFF))
+                //for (uint32_t i = index; i < sieving_prime_count; i += stride)
                 //for (uint32_t prime_index_offset = 0; prime_index_offset < primes_per_thread; prime_index_offset++)
                 {
                     //uint32_t i = primes_per_thread * index + prime_index_offset;
                     /*if (i >= sieving_prime_count)
                         break;*/
-
+                    
                     k = sieving_primes[i];
                     
                     //get aligned to this region
@@ -593,7 +602,7 @@ namespace nexusminer {
                     prime_mod_inv = prime_mod30_inverse_shared[k % 30];
                     wheel_index = sieve30_index_shared[(prime_mod_inv * j) % 30];
                     next_wheel_gap = sieve30_gaps_shared[wheel_index];
-                        
+                    
                     while (j < segment_size)
                     {
                         //cross off a multiple of the sieving prime
@@ -616,11 +625,16 @@ namespace nexusminer {
                         j += k * next_wheel_gap;
                         wheel_index = (wheel_index + 1) % 8;
                         next_wheel_gap = sieve30_gaps_shared[wheel_index];
+                        //loop_count++;
                     }
                     //save the starting multiple for this prime for the next segment
                     multiples[block_id * sieving_prime_count + i] = j - segment_size;
                     
                 }
+                /*if (s == 0 && block_id == 0)
+                {
+                    printf("Thread %u Loop count %llu\n", index, loop_count);
+                }*/
                 __syncthreads();
                 
 

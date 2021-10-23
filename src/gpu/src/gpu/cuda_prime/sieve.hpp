@@ -38,16 +38,16 @@ namespace nexusminer {
 			static const int m_num_blocks = 256;  //each block sieves part of the range
 			static const uint64_t m_sieve_total_size = m_kernel_sieve_size_words_per_block * m_num_blocks; //size of the sieve in words
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
-			static const int m_estimated_chains_per_million = 11;
+			static const int m_estimated_chains_per_million = 4;
 			static const uint32_t m_max_chains = 2*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const uint32_t m_max_long_chains = 32;
 			static const int m_min_chain_length = 8;
-			static const int m_small_prime_count = 23;
+			static const int m_small_prime_count = 24;
 			static const int m_small_primes[]; //array is defined in sieve.cu
-//primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
-//       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,
-			static constexpr int m_medium_prime_count = 1u << 17;
-			static constexpr int m_large_prime_count = 1u << 21;
+//primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
+//       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
+			static constexpr int m_medium_prime_count = 32 * 7000;//1u << 17;
+			static constexpr int m_large_prime_count = 32 * 65536;// 1u << 21; 
 			static const int chain_histogram_max = 10;  
 			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /16;
 			
