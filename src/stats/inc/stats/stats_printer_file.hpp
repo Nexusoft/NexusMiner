@@ -36,7 +36,7 @@ inline Printer_file<PrinterType>::Printer_file(std::string const& filename, conf
     : m_mining_mode{ mining_mode }
     , m_worker_config{ worker_config }
     , m_stats_collector{ stats_collector }
-    , m_logger{ spdlog::basic_logger_mt("satistics_file", filename.empty() ? "stats.log" : filename, true) }
+    , m_logger{ spdlog::basic_logger_mt("statistics_file", filename.empty() ? "stats.log" : filename, true) }
 {
     m_logger->set_pattern("[%D %H:%M:%S.%e][%^%n%$] %v");
 }
