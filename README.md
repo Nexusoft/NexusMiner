@@ -1,15 +1,15 @@
 # NexusMiner
 
-Miner for Nexus Hash channel with FPGA and (optional) CUDA GPU. Both pool and solo mining is supported. Supported pools are [hashpool](https://hashpool.com/coins/NXS) and [blackminer](https://pool.blackminer.com/).
+Miner for Nexus Hash and Prime channels with Hash channel FPGA support and (optional) CUDA GPU support for both hash and prime. Both pool and solo mining is supported. Supported hash channel pools are [hashpool](https://hashpool.com/coins/NXS) and [blackminer](https://pool.blackminer.com/).
 
 ## FPGA Support
 List of supported [FPGA boards](https://github.com/Nexusoft/NexusMiner/blob/master/docs/fpga_support.md). 
 
 ## Prime Channel
-The miner currently supports prime mining for CPU and GPU (Beta), solo only.  CPU prime mining is useful for development and testnet work but is not competitive with GPU prime mining on main net. 
+The miner supports prime mining for CPU and GPU, solo and pool.  CPU prime mining is useful for development and testnet work but is not competitive with GPU prime mining on main net. 
 ## Wallet Setup
 
-Ensure you are on latest wallet daemon release 5.0.x or greater. Ensure wallet has been unlocked for mining.
+For solo mining use the latest wallet daemon release 5.0.5 or greater and ensure the wallet has been unlocked for mining.
 
 ```
     -llpallowip=<ip-port>   ex: -llpallowip=192.168.0.1:9325 
