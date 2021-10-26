@@ -3,7 +3,7 @@
 Miner for Nexus Hash channel with FPGA and (optional) CUDA GPU. Both pool and solo mining is supported. Supported pools are [hashpool](https://hashpool.com/coins/NXS) and [blackminer](https://pool.blackminer.com/).
 
 ## FPGA Support
-List of supported [FPGA boards](https://github.com/Nexusoft/NexusMiner/blob/v2.0/docs/fpga_support.md). 
+List of supported [FPGA boards](https://github.com/Nexusoft/NexusMiner/blob/master/docs/fpga_support.md). 
 
 ## Prime Channel
 The miner currently supports prime mining for CPU and GPU (Beta), solo only.  CPU prime mining is useful for development and testnet work but is not competitive with GPU prime mining on main net. 
