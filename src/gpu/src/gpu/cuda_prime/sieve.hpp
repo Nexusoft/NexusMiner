@@ -46,21 +46,25 @@ namespace nexusminer {
 			static const int m_small_primes[]; //array is defined in sieve.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
-			static constexpr int m_medium_prime_count = 32 * 7000;//1u << 17;
-			static constexpr int m_large_prime_count = 32 * 65536;// 1u << 21; 
+			static constexpr int m_medium_small_prime_count = 32*16;
+			static constexpr int m_medium_prime_count = 32 * (4500);// 000;//1u << 17;
+			static constexpr int m_large_prime_count = 32 * 75000;// 1u << 21; 
 			static const int chain_histogram_max = 10;  
 			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /16;
 			
 
 			Cuda_sieve();
 			~Cuda_sieve();
-			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t sieve_size, uint16_t device);
-			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[]);
+			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[], 
+				uint32_t sieve_size, uint16_t device);
+			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
+				uint32_t medium_small_prime_starting_multiples[]);
 			void reset_stats();
 			void free_sieve();
 			void run_small_prime_sieve(uint64_t sieve_start_offset);
 			void run_large_prime_sieve(uint64_t sieve_start_offset);
 			void run_sieve(uint64_t sieve_start_offset);
+			void run_medium_small_prime_sieve(uint64_t sieve_start_offset);
 			void find_chains();
 			void clean_chains();
 			void get_chains(CudaChain chains[], uint32_t& chain_count);

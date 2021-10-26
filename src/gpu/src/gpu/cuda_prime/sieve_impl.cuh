@@ -13,13 +13,16 @@ namespace nexusminer {
 			uint32_t m_sieving_prime_count;
 			uint64_t m_sieve_start_offset;
 			
-			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t sieve_size, uint16_t device);
-			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[]);
+			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[],
+				uint32_t sieve_size, uint16_t device);
+			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
+				uint32_t medium_small_prime_multiples[]);
 			void reset_stats();
 			void free_sieve();
 			void run_small_prime_sieve(uint64_t sieve_start_offset);
 			void run_large_prime_sieve(uint64_t sieve_start_offset);
 			void run_sieve(uint64_t sieve_start_offset);
+			void run_medium_small_prime_sieve(uint64_t sieve_start_offset);
 			void get_sieve(Cuda_sieve::sieve_word_t sieve[]);
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);
 			void find_chains();
@@ -40,6 +43,8 @@ namespace nexusminer {
 			uint32_t* d_large_primes;
 			uint32_t* d_large_prime_starting_multiples;
 			uint32_t* d_small_prime_offsets;
+			uint32_t* d_medium_small_primes;
+			uint32_t* d_medium_small_prime_starting_multiples;
 			//temporary storage for sorting large primes used in large prime bucket sieve
 			uint32_t* d_large_prime_buckets;
 			uint32_t* d_bucket_indices;

@@ -142,6 +142,7 @@ void Worker_prime::run()
 
 		auto sieve_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_sieve_small_primes(low);
+		m_segmented_sieve->gpu_sieve_medium_small_primes(low);
 		m_segmented_sieve->sieve_batch(low);
 		m_segmented_sieve->gpu_sieve_large_primes(low);
 		if (debug) m_segmented_sieve->gpu_sieve_synchronize();

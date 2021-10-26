@@ -6,6 +6,7 @@
 #include <chrono>
 #include <bitset>
 #include <sstream>
+#include <limits>
 #include <boost/integer/mod_inverse.hpp>
 #include "small_sieve_tools.hpp"
 #include "fastmod.h"
@@ -28,27 +29,22 @@ namespace nexusminer {
             //small primes are hardcoded in sieve.cu
             m_logger->info("Generating sieving primes...");
             auto start = std::chrono::steady_clock::now();
+            //generate medium small sieving primes
+            primesieve::generate_n_primes(Cuda_sieve::m_medium_small_prime_count, m_medium_small_start_prime, &m_medium_small_primes);
+            //the largest medium small sieving prime
+            if (m_medium_small_primes.size() > 0)
+                m_medium_small_prime_limit = m_medium_small_primes.back();
+            else
+                m_medium_small_prime_limit = m_medium_small_start_prime-1;
+
             //generate medium sieving primes
-            primesieve::generate_n_primes(Cuda_sieve::m_medium_prime_count, m_sieving_start_prime, &m_sieving_primes);
+            primesieve::generate_n_primes(Cuda_sieve::m_medium_prime_count, m_medium_small_prime_limit + 1ull, &m_sieving_primes);
             //the largest medium sieving prime
             if (m_sieving_primes.size() > 0)
                 m_sieving_prime_limit = m_sieving_primes.back();
             else
-                m_sieving_prime_limit = 0;
-            //reorder the primes
-            /*std::vector<Cuda_sieve::sieve_word_t> temp_primes;
-            uint32_t index = 0;
-            const uint32_t primes_per_thread = (m_sieving_primes.size() + Cuda_sieve::m_threads_per_block - 1) / Cuda_sieve::m_threads_per_block;
-            double prime_parallel_sum = 0;
-            for (auto i = 0; i < m_sieving_primes.size(); i++)
-            {
-                prime_parallel_sum += 1.0 / m_sieving_primes[i];
-                index = (i % primes_per_thread) * Cuda_sieve::m_threads_per_block + i / primes_per_thread;
-                temp_primes.push_back(m_sieving_primes[index]);
-            }
-            double avg_prime = primes_per_thread / prime_parallel_sum;
-            std::cout << "primes per thread " << primes_per_thread << " parallel avg prime " << avg_prime << std::endl;*/
-            //m_sieving_primes = temp_primes;
+                m_sieving_prime_limit = m_medium_small_prime_limit;
+            
             //large primes
             primesieve::generate_n_primes(Cuda_sieve::m_large_prime_count, m_sieving_prime_limit + 1ull, &m_large_sieving_primes);
             if (m_large_sieving_primes.size() > 0)
@@ -79,10 +75,13 @@ namespace nexusminer {
             return m_sieve_start;
         }
 
+
+        //generate starting multiples of the sieving primes.  
+        //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
+        //do this once at the start of a new block to initialize the sieve.
         void Sieve::calculate_starting_multiples()
         {
-
-            //calculate the starting offsets of the small primes relative to the sieve start
+            m_logger->info("Calculating starting multiples.");
             m_small_prime_offsets = {};
             for (int i = 0; i < Cuda_sieve::m_small_prime_count; i++)
             {
@@ -90,23 +89,18 @@ namespace nexusminer {
                 uint32_t offset = static_cast<uint32_t>(((m_sieve_start / m_sieve_range_per_byte) % s)) * m_sieve_range_per_byte;
                 m_small_prime_offsets.push_back(offset); 
             }
-
-            //generate starting multiples of the sieving primes.  
-            //This gets us aligned so that we may start sieving at an arbitrary starting point instead of at 0.
-            //do this once at the start of a new block to initialize the sieve.
+            m_medium_small_multples = {};
+            for (const auto& s : m_medium_small_primes)
+            {
+                uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
+                m_medium_small_multples.push_back(m);
+            }
             m_multiples = {};
-            m_logger->info("Calculating starting multiples.");
-            auto start = std::chrono::steady_clock::now();
-            for (auto s : m_sieving_primes)
+            for (const auto& s : m_sieving_primes)
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
                 m_multiples.push_back(m);
             }
-            auto end = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            //std::stringstream ss;
-            //ss << "Done. (" << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds)";
-            //m_logger->info(ss.str());
             m_large_multiples = {};
             for (const auto& p : m_large_sieving_primes)
             {
@@ -117,14 +111,15 @@ namespace nexusminer {
 
         void Sieve::gpu_sieve_load(uint16_t device=0)
         {
-            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(), m_sieve_batch_buffer_size, device);
+            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(),
+                m_medium_small_primes.data(), m_sieve_batch_buffer_size, device);
             m_cuda_sieve_allocated = true;
             reset_stats();
         }
 
         void Sieve::gpu_sieve_init()
         {
-            m_cuda_sieve.init_sieve(m_multiples.data(), m_small_prime_offsets.data(), m_large_multiples.data());
+            m_cuda_sieve.init_sieve(m_multiples.data(), m_small_prime_offsets.data(), m_large_multiples.data(), m_medium_small_multples.data());
             m_sieve_run_count = 0;
         }
 
@@ -187,9 +182,10 @@ namespace nexusminer {
             m_cuda_sieve.run_large_prime_sieve(sieve_start_offset);
         }
 
-
-       
-       
+        void Sieve::gpu_sieve_medium_small_primes(uint64_t sieve_start_offset)
+        {
+            m_cuda_sieve.run_medium_small_prime_sieve(sieve_start_offset);
+        }
 
         //run the sieve on the gpu
         void Sieve::sieve_batch(uint64_t low)
