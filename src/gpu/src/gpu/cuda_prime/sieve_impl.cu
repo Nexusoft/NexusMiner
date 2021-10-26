@@ -43,8 +43,8 @@ namespace nexusminer {
         __device__ const unsigned int prime_mod30_inverse[]
         { 1,1,13,13,13,13,13, 13, 11, 11, 11, 11, 7, 7, 23, 23, 23, 23, 19, 19, 17, 17, 17, 17, 29, 29, 29, 29, 29, 29 };  //lookup table - prime % 30 to prime inverse % 30
 
-        __device__ const unsigned int next_multiple_mod30_offset[]  //range mod30 to the next highest prime.
-        { 1,0,5,4,3,2,1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 5, 4, 3, 2, 1, 0 };
+        //__device__ const unsigned int next_multiple_mod30_offset[]  //range mod30 to the next highest prime.
+        //{ 1,0,5,4,3,2,1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 5, 4, 3, 2, 1, 0 };
 
         __device__ const unsigned int sieve120_index[]
         {    0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 
@@ -54,12 +54,12 @@ namespace nexusminer {
         };  //reverse lookup table (offset mod 120 to index)
 
 
-        __device__  const Cuda_sieve::sieve_word_t unset_bit_mask[]{
+        /*__device__  const Cuda_sieve::sieve_word_t unset_bit_mask[]{
             ~(1u << 0),  ~(1u << 1),  ~(1u << 2),  ~(1u << 3),  ~(1u << 4),  ~(1u << 5),  ~(1u << 6),  ~(1u << 7), 
             ~(1u << 8),  ~(1u << 9),  ~(1u << 10), ~(1u << 11), ~(1u << 12), ~(1u << 13), ~(1u << 14), ~(1u << 15),
             ~(1u << 16), ~(1u << 17), ~(1u << 18), ~(1u << 19), ~(1u << 20), ~(1u << 21), ~(1u << 22), ~(1u << 23),
             ~(1u << 24), ~(1u << 25), ~(1u << 26), ~(1u << 27), ~(1u << 28), ~(1u << 29), ~(1u << 30), ~(1u << 31)
-        };
+        };*/
         
         // cross off small primes.  These primes hit the sieve often.  We iterate through the sieve words and cross them off using 
         // precalculated constants.  start is offset from the sieve start 
@@ -174,7 +174,6 @@ namespace nexusminer {
             uint32_t* starting_multiples, uint32_t* large_prime_buckets, uint32_t* bucket_indices, Cuda_sieve::sieve_word_t* sieve_results)
         {
             //each kernel block works on one segment of the sieve.  
-            unsigned int num_blocks = gridDim.x;
             unsigned int num_threads = blockDim.x;
             unsigned int block_id = blockIdx.x/Cuda_sieve::m_kernel_segments_per_block;
             unsigned int segment_id = blockIdx.x % Cuda_sieve::m_kernel_segments_per_block;
@@ -201,7 +200,6 @@ namespace nexusminer {
             uint32_t z = block_id;
             uint32_t y = segment_id;
             uint32_t x;
-            const uint32_t zmax = Cuda_sieve::m_num_blocks;
             const uint32_t ymax = Cuda_sieve::m_kernel_segments_per_block;
             const uint32_t xmax = Cuda_sieve::m_large_prime_bucket_size;
             //iterate through the sieve hits
@@ -375,7 +373,6 @@ namespace nexusminer {
             unsigned int segment_id = blockIdx.x % Cuda_sieve::m_kernel_segments_per_block;
             unsigned int index = threadIdx.x;
             unsigned int search_regions_per_kernel_block = (total_search_regions + num_blocks - 1) / num_blocks;
-            unsigned int search_regions_per_thread = (search_regions_per_kernel_block + num_threads - 1) / num_threads;
             unsigned int stride = num_threads;
             unsigned int gap;
             uint32_t chain_start;
@@ -384,7 +381,6 @@ namespace nexusminer {
             uint32_t sieve_index;
             //shared copies of lookup tables
             __shared__ unsigned int sieve30_offsets_shared[8];
-            __shared__ unsigned int sieve30_gaps_shared[8];
             //local stats
             __shared__ uint32_t chain_count_shared;
 
@@ -392,7 +388,6 @@ namespace nexusminer {
             {
                 int i = threadIdx.x;
                 sieve30_offsets_shared[i] = sieve30_offsets[i];
-                sieve30_gaps_shared[i] = sieve30_gaps[i];
             }
 
             if (threadIdx.x == 0)
@@ -534,7 +529,6 @@ namespace nexusminer {
            
             const uint32_t segments = Cuda_sieve::m_kernel_segments_per_block;
             uint32_t sieve_results_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block;
-            const uint32_t primes_per_thread = (sieving_prime_count + num_threads - 1) / num_threads;
             //each block sieves a different region
             uint64_t start_offset = sieve_start_offset + static_cast<uint64_t>(block_id) * Cuda_sieve::m_kernel_sieve_size_words_per_block * Cuda_sieve::m_sieve_word_range;
             
@@ -543,7 +537,6 @@ namespace nexusminer {
             uint32_t j;
             uint32_t k;
             uint32_t prime_mod_inv;
-            uint64_t loop_count;
             for (int s = 0; s < segments; s++)
             {
                 //everyone in the block initialize part of the shared sieve
@@ -556,13 +549,8 @@ namespace nexusminer {
                     prime_index = num_threads;
                 }
                 __syncthreads();
-                loop_count = 0;
                 for(uint32_t i=index; i < sieving_prime_count; i = atomicInc(&prime_index, 0xFFFFFFFF))
-                //for (uint32_t i = index; i < sieving_prime_count; i += stride)
-                //for (uint32_t prime_index_offset = 0; prime_index_offset < primes_per_thread; prime_index_offset++)
-                {
-                    //uint32_t i = primes_per_thread * index + prime_index_offset;
-                   
+                {                   
                     k = sieving_primes[i];
                     
                     //get aligned to this region
@@ -601,34 +589,20 @@ namespace nexusminer {
                     {
                         //cross off a multiple of the sieving prime
                         uint32_t sieve_index = j / Cuda_sieve::m_sieve_word_range;
-                        //Cuda_sieve::sieve_word_t bitmask = ~(static_cast<Cuda_sieve::sieve_word_t>(1) <<
-                        //    (sieve30_index[j % 30] + (8 * (j/Cuda_sieve::m_sieve_byte_range % Cuda_sieve::m_sieve_word_byte_count))));
                         
                         Cuda_sieve::sieve_word_t bitmask = ~(static_cast<Cuda_sieve::sieve_word_t>(1) <<
                             sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]);
-                        //using this lookup table from shared memory is about the same as the hybrid version above
-                        //Cuda_sieve::sieve_word_t bitmask = unset_bit_mask_shared[sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]];
-                        
-                        //printf("%" PRIu64 " %u\n", j, bitmask);
-                        //if (k >= 821999 && block_id == 1)
-                        //    printf("med sieve prime %u block %u segment %u sieve word %u bit %u\n", k, block_id, s, sieve_index, sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]);
-                            
+                       
                         atomicAnd(&sieve[sieve_index], bitmask);
                         
                         //increment the next multiple of the current prime (rotate the wheel).
                         j += k * next_wheel_gap;
                         wheel_index = (wheel_index + 1) % 8;
                         next_wheel_gap = sieve30_gaps_shared[wheel_index];
-                        //loop_count++;
-
                     }
                     
                     //save the starting multiple for this prime for the next segment
                     multiples[block_id * sieving_prime_count + i] = j - segment_size;
-                    /*if (s == 1 && block_id == 0 && index == 0)
-                    {
-                        printf("Thread %u prime %u loop count %llu\n", index, k, loop_count);
-                    }*/
                 }
                 __syncthreads();
                 
@@ -664,7 +638,6 @@ namespace nexusminer {
 
             uint32_t index = threadIdx.x;
             uint32_t stride = blockDim.x;
-            uint32_t num_threads = blockDim.x;
             unsigned int block_id = blockIdx.x;
             unsigned int warp_id = threadIdx.x / 32;
             unsigned int lane_id = threadIdx.x % 32;
@@ -693,7 +666,6 @@ namespace nexusminer {
             uint32_t j;
             uint32_t k;
             uint32_t prime_mod_inv;
-            uint64_t loop_count;
             for (int s = 0; s < segments; s++)
             {
                 //everyone in the block initialize part of the shared sieve
@@ -703,8 +675,7 @@ namespace nexusminer {
                 }
 
                 __syncthreads();
-                loop_count = 0;
-                for (uint32_t i = index/32; i < Cuda_sieve::m_medium_small_prime_count; i += stride/32)
+                for (uint32_t i = warp_id; i < Cuda_sieve::m_medium_small_prime_count; i += stride/32)
                 {
                     k = sieving_primes[i];
 
@@ -747,42 +718,27 @@ namespace nexusminer {
                         j += k * next_wheel_gap;
                         wheel_index = (wheel_index + 1) % 8;
                         next_wheel_gap = sieve30_gaps_shared[wheel_index];
-                        //loop_count++;
                     }
                     //__syncwarp();
                     while (j < segment_size)
                     {
                         //cross off a multiple of the sieving prime
                         uint32_t sieve_index = j / Cuda_sieve::m_sieve_word_range;
-                        //Cuda_sieve::sieve_word_t bitmask = ~(static_cast<Cuda_sieve::sieve_word_t>(1) <<
-                        //    (sieve30_index[j % 30] + (8 * (j/Cuda_sieve::m_sieve_byte_range % Cuda_sieve::m_sieve_word_byte_count))));
 
                         Cuda_sieve::sieve_word_t bitmask = ~(static_cast<Cuda_sieve::sieve_word_t>(1) <<
                             sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]);
-                        //using this lookup table from shared memory is about the same as the hybrid version above
-                        //Cuda_sieve::sieve_word_t bitmask = unset_bit_mask_shared[sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]];
-
-                        //printf("%" PRIu64 " %u\n", j, bitmask);
-                        //if (k >= 821999 && block_id == 1)
-                        //    printf("med sieve prime %u block %u segment %u sieve word %u bit %u\n", k, block_id, s, sieve_index, sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]);
-
+                      
                         atomicAnd(&sieve[sieve_index], bitmask);
 
                         //increment the next multiple of the current prime (rotate the wheel).  Increment by 32x because 32 lanes work on one prime 
                         j += 120 * k;// *next_wheel_gap;
-                        //wheel_index = (wheel_index + 1) % 8;
-                        //next_wheel_gap = sieve30_gaps_shared[wheel_index];
-                        //loop_count++;
-
+                       
                     }
  
                     //save the starting multiple for this prime for the next segment
 
                     //multiples[block_id * Cuda_sieve::m_medium_small_prime_count + i] = j - segment_size;
-                    /*if (s == 1 && block_id == 0 && index == 0)
-                    {
-                        printf("Thread %u prime %u loop count %llu\n", index, k, loop_count);
-                    }*/
+                   
                 }
                 __syncthreads();
 
@@ -872,7 +828,6 @@ namespace nexusminer {
         __global__ void sort_large_primes(uint64_t sieve_start_offset, uint32_t* large_primes,
             uint32_t* starting_multiples, uint32_t* large_prime_buckets, uint32_t* bucket_indices)
         {
-            int num_blocks = gridDim.x;
             int num_threads = blockDim.x;
             int block_id = blockIdx.x;
             int index = threadIdx.x;
@@ -890,13 +845,7 @@ namespace nexusminer {
             __shared__ unsigned int sieve30_index_shared[30];
             __shared__ unsigned int prime_mod30_inverse_shared[30];
             __shared__ unsigned int sieve120_index_shared[120];
-            __shared__ unsigned int max_bucket;
             uint32_t bucket_index = 0;
-
-            if (index == 0)
-            {
-                max_bucket = 0;
-            }
 
             //initialize shared lookup tables.  lookup tables in shared memory are faster than global memory lookup tables.
             for (int i = index; i < 8; i += stride)
@@ -960,15 +909,9 @@ namespace nexusminer {
                     uint32_t z = block_id;
                     uint32_t y = next_segment;
                     uint32_t x = bucket_index;
-                    const uint32_t zmax = Cuda_sieve::m_num_blocks;
                     const uint32_t ymax = segments;
                     const uint32_t xmax = Cuda_sieve::m_large_prime_bucket_size;
                     large_prime_buckets[z*xmax*ymax + y*xmax + x] = sieve_segment_hit;
-                    
-                    //if (/*k == 821999 &&*/ block_id == 1)
-                    //    printf("Block %i Prime %u start offset %" PRIu64 " j %u next segment %u sieve word %u sieve bit %u bucket data %x bucket_index %u\n",
-                    //        block_id, k, start_offset, j, next_segment, sieve_word, sieve_bit, sieve_segment_hit, bucket_index);
-                   
                    
                     //increment the next multiple of the current prime (rotate the wheel).
                     j += k * next_wheel_gap;
@@ -977,11 +920,7 @@ namespace nexusminer {
                     next_segment = j / segment_size;
                     segment_offset = j % segment_size;
                 }
-                //atomicMax(&max_bucket, bucket_index);
             }
-           /* __syncthreads();
-            if (index == 0)
-                printf("block %u max bucket %u\n", block_id, max_bucket);*/
 
         }
 
@@ -1011,7 +950,6 @@ namespace nexusminer {
             
             sieveSmallPrimes << <blocks, threads >> > (d_sieve, sieve_start_offset, d_small_prime_offsets);
 
-            //checkCudaErrors(cudaDeviceSynchronize());
         }
 
         void Cuda_sieve_impl::run_sieve(uint64_t sieve_start_offset)
@@ -1021,7 +959,6 @@ namespace nexusminer {
             do_sieve <<<Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block >>> (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
                 d_starting_multiples, d_sieve, d_multiples);
 
-            //checkCudaErrors(cudaDeviceSynchronize());
         }
 
         void Cuda_sieve_impl::run_medium_small_prime_sieve(uint64_t sieve_start_offset)
@@ -1030,8 +967,7 @@ namespace nexusminer {
            medium_small_sieve << <Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block >> > 
                 (sieve_start_offset, d_medium_small_primes, d_medium_small_prime_starting_multiples, d_sieve, d_multiples);
 
-            /*do_sieve << <Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block >> > (sieve_start_offset, d_medium_small_primes, Cuda_sieve::m_medium_small_prime_count,
-                d_medium_small_prime_starting_multiples, d_sieve, d_multiples);*/
+          
 
         }
 
@@ -1054,11 +990,11 @@ namespace nexusminer {
 
         void Cuda_sieve_impl::find_chains()
         {
-            const int sieve_threads = 64;
-            const int checks_per_block = 64;
-            const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
-            const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;
-            const int sieve_blocks = (sieve_total_bits /checks_per_block + sieve_threads - 1)/ sieve_threads;
+            //const int sieve_threads = 64;
+            //const int checks_per_block = 64;
+            //const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
+            //const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;
+            //const int sieve_blocks = (sieve_total_bits /checks_per_block + sieve_threads - 1)/ sieve_threads;
             //find_chain_kernel << <sieve_blocks, sieve_threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
 
             const int blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
@@ -1067,8 +1003,6 @@ namespace nexusminer {
             const unsigned int search_regions_per_segment = (Cuda_sieve::m_segment_range + search_range - 1) / search_range;
             const unsigned int threads = (search_regions_per_segment + search_regions_per_thread - 1) / search_regions_per_thread;
             find_chain_kernel2 << <blocks, threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
-
-            //checkCudaErrors(cudaDeviceSynchronize());
             
         }
 
@@ -1100,7 +1034,6 @@ namespace nexusminer {
             //copy surviving chains to a temporary location. 
             filter_busted_chains << <blocks, threads >> > (d_chains, d_last_chain_index, d_good_chains, d_good_chain_index,
                 d_long_chains, d_last_long_chain_index, d_chain_histogram);
-            //checkCudaErrors(cudaDeviceSynchronize());
             uint32_t good_chain_count;
             //get the count of good chains from device memory
             checkCudaErrors(cudaMemcpy(&good_chain_count, d_good_chain_index, sizeof(*d_good_chain_index), cudaMemcpyDeviceToHost));

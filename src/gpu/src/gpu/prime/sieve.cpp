@@ -392,7 +392,7 @@ namespace nexusminer {
                 uint64_t base_offset;
                 int offset, length;
                 chain.get_best_fermat_chain(base_offset, offset, length);
-                m_logger->info("Found a fermat chain of length {}.", length);
+                m_logger->info("Found a fermat chain of length {}+.", length);
                 //std::cout << chain.str() << std::endl;
                 m_long_chain_starts.push_back(base_offset + offset);
             }
@@ -426,28 +426,6 @@ namespace nexusminer {
         }
 
         
-
-        void Sieve::close_chain()
-        {
-            if (m_current_chain.length() >= m_current_chain.m_min_chain_length)
-            {
-                //we found a chain candidate.  save it.
-                m_chain.push_back(m_current_chain);
-                m_chain_count++;
-                m_chain_candidate_max_length = std::max(m_current_chain.length(), m_chain_candidate_max_length);
-                m_chain_candidate_total_length += m_current_chain.length();
-            }
-            m_current_chain.close();
-            m_chain_in_process = false;
-        }
-
-        void Sieve::open_chain(uint64_t base_offset)
-        {
-            //reset chain in process to the default
-            m_current_chain = { base_offset };
-            m_chain_in_process = true;
-        }
-
         //batch process the list of prime candidates to be fermat tested.  
         void Sieve::primality_batch_test(uint16_t device=0)
         {
@@ -703,7 +681,7 @@ namespace nexusminer {
                     if (length >= chain.m_min_chain_report_length)
                     {
                         //we found a long chain.  save it.
-                        m_logger->info("Found a fermat chain of length {}.", length);
+                        m_logger->info("Found a fermat chain of length {}+.", length);
                         //std::cout << chain.str() << std::endl;
                         m_long_chain_starts.push_back(base_offset + offset);
                     }

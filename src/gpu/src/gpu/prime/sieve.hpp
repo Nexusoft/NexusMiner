@@ -115,6 +115,7 @@ namespace nexusminer {
 			int m_chain_candidate_max_length = 0;
 			uint64_t m_chain_candidate_total_length = 0;
 			uint64_t m_trial_division_chains_busted = 0;
+			double m_best_chain = 0;
 			
 
 		private:
@@ -133,43 +134,7 @@ namespace nexusminer {
 			//we start sieving at 7 with the small primes.  medium primes start here.
 			const int m_medium_small_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
 			const int m_sieving_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
-			
-
-
-			/// Bitmasks used to unset bits 
-			static constexpr uint8_t unset_bit_mask[30] =
-			{
-				(uint8_t)~(1 << 0), (uint8_t)~(1 << 0),
-				(uint8_t)~(1 << 1), (uint8_t)~(1 << 1), (uint8_t)~(1 << 1), (uint8_t)~(1 << 1), (uint8_t)~(1 << 1), (uint8_t)~(1 << 1),
-				(uint8_t)~(1 << 2), (uint8_t)~(1 << 2), (uint8_t)~(1 << 2), (uint8_t)~(1 << 2),
-				(uint8_t)~(1 << 3), (uint8_t)~(1 << 3),
-				(uint8_t)~(1 << 4), (uint8_t)~(1 << 4), (uint8_t)~(1 << 4), (uint8_t)~(1 << 4),
-				(uint8_t)~(1 << 5), (uint8_t)~(1 << 5),
-				(uint8_t)~(1 << 6), (uint8_t)~(1 << 6), (uint8_t)~(1 << 6), (uint8_t)~(1 << 6),
-				(uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7), (uint8_t)~(1 << 7)
-			};
-
-
-			//how many bits are set in a byte
-			static constexpr int popcnt[256] =
-			{
-			  0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
-			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-			  1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
-			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-			  2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,
-			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-			  3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,
-			  4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
-			};
+		
 
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve;
@@ -188,8 +153,6 @@ namespace nexusminer {
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
 			
-			void close_chain();
-			void open_chain(uint64_t base_offset);
 			uint64_t m_sieve_run_count = 0;
 
 			Cuda_sieve m_cuda_sieve;

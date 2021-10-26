@@ -132,7 +132,7 @@ void Worker_prime::run()
 	uint64_t fermat_passes_this_cycle_start;
 	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start);
 
-	bool debug = true;
+	bool debug = false;
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
@@ -175,7 +175,9 @@ void Worker_prime::run()
 		{
 			m_block.nNonce = m_nonce + x;
 			uint1k chain_start = m_base_hash + m_block.nNonce;
-			m_logger->info("Actual difficulty {} required {}", getDifficulty(chain_start), getNetworkDifficulty());
+			double difficulty = getDifficulty(chain_start);
+			m_segmented_sieve->m_best_chain = std::max(difficulty, m_segmented_sieve->m_best_chain);
+			m_logger->info("Actual difficulty {} required {}", difficulty, getNetworkDifficulty());
 			if (difficulty_check(chain_start))
 			{
 				//we found a valid chain.  submit it. 
@@ -272,7 +274,7 @@ void Worker_prime::update_statistics(stats::Collector& stats_collector)
 	prime_stats.m_difficulty = m_difficulty;
 	prime_stats.m_chain_histogram = m_segmented_sieve->m_chain_histogram;
 	prime_stats.m_range_searched = m_range_searched;
-
+	prime_stats.m_most_difficult_chain = m_segmented_sieve->m_best_chain;
 	stats_collector.update_worker_stats(m_config.m_internal_id, prime_stats);
 
 	m_primes = 0;

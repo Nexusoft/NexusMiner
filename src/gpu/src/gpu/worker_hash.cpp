@@ -84,7 +84,10 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 
     double mainnet_difficulty = TAO::Ledger::GetDifficulty(m_block.nBits, m_block.nChannel);
     double pool_difficulty = TAO::Ledger::GetDifficulty(m_pool_nbits, m_block.nChannel);
-    m_logger->debug("Leading zeros required mainnet:{}  pool:{}", log2(mainnet_difficulty)+34, log2(pool_difficulty)+34);
+    if (m_pool_nbits != 0)
+        m_logger->debug("Leading zeros required mainnet:{}  pool:{}", log2(mainnet_difficulty)+34, log2(pool_difficulty)+34);
+    else
+        m_logger->debug("Leading zeros required:{}", log2(mainnet_difficulty) + 34);
 
     /* Get the target difficulty. */
     LLC::CBigNum target;

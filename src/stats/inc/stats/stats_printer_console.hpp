@@ -72,14 +72,15 @@ inline void Printer_console<PrinterType>::print()
         {
             auto& prime_stats = std::get<Prime>(worker);
             ss << std::setprecision(2) << std::fixed;
-            //MISPS = million integers searched per second
-            ss << (prime_stats.m_range_searched / (1.0e6 * static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count()))) << " MISPS ";
+            //GISPS = Billion integers searched per second
+            ss << (prime_stats.m_range_searched / (1.0e9 * static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count()))) << " GISPS ";
             ss << "Chain Count: ";
-            for (auto i=3; i< prime_stats.m_chain_histogram.size(); i++)
+            for (auto i=4; i< prime_stats.m_chain_histogram.size(); i++)
             {
                 ss << i << ":" << prime_stats.m_chain_histogram[i] << " ";
             }
-            ss << " Difficulty " << prime_stats.m_difficulty / 10000000.0;
+            ss << " Best " << prime_stats.m_most_difficult_chain;
+            ss << " Current Difficulty " << prime_stats.m_difficulty / 10000000.0;
         }
         worker_config_index++;
         ss << std::endl;
