@@ -6,6 +6,7 @@
 #include "config/validator.hpp"
 #include "worker_manager.hpp"
 #include "worker.hpp"
+#include "version.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -14,6 +15,7 @@
 #include <asio.hpp>
 #include <chrono>
 #include <fstream>
+#include <iostream>
 
 namespace nexusminer
 {
@@ -69,10 +71,15 @@ namespace nexusminer
 
 	bool Miner::init(std::string const& miner_config_file)
 	{
+		// print header
+		std::cout << "NexusMiner Version " << NexusMiner_VERSION_MAJOR << "." << NexusMiner_VERSION_MINOR << "\n" << std::endl;
+
 		if (!m_config.read_config(miner_config_file))
 		{
 			return false;
 		}
+
+		m_logger->set_level(static_cast<spdlog::level::level_enum>(m_config.get_log_level()));
 
 		// timer initialisation
 		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);

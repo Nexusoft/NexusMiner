@@ -3,7 +3,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 set(CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/libs")
 
-project(NexusMiner VERSION 1.1 LANGUAGES CXX)
+project(NexusMiner VERSION 1.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -81,6 +81,7 @@ add_subdirectory(src/stats)
 add_subdirectory(src/protocol)
 add_subdirectory(src/cpu)
 add_subdirectory(src/fpga)
+add_subdirectory(src/TAO)
 
 
 if(WITH_GPU_CUDA)
@@ -94,7 +95,7 @@ add_executable(NexusMiner
                 src/timer_manager.cpp)
 
 target_include_directories(NexusMiner PUBLIC "${PROJECT_BINARY_DIR}")
-target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker)
+target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker TAO)
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()

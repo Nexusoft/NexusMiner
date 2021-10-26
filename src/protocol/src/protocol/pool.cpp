@@ -79,6 +79,18 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_login_handler(false);
         }
     }
+    // NexusPool sends periodically this message to set height
+    else if (packet.m_header == Packet::BLOCK_HEIGHT)
+    {
+        auto const height = bytes2uint(*packet.m_data);
+        if (height > m_current_height)
+        {
+            m_logger->info("Nexus Network: New height {}", height);
+            m_current_height = height;
+            connection->transmit(get_work());
+        }
+    }
+    // blackpool and hashpool send periodically this message to set height
     else if(packet.m_header == Packet::BLOCK_DATA)
     {
         std::uint32_t nbits{0U};
@@ -88,14 +100,15 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         {
             m_logger->info("Nexus Network: New height {}", block.nHeight);
             m_current_height = block.nHeight;
-            if(m_set_block_handler)
-            {
-                m_set_block_handler(block, nbits);
-            }
-            else
-            {
-                m_logger->error("No Block handler set");
-            }
+        }
+
+        if (m_set_block_handler)
+        {
+            m_set_block_handler(block, nbits);
+        }
+        else
+        {
+            m_logger->error("No Block handler set");
         }
     }
     else if(packet.m_header == Packet::ACCEPT)
@@ -111,6 +124,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         global_stats.m_rejected_shares = 1;
         m_stats_collector->update_global_stats(global_stats);
         m_logger->warn("Share Rejected by Pool.");
+        connection->transmit(get_work());
     }
     else if (packet.m_header == Packet::BLOCK)
     {
@@ -124,6 +138,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
 network::Shared_payload Pool::extract_nbits_from_block(network::Shared_payload data, std::uint32_t& nbits)
 {
     nbits = bytes2uint(std::vector<unsigned char>(data->begin(), data->begin() + 4));
+    m_logger->debug("Pool nbits: {}", nbits);
     return std::make_shared<network::Payload>(data->begin() + 4, data->end());
 }
 

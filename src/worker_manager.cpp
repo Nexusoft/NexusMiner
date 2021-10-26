@@ -226,9 +226,16 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                     auto const print_statistics_interval = self->m_config.get_print_statistics_interval();
                     self->m_timer_manager.start_stats_collector_timer(print_statistics_interval, self->m_workers, self->m_stats_collector);
                     self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
-                    // only solo miner uses GET_HEIGHT message
-                    if(!self->m_config.get_use_bool())
+
+                    if(self->m_config.get_use_bool())
                     {
+                        // pool miner sends PING to keep connection alive
+                        auto const ping_interval = self->m_config.get_ping_interval();
+                        self->m_timer_manager.start_ping_timer(ping_interval, self->m_connection);
+                    }
+                    else
+                    {
+                        // only solo miner uses GET_HEIGHT message
                         auto const get_height_interval = self->m_config.get_height_interval();
                         self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection);
                     }
@@ -276,9 +283,7 @@ void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 
     if (packet.m_header == Packet::PING)
     {
-        Packet response;
-        response = response.get_packet(Packet::PING);
-        m_connection->transmit(response.get_bytes());
+        m_logger->trace("PING received");
     }
     else
     {

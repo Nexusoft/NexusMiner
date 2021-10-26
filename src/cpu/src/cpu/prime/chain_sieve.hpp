@@ -99,6 +99,7 @@ namespace nexusminer {
 			uint64_t m_chain_count = 0;
 			int m_chain_candidate_max_length = 0;
 			uint64_t m_chain_candidate_total_length = 0;
+			double m_best_chain = 0;
 
 		private:
 			class Fermat_test_candidate {

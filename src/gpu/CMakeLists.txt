@@ -3,11 +3,16 @@ add_library(gpu STATIC "src/gpu/worker_hash.cpp" "src/gpu/cuda_hash/util.cu" "sr
 
 
 if(WITH_PRIME)
-    target_sources(gpu PRIVATE src/gpu/worker_prime.cpp src/gpu/prime/prime.cpp src/gpu/prime/chain_sieve.cpp "src/gpu/cuda_prime/cuda_chain.cu" src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/sieve.cu)
+    target_sources(gpu PRIVATE src/gpu/worker_prime.cpp src/gpu/prime/prime.cpp src/gpu/prime/prime_tests.cpp
+        src/gpu/prime/chain.cpp src/gpu/prime/sieve.cpp
+        src/gpu/cuda_prime/cuda_chain.cu src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/sieve.cu
+        src/gpu/cuda_prime/sieve_impl.cu src/gpu/cuda_prime/fermat_test_impl.cu
+        src/gpu/prime/small_sieve_tools.cpp)
 endif()
 
 set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES 61 75)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info")
 #set(CMAKE_CUDA_FLAGS "-arch=sm_61")
 #set(CMAKE_CUDA_FLAGS "-gencode arch=compute_61,code=sm_61 -gencode arch=compute_75,code=sm_75")
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
@@ -28,7 +33,7 @@ target_include_directories(gpu
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
 
-target_link_libraries(gpu LLC worker LLP stats config)
+target_link_libraries(gpu LLC worker LLP stats config TAO)
 
 if(WITH_PRIME)
     target_link_libraries(gpu libprimesieve-static)

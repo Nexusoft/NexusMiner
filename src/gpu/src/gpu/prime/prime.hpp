@@ -1,5 +1,5 @@
-#ifndef NEXUSMINER_CPU_PRIME_HPP
-#define NEXUSMINER_CPU_PRIME_HPP
+#ifndef NEXUSMINER_GPU_PRIME_HPP
+#define NEXUSMINER_GPU_PRIME_HPP
 //taken from nxs primesolominer
 
 #include <memory>

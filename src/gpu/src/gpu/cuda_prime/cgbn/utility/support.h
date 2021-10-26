@@ -21,7 +21,11 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 
 ***/
+#ifndef CGBN_SUPPORT_H
+#define CGBN_SUPPORT_H
 
 #include "cpu_support.h"
 #include "cpu_simple_bn_math.h"
 #include "gpu_support.h"
+
+#endif

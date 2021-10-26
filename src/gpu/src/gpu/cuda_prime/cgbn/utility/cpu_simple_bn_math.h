@@ -22,7 +22,7 @@ IN THE SOFTWARE.
 
 ***/
 
-void add_words(uint32_t *r, uint32_t *x, uint32_t *y, uint32_t count) {
+inline void add_words(uint32_t *r, uint32_t *x, uint32_t *y, uint32_t count) {
   int     index;
   int64_t sum=0;
 
@@ -33,7 +33,7 @@ void add_words(uint32_t *r, uint32_t *x, uint32_t *y, uint32_t count) {
   }
 }
 
-void sub_words(uint32_t *r, uint32_t *x, uint32_t *y, uint32_t count) {
+inline void sub_words(uint32_t *r, uint32_t *x, uint32_t *y, uint32_t count) {
   int     index;
   int64_t sum=0;
 

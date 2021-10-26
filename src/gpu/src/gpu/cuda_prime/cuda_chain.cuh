@@ -1,21 +1,14 @@
-#ifndef CUDA_CHAIN_CUH
-#define CUDA_CHAIN_CUH
+#ifndef NEXUSMINER_GPU_CUDA_CHAIN_CUH
+#define NEXUSMINER_GPU_CUDA_CHAIN_CUH
+
 #include <stdint.h>
+#include "gpu/prime_common.hpp"
 
 //A class representing a chain of nexus prime candidates.
 //We avoid the standard library (no vectors or std::strings) so we can use this with cuda.
 namespace nexusminer {
 	namespace gpu
 	{
-		
-
-		enum class Fermat_test_status {
-			untested,
-			fail,
-			pass
-		};
-
-		static constexpr int maxGap = 12;  //the largest allowable prime gap.
 
 		//a candidate for a dense prime cluster.  A chain consists of a base integer plus a list of offsets. 
 		struct CudaChain
@@ -29,7 +22,7 @@ namespace nexusminer {
 				complete  //fermat testing is complete. 
 			};
 
-			static constexpr int m_max_chain_length = 22;  //the longest chain we can represent. 
+			static constexpr int m_max_chain_length = 40;  //22 the longest chain we can represent. 
 			int m_min_chain_length = 8;
 			int m_min_chain_report_length = 5;
 			Chain_state m_chain_state = Chain_state::open;

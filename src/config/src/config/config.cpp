@@ -19,16 +19,18 @@ namespace config
 		, m_mining_mode{ Mining_mode::HASH}
 		, m_use_pool{false}
 		, m_pool_config{}
+		, m_log_level{2}	// info level
 		, m_logfile{""}		// no logfile usage, default
 		, m_connection_retry_interval{5}
 		, m_print_statistics_interval{5}
 		, m_get_height_interval{2}
+		, m_ping_interval{10}
 	{
 	}
 
 	bool Config::read_config(std::string const& miner_config_file)
 	{
-		m_logger->info("Reading config file {}", miner_config_file);
+	//	m_logger->info("Reading config file {}", miner_config_file);
 
 		std::ifstream config_file(miner_config_file);
 		if (!config_file.is_open())
@@ -92,8 +94,18 @@ namespace config
 			{
 				j.at("get_height_interval").get_to(m_get_height_interval);
 			}
+			if (j.count("ping_interval") != 0)
+			{
+				j.at("ping_interval").get_to(m_ping_interval);
+			}
+
+			if (j.count("log_level") != 0)
+			{
+				j.at("log_level").get_to(m_log_level);
+			}
 
 			j.at("logfile").get_to(m_logfile);
+			print_global_config();
 			print_worker_config();
 			return true;
 		}
@@ -188,6 +200,15 @@ namespace config
 			}
 			ss << worker.m_id << " mode: " << mode << std::endl;
 		}
+
+		m_logger->info(ss.str());
+	}
+
+	void Config::print_global_config() const
+	{
+		std::stringstream ss;
+		ss << "Mining " << (m_mining_mode == config::Mining_mode::HASH ? "HASH" : "PRIME") << " Channel in "
+			<< (m_use_pool ? "POOL" : "SOLO") << " mode";
 
 		m_logger->info(ss.str());
 	}
