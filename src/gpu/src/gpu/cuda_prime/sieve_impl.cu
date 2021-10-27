@@ -710,34 +710,37 @@ namespace nexusminer {
                     prime_mod_inv = prime_mod30_inverse_shared[k % 30];
                     unsigned int full_wheels = lane_id / 8;
                     wheel_index = sieve30_index_shared[(prime_mod_inv * j) % 30];
-                    next_wheel_gap = sieve30_gaps_shared[wheel_index];
+                    next_wheel_gap = 0;
                     j += full_wheels * 30 * k;
                     for (auto id = 0; id < lane_id % 8; id++)
                     {
-
-                        j += k * next_wheel_gap;
-                        wheel_index = (wheel_index + 1) % 8;
-                        next_wheel_gap = sieve30_gaps_shared[wheel_index];
+                        next_wheel_gap += sieve30_gaps_shared[wheel_index % 8];
+                        wheel_index++;
                     }
-                    //__syncwarp();
-                    while (j < segment_size)
+                    j += k * next_wheel_gap;
+                    
+                    
+                    uint32_t sieve_index = j / Cuda_sieve::m_sieve_word_range;
+                    Cuda_sieve::sieve_word_t bitmask = ~(static_cast<Cuda_sieve::sieve_word_t>(1) <<
+                        sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]);
+                    //each lane always crosses off the same spot on the wheel (the same bit in the word)
+                    //uint32_t increment = 120 * k;  
+                    //while (j < segment_size)
+                    while(sieve_index < Cuda_sieve::m_kernel_sieve_size_words)
                     {
                         //cross off a multiple of the sieving prime
-                        uint32_t sieve_index = j / Cuda_sieve::m_sieve_word_range;
-
-                        Cuda_sieve::sieve_word_t bitmask = ~(static_cast<Cuda_sieve::sieve_word_t>(1) <<
-                            sieve120_index_shared[j % Cuda_sieve::m_sieve_word_range]);
-                      
                         atomicAnd(&sieve[sieve_index], bitmask);
 
                         //increment the next multiple of the current prime (rotate the wheel).  Increment by 32x because 32 lanes work on one prime 
-                        j += 120 * k;// *next_wheel_gap;
+                        //j += increment; //we don't need to keep track of the multiple of the prime, only the index of the sieve word. 
+                        sieve_index += k; //this looks wierd but it works because each lane works on a multiple of 120 * prime
                        
                     }
- 
+                    
+                    
                     //save the starting multiple for this prime for the next segment
 
-                    //multiples[block_id * Cuda_sieve::m_medium_small_prime_count + i] = j - segment_size;
+                    //multiples[block_id * Cuda_sieve::m_medium_small_prime_count + i] = lowest_multiple[warp_id] - segment_size;
                    
                 }
                 __syncthreads();

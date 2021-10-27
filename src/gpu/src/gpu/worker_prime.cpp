@@ -132,7 +132,7 @@ void Worker_prime::run()
 	uint64_t fermat_passes_this_cycle_start;
 	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start);
 
-	bool debug = false;
+	bool debug = true;
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)
