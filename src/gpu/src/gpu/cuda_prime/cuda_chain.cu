@@ -22,18 +22,13 @@ namespace nexusminer {
         __device__  void cuda_chain_open(CudaChain& chain, uint64_t base_offset)
         {
             chain.m_base_offset = base_offset;
-            chain.m_chain_state = CudaChain::Chain_state::open;
             chain.m_offsets[0] = 0; //the first offset is always zero
             chain.m_fermat_test_status[0] = Fermat_test_status::untested;
             chain.m_untested_count = 1;
             chain.m_offset_count = 1;
-            chain.m_gap_in_process = 0;
             chain.m_prime_count = 0;
         }
-        __device__  void cuda_chain_close(CudaChain& chain)
-        {
-            chain.m_chain_state = CudaChain::Chain_state::closed;
-        }
+       
 
         //analyze the chain fermat test results.  
         //return the starting offset and length of the longest fermat chain that meets the mininmum gap requirement

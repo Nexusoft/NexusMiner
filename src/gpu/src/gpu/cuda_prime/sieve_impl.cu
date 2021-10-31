@@ -60,6 +60,11 @@ namespace nexusminer {
             ~(1u << 16), ~(1u << 17), ~(1u << 18), ~(1u << 19), ~(1u << 20), ~(1u << 21), ~(1u << 22), ~(1u << 23),
             ~(1u << 24), ~(1u << 25), ~(1u << 26), ~(1u << 27), ~(1u << 28), ~(1u << 29), ~(1u << 30), ~(1u << 31)
         };*/
+
+        int round_up(int num, int factor)
+        {
+            return num + factor - 1 - (num + factor - 1) % factor;
+        }
         
         // cross off small primes.  These primes hit the sieve often.  We iterate through the sieve words and cross them off using 
         // precalculated constants.  start is offset from the sieve start 
@@ -186,17 +191,16 @@ namespace nexusminer {
             //local shared copy of one segment of the sieve
             __shared__ Cuda_sieve::sieve_word_t sieve[Cuda_sieve::m_kernel_sieve_size_words];
             
+            uint32_t sieve_results_index = blockIdx.x * Cuda_sieve::m_kernel_sieve_size_words;
             //each thread in the block initialize part of the shared sieve
             for (int j = index; j < Cuda_sieve::m_kernel_sieve_size_words; j += stride)
             {
-                sieve[j] = ~0;
+                sieve[j] = sieve_results[sieve_results_index + j];
             }
             __syncthreads();
 
             //the number of sieve hits in this segment
             unsigned int sieve_hits = bucket_indices[block_id * Cuda_sieve::m_kernel_segments_per_block + segment_id];
-            /*if (index == 0 && block_id == 0)
-                printf("block %u segment %u sieve hits %u\n", block_id, segment_id, sieve_hits);*/
             uint32_t z = block_id;
             uint32_t y = segment_id;
             uint32_t x;
@@ -220,10 +224,9 @@ namespace nexusminer {
             __syncthreads();
 
             //merge the sieve results back to global memory
-            uint32_t sieve_results_index = blockIdx.x * Cuda_sieve::m_kernel_sieve_size_words;
             for (unsigned int j = index; j < Cuda_sieve::m_kernel_sieve_size_words; j += stride)
             {
-                sieve_results[sieve_results_index + j] &= sieve[j];
+                sieve_results[sieve_results_index + j] = sieve[j];
             }
 
         }
@@ -368,12 +371,11 @@ namespace nexusminer {
             const unsigned int search_words = search_range / Cuda_sieve::m_sieve_word_range;
             const unsigned int total_search_regions = Cuda_sieve::m_sieve_range / search_range;
             unsigned int num_blocks = gridDim.x;
-            unsigned int num_threads = blockDim.x;
             unsigned int block_id = blockIdx.x / Cuda_sieve::m_kernel_segments_per_block;
             unsigned int segment_id = blockIdx.x % Cuda_sieve::m_kernel_segments_per_block;
             unsigned int index = threadIdx.x;
             unsigned int search_regions_per_kernel_block = (total_search_regions + num_blocks - 1) / num_blocks;
-            unsigned int stride = num_threads;
+            unsigned int stride = blockDim.x;
             unsigned int gap;
             uint32_t chain_start;
             uint64_t segment_offset = sieve_start_offset + block_id * Cuda_sieve::m_block_range + segment_id * Cuda_sieve::m_segment_range;
@@ -383,6 +385,8 @@ namespace nexusminer {
             __shared__ unsigned int sieve30_offsets_shared[8];
             //local stats
             __shared__ uint32_t chain_count_shared;
+            //local shared copy of the sieve
+            //__shared__ Cuda_sieve::sieve_word_t sieve_shared[Cuda_sieve::m_kernel_sieve_size_words];
 
             if (threadIdx.x < 8)
             {
@@ -394,6 +398,13 @@ namespace nexusminer {
             {
                 chain_count_shared = 0;
             }
+
+            ////copy sieve segment from global to shared memory
+            //for (int i = index; i < Cuda_sieve::m_kernel_sieve_size_words; i += stride)
+            //{
+
+            //    sieve_shared[i] = sieve[sieve_segment_index + i];
+            //}
                 
             __syncthreads();
 
@@ -403,7 +414,7 @@ namespace nexusminer {
                 CudaChain current_chain;
                 uint64_t region_offset = segment_offset + region * search_range;
                 chain_start = 0;
-                sieve_index = sieve_segment_index + region * search_words;
+                sieve_index = region * search_words + sieve_segment_index;
                 uint32_t last_offset = 0;
                 //iterate through each word in the search region
                 for (unsigned int word = 0; word < search_words; word++)
@@ -459,7 +470,6 @@ namespace nexusminer {
                             chain_in_process = true;
                         }
                     }
-                    
                 }
                 //we reached the end of the search region.  do a final check on the chain in process
                 if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
@@ -480,6 +490,7 @@ namespace nexusminer {
             {
                 atomicAdd(chain_stat_count, chain_count_shared);
             }
+            
         }
 
         //medium prime sieve.  We use a block of shared memory to sieve in segments.  Each block sieves a different range. 
@@ -542,7 +553,8 @@ namespace nexusminer {
                 //everyone in the block initialize part of the shared sieve
                 for (int sieve_index = index; sieve_index < Cuda_sieve::m_kernel_sieve_size_words; sieve_index += stride)
                 {
-                    sieve[sieve_index] = ~0;
+                    //sieve[sieve_index] = ~0;
+                    sieve[sieve_index] = sieve_results[sieve_results_index + sieve_index];
                 }
                 if (index == 0)
                 {
@@ -610,7 +622,7 @@ namespace nexusminer {
                 //merge the sieve results back to global memory
                 for (uint32_t sieve_index = index; sieve_index < Cuda_sieve::m_kernel_sieve_size_words; sieve_index += stride)
                 {
-                    sieve_results[sieve_results_index + sieve_index] &= sieve[sieve_index];
+                    sieve_results[sieve_results_index + sieve_index] = sieve[sieve_index];
                 }
                 
                 sieve_results_index += Cuda_sieve::m_kernel_sieve_size_words;
@@ -671,7 +683,8 @@ namespace nexusminer {
                 //everyone in the block initialize part of the shared sieve
                 for (int sieve_index = index; sieve_index < Cuda_sieve::m_kernel_sieve_size_words; sieve_index += stride)
                 {
-                    sieve[sieve_index] = ~0;
+                    //sieve[sieve_index] = ~0;
+                    sieve[sieve_index] = sieve_results[sieve_results_index + sieve_index];
                 }
 
                 __syncthreads();
@@ -731,9 +744,11 @@ namespace nexusminer {
                         //cross off a multiple of the sieving prime
                         atomicAnd(&sieve[sieve_index], bitmask);
 
-                        //increment the next multiple of the current prime (rotate the wheel).  Increment by 32x because 32 lanes work on one prime 
-                        //j += increment; //we don't need to keep track of the multiple of the prime, only the index of the sieve word. 
-                        sieve_index += k; //this looks wierd but it works because each lane works on a multiple of 120 * prime
+                        //Normally this is where we add the next multiple of the current prime (rotate the wheel).  
+                        //j += increment; //we don't need to keep track of the multiple of the prime, only the index of the sieve word.
+                        //there are 32 lanes working on a prime.  There are also 32 bits in the sieve word and the mod30 wheel is 8 bits.
+                        //Each lane works on multiples of one bit in the wheel.   
+                        sieve_index += k; //this looks wierd but it works because each lane works on a multiple of 120 * prime.  
                        
                     }
                     
@@ -749,7 +764,7 @@ namespace nexusminer {
                 //merge the sieve results back to global memory
                 for (uint32_t sieve_index = index; sieve_index < Cuda_sieve::m_kernel_sieve_size_words; sieve_index += stride)
                 {
-                    sieve_results[sieve_results_index + sieve_index] &= sieve[sieve_index];
+                    sieve_results[sieve_results_index + sieve_index] = sieve[sieve_index];
                 }
 
                 sieve_results_index += Cuda_sieve::m_kernel_sieve_size_words;
@@ -1004,7 +1019,7 @@ namespace nexusminer {
             const int search_regions_per_thread = 1;
             const unsigned int search_range = Cuda_sieve::m_sieve_chain_search_boundary * Cuda_sieve::m_sieve_word_byte_count;
             const unsigned int search_regions_per_segment = (Cuda_sieve::m_segment_range + search_range - 1) / search_range;
-            const unsigned int threads = (search_regions_per_segment + search_regions_per_thread - 1) / search_regions_per_thread;
+            const unsigned int threads = round_up((search_regions_per_segment + search_regions_per_thread - 1) / search_regions_per_thread,32);
             find_chain_kernel2 << <blocks, threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count);
             
         }
