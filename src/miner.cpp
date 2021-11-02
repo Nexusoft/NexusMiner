@@ -10,7 +10,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
 #include <asio.hpp>
 #include <chrono>
@@ -26,8 +26,6 @@ namespace nexusminer
 	, m_logger{ spdlog::stdout_color_mt("logger") }
 	, m_config{ m_logger }
 	{
-		
-		m_logger->set_level(spdlog::level::debug);
 		m_logger->set_pattern("[%D %H:%M:%S.%e][%^%l%$] %v");
 
 		// Register to handle the signals that indicate when the server should exit.
@@ -77,6 +75,20 @@ namespace nexusminer
 		if (!m_config.read_config(miner_config_file))
 		{
 			return false;
+		}
+
+		// logger settings
+		if (!m_config.get_logfile().empty())
+		{
+			// initialise a new logger
+			spdlog::drop("logger");
+			auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+			auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(m_config.get_logfile(), true);
+
+			m_logger = std::make_shared<spdlog::logger>(spdlog::logger("logger", { console_sink, file_sink }));
+			m_logger->set_pattern("[%D %H:%M:%S.%e][%^%l%$] %v");
+			spdlog::set_default_logger(m_logger);
+			spdlog::flush_on(spdlog::level::info);
 		}
 
 		m_logger->set_level(static_cast<spdlog::level::level_enum>(m_config.get_log_level()));
