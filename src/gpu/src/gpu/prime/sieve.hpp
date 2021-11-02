@@ -22,6 +22,7 @@ namespace nexusminer {
 			using sieve_word_t = Cuda_sieve::sieve_word_t;
 			Sieve();
 			void generate_sieving_primes();
+			void generate_small_prime_tables();
 			void set_sieve_start(boost::multiprecision::uint1024_t);
 			boost::multiprecision::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
@@ -95,6 +96,7 @@ namespace nexusminer {
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
+			uint32_t m_small_prime_limit;
 			uint32_t m_medium_small_prime_limit;
 			uint32_t m_sieving_prime_limit;
 			uint32_t m_large_prime_limit;
@@ -132,21 +134,25 @@ namespace nexusminer {
 			//each byte covers a range of 30 sieving primes 
 			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
 			//we start sieving at 7 with the small primes.  medium primes start here.
-			const int m_medium_small_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
-			const int m_sieving_start_prime = Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count];
+			//uint32_t m_medium_small_start_prime;
+			//uint32_t m_sieving_start_prime;
 		
 
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve;
+
+			std::vector<uint8_t>m_small_primes;
+			std::vector<uint16_t>m_small_prime_offsets;
 			std::vector<uint32_t> m_sieving_primes;
-			std::vector<uint32_t> m_large_sieving_primes;
 			std::vector<uint32_t> m_multiples;
-			std::vector<uint32_t> m_large_multiples;
 			std::vector<uint32_t> m_medium_small_primes;
 			std::vector<uint32_t> m_medium_small_multples;
+			std::vector<uint32_t> m_large_sieving_primes;
+			std::vector<uint32_t> m_large_multiples;
+			std::vector<uint32_t> m_small_prime_lookup_table;
+
 			std::vector<Chain> m_chain;
 			std::vector<CudaChain>m_cuda_chains;
-			std::vector<uint32_t>m_small_prime_offsets;
 			std::vector<double>m_large_prime_mod_constants;
 
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.

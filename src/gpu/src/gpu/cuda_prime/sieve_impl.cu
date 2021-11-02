@@ -68,43 +68,51 @@ namespace nexusminer {
         
         // cross off small primes.  These primes hit the sieve often.  We iterate through the sieve words and cross them off using 
         // precalculated constants.  start is offset from the sieve start 
-        __global__ void sieveSmallPrimes(Cuda_sieve::sieve_word_t* sieve, uint64_t start, uint32_t* small_prime_offsets)
+        __global__ void sieveSmallPrimes(Cuda_sieve::sieve_word_t* sieve, uint64_t start, uint16_t* small_prime_offsets, uint32_t* masks, 
+            uint8_t* small_primes)
         {
 
-            uint64_t num_blocks = gridDim.x;
-            uint64_t num_threads = blockDim.x;
-            uint64_t block_id = blockIdx.x;
-            uint64_t index = block_id * num_threads + threadIdx.x;
-            uint64_t stride = num_blocks * num_threads;
+            uint32_t num_blocks = gridDim.x;
+            uint32_t num_threads = blockDim.x;
+            uint32_t block_id = blockIdx.x;
+            uint32_t index = block_id * num_threads + threadIdx.x;
+            uint32_t stride = num_blocks * num_threads;
 
-            const uint32_t increment = Cuda_sieve::m_sieve_word_range;
+            const uint64_t increment = Cuda_sieve::m_sieve_word_range;
+            //uint16_t mask_indices[Cuda_sieve::m_small_prime_count];
 
-            //#pragma unroll
-            for (uint64_t i = index; i < Cuda_sieve::m_sieve_total_size; i += stride) 
+            for (uint32_t i = index; i < Cuda_sieve::m_sieve_total_size; i += stride) 
             {
-                
                 //the offset for the sieve word in process
-                uint64_t inc = i * increment;
+                uint64_t inc = start + i * increment;
                 //get the correct rotation for the prime mask
-                //primes for reference 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101
-                //                     1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23  
 
-                uint16_t index7 = (start + small_prime_offsets[0] + inc) % 7;
-                uint16_t index11 = (start + small_prime_offsets[1] + inc) % 11;
-                uint16_t index13 = (start + small_prime_offsets[2] + inc) % 13;
-                uint16_t index17 = (start + small_prime_offsets[3] + inc) % 17;
-                uint16_t index19 = (start + small_prime_offsets[4] + inc) % 19;
-                uint16_t index23 = (start + small_prime_offsets[5] + inc) % 23;
-                uint16_t index29 = (start + small_prime_offsets[6] + inc) % 29;
-                uint16_t index31 = (start + small_prime_offsets[7] + inc) % 31;
-                uint16_t index37 = (start + small_prime_offsets[8] + inc) % 37;
-                uint16_t index41 = (start + small_prime_offsets[9] + inc) % 41;
-                uint16_t index43 = (start + small_prime_offsets[10] + inc) % 43;
-                uint16_t index47 = (start + small_prime_offsets[11] + inc) % 47;
-                uint16_t index53 = (start + small_prime_offsets[12] + inc) % 53;
-                uint16_t index59 = (start + small_prime_offsets[13] + inc) % 59;
-                uint16_t index61 = (start + small_prime_offsets[14] + inc) % 61;
-                uint16_t index67 = (start + small_prime_offsets[15] + inc) % 67;
+                /*Cuda_sieve::sieve_word_t word = 0xFFFFFFFF;
+                unsigned int prime_mask_index_offset = 0;
+                #pragma unroll
+                for (unsigned int prime_index = 0; prime_index < Cuda_sieve::m_small_prime_count; prime_index++)
+                {
+                    uint8_t mask_index = (small_prime_offsets[prime_index] + inc) % small_primes[prime_index];
+                    word &= masks[prime_mask_index_offset + mask_index];
+                    prime_mask_index_offset += small_primes[prime_index];
+                }*/
+                //The loop above works, but hardcoding each prime is faster.
+                uint16_t index7 = (small_prime_offsets[0] + inc) % 7;
+                uint16_t index11 = (small_prime_offsets[1] + inc) % 11;
+                uint16_t index13 = (small_prime_offsets[2] + inc) % 13;
+                uint16_t index17 = (small_prime_offsets[3] + inc) % 17;
+                uint16_t index19 = (small_prime_offsets[4] + inc) % 19;
+                uint16_t index23 = (small_prime_offsets[5] + inc) % 23;
+                uint16_t index29 = (small_prime_offsets[6] + inc) % 29;
+                uint16_t index31 = (small_prime_offsets[7] + inc) % 31;
+                uint16_t index37 = (small_prime_offsets[8] + inc) % 37;
+                uint16_t index41 = (small_prime_offsets[9] + inc) % 41;
+                uint16_t index43 = (small_prime_offsets[10] + inc) % 43;
+                uint16_t index47 = (small_prime_offsets[11] + inc) % 47;
+                uint16_t index53 = (small_prime_offsets[12] + inc) % 53;
+                uint16_t index59 = (small_prime_offsets[13] + inc) % 59;
+                uint16_t index61 = (small_prime_offsets[14] + inc) % 61;
+                /*uint16_t index67 = (start + small_prime_offsets[15] + inc) % 67;
                 uint16_t index71 = (start + small_prime_offsets[16] + inc) % 71;
                 uint16_t index73 = (start + small_prime_offsets[17] + inc) % 73;
                 uint16_t index79 = (start + small_prime_offsets[18] + inc) % 79;
@@ -112,28 +120,15 @@ namespace nexusminer {
                 uint16_t index89 = (start + small_prime_offsets[20] + inc) % 89;
                 uint16_t index97 = (start + small_prime_offsets[21] + inc) % 97;
                 uint16_t index101 = (start + small_prime_offsets[22] + inc) % 101;
-                uint16_t index103 = (start + small_prime_offsets[23] + inc) % 103;
+                uint16_t index103 = (start + small_prime_offsets[23] + inc) % 103;*/
 
                
-
-                //apply the mask.  the mask for the first prime 7 is also used to initialize the sieve (hence no &).
                 Cuda_sieve::sieve_word_t word;
-                word = p7[index7];
-                word &= p11[index11];
-                word &= p13[index13];
-                word &= p17[index17];
-                word &= p19[index19];
-                word &= p23[index23];
-                word &= p29[index29];
-                word &= p31[index31];
-                word &= p37[index37];
-                word &= p41[index41];
-                word &= p43[index43];
-                word &= p47[index47];
-                word &= p53[index53];
-                word &= p59[index59];
-                word &= p61[index61];
-                word &= p67[index67];
+                //apply the mask.  the mask for the first prime 7 is also used to initialize the sieve (hence no &).
+                word = p7[index7] & p11[index11] & p13[index13] & p17[index17] & p19[index19] & p23[index23] & p29[index29] & p31[index31] &
+                    p37[index37] & p41[index41] & p43[index43] & p47[index47] & p53[index53] & p59[index59] & p61[index61];
+
+               /* word &= p67[index67];
                 word &= p71[index71];
                 word &= p73[index73];
                 word &= p79[index79];
@@ -141,11 +136,10 @@ namespace nexusminer {
                 word &= p89[index89];
                 word &= p97[index97];
                 word &= p101[index101];
-                word &= p103[index103];
+                word &= p103[index103];*/
 
                 //save to global memory
                 sieve[i] = word;
-
             }
         }
 
@@ -966,7 +960,7 @@ namespace nexusminer {
             const int threads = 256;
             const int blocks = (Cuda_sieve::m_sieve_total_size + threads - 1)/threads;
             
-            sieveSmallPrimes << <blocks, threads >> > (d_sieve, sieve_start_offset, d_small_prime_offsets);
+            sieveSmallPrimes << <blocks, threads >> > (d_sieve, sieve_start_offset, d_small_prime_offsets, d_small_prime_masks, d_small_primes);
 
         }
 
@@ -1088,7 +1082,7 @@ namespace nexusminer {
 
         //allocate global memory and load values used by the sieve to the gpu 
         void Cuda_sieve_impl::load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[], 
-            uint32_t sieve_size, uint16_t device)
+            uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device)
         {
           
             m_sieving_prime_count = prime_count;
@@ -1101,7 +1095,8 @@ namespace nexusminer {
             checkCudaErrors(cudaMalloc(&d_medium_small_primes, Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_primes)));
             checkCudaErrors(cudaMalloc(&d_medium_small_prime_starting_multiples, 
                 Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_prime_starting_multiples)));
-
+            checkCudaErrors(cudaMalloc(&d_small_prime_masks, small_prime_mask_count * sizeof(*d_small_prime_masks)));
+            checkCudaErrors(cudaMalloc(&d_small_primes, Cuda_sieve::m_small_prime_count * sizeof(*d_small_primes)));
             checkCudaErrors(cudaMalloc(&d_large_primes, Cuda_sieve::m_large_prime_count * sizeof(*d_large_primes)));
             checkCudaErrors(cudaMalloc(&d_large_prime_starting_multiples, Cuda_sieve::m_large_prime_count * sizeof(*d_large_prime_starting_multiples)));
             checkCudaErrors(cudaMalloc(&d_large_prime_buckets, Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block
@@ -1121,6 +1116,8 @@ namespace nexusminer {
 
 
             //copy data to the gpu
+            checkCudaErrors(cudaMemcpy(d_small_primes, small_primes, Cuda_sieve::m_small_prime_count * sizeof(*d_small_primes), cudaMemcpyHostToDevice));
+            checkCudaErrors(cudaMemcpy(d_small_prime_masks, small_prime_masks, small_prime_mask_count * sizeof(*d_small_prime_masks), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, prime_count * sizeof(*d_sieving_primes), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_large_primes, large_primes, Cuda_sieve::m_large_prime_count * sizeof(*d_large_primes), cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_medium_small_primes, medium_small_primes,
@@ -1134,7 +1131,7 @@ namespace nexusminer {
         }
 
         //reset sieve with new starting offsets
-        void Cuda_sieve_impl::init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_multiples[],
+        void Cuda_sieve_impl::init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_multiples[],
             uint32_t medium_small_prime_multiples[])
         {
             checkCudaErrors(cudaSetDevice(m_device));
@@ -1174,6 +1171,11 @@ namespace nexusminer {
             checkCudaErrors(cudaFree(d_bucket_indices));
             checkCudaErrors(cudaFree(d_medium_small_primes));
             checkCudaErrors(cudaFree(d_medium_small_prime_starting_multiples));
+            checkCudaErrors(cudaFree(d_small_primes));
+            checkCudaErrors(cudaFree(d_small_prime_masks));
+
+
+
         }
     }
 }

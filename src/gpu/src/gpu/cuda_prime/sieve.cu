@@ -6,11 +6,7 @@
 namespace nexusminer {
     namespace gpu {
 
-        //primes for reference 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
-        //                     1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
 
-        const int Cuda_sieve::m_small_primes[] = { 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,
-                103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211 };
         Cuda_sieve::Cuda_sieve() : m_impl(std::make_unique<Cuda_sieve_impl>()) {}
         Cuda_sieve::~Cuda_sieve() = default;
         void Cuda_sieve::run_sieve(uint64_t sieve_start_offset)
@@ -24,12 +20,13 @@ namespace nexusminer {
         }
        
         void Cuda_sieve::load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[],
-            uint32_t sieve_size, uint16_t device)
+            uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device)
         {
-            m_impl->load_sieve(primes, prime_count, large_primes, medium_small_primes, sieve_size, device);
+            m_impl->load_sieve(primes, prime_count, large_primes, medium_small_primes, small_prime_masks, small_prime_mask_count,
+                small_primes, sieve_size, device);
         }
 
-        void Cuda_sieve::init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
+        void Cuda_sieve::init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
             uint32_t medium_small_prime_starting_multiples[])
         {
             m_impl->init_sieve(starting_multiples, small_prime_offsets, large_prime_starting_multiples, medium_small_prime_starting_multiples);

@@ -34,6 +34,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	prime_test.sieve_performance_test();
 	prime_test.fermat_performance_test();
 	m_segmented_sieve->generate_sieving_primes();
+	m_segmented_sieve->generate_small_prime_tables();
 
 }
 

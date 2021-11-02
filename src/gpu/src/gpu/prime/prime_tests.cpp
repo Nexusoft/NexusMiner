@@ -120,13 +120,14 @@ namespace gpu
 		//test_sieve.m_sieving_prime_limit = 1000;
 		//test_sieve.m_segment_batch_size = 100;
 		test_sieve.generate_sieving_primes();
+		test_sieve.generate_small_prime_tables();
 		test_sieve.calculate_starting_multiples();
 		uint64_t sieve_range = Cuda_sieve::m_sieve_range;
 		//test_sieve.reset_sieve();
 		//test_sieve.reset_sieve_batch(0);
 		test_sieve.gpu_sieve_load(m_device);
 		test_sieve.gpu_sieve_init();
-		test_sieve.sieve_small_primes();
+		//test_sieve.sieve_small_primes();
 		
 		auto start = std::chrono::steady_clock::now();
 		test_sieve.gpu_sieve_small_primes(0);
@@ -134,8 +135,8 @@ namespace gpu
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double small_prime_sieve_elapsed_s = elapsed.count() / 1000.0;
-		m_logger->info("Small prime sieved {:.1E} integers using primes up to {} in {:.3f} seconds ({:.1f} MISPS).",
-			(double)sieve_range, Cuda_sieve::m_small_primes[Cuda_sieve::m_small_prime_count - 1], small_prime_sieve_elapsed_s,
+		m_logger->info("Small prime sieved {:.1E} integers using {} primes up to {} in {:.3f} seconds ({:.1f} MISPS).",
+			(double)sieve_range, Cuda_sieve::m_small_prime_count, (double)test_sieve.m_small_prime_limit, small_prime_sieve_elapsed_s,
 			sieve_range / small_prime_sieve_elapsed_s / 1e6);
 		start = std::chrono::steady_clock::now();
 		test_sieve.gpu_sieve_medium_small_primes(0);
@@ -167,7 +168,8 @@ namespace gpu
 		uint64_t prime_candidate_count = test_sieve.gpu_get_prime_candidate_count();
 		double candidate_ratio = static_cast<double>(prime_candidate_count) / sieve_range;
 		double candidate_ratio_expected = test_sieve.sieve_pass_through_rate_expected();
-		m_logger->info("Combined sieve ({:.1f} MISPS).", sieve_range / (sieve_elapsed_s + medium_small_sieve_elapsed_s + small_prime_sieve_elapsed_s + large_prime_sieve_elapsed_s) / 1e6);
+		double combined_sieve_time = sieve_elapsed_s + medium_small_sieve_elapsed_s + small_prime_sieve_elapsed_s + large_prime_sieve_elapsed_s;
+		m_logger->info("Combined sieve time {:.3f} seconds ({:.1f} MISPS).", combined_sieve_time, sieve_range / (combined_sieve_time) / 1e6);
 		m_logger->info("Got {:.3f}% sieve pass through rate.  Expected about {:.3f}%.",
 			candidate_ratio * 100, candidate_ratio_expected * 100);
 		//test_sieve.gpu_get_sieve();

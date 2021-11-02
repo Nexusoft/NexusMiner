@@ -42,11 +42,12 @@ namespace nexusminer {
 			static const uint32_t m_max_chains = 2*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const uint32_t m_max_long_chains = 32;
 			static const int m_min_chain_length = 8;
-			static const int m_small_prime_count = 24;
-			static const int m_small_primes[]; //array is defined in sieve.cu
+			static const int m_start_prime = 7;
+			static const int m_small_prime_count = 15; //61 is the 15th prime starting at 7.  61 is first prime that hits each sieve word no more than 1 time.
+			//If you change the small_prime_count, make sure you also change the hardcoded list of primes in the small prime sieve in sieve_impl.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
-			static constexpr int m_medium_small_prime_count = 32 * 16;
+			static constexpr int m_medium_small_prime_count = 32 * 18;
 			static constexpr int m_medium_prime_count = 32 * 4500;
 			static constexpr int m_large_prime_count = 32 * 75000;
 			static const int chain_histogram_max = 10;  
@@ -56,8 +57,8 @@ namespace nexusminer {
 			Cuda_sieve();
 			~Cuda_sieve();
 			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[], 
-				uint32_t sieve_size, uint16_t device);
-			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
+				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device);
+			void init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
 				uint32_t medium_small_prime_starting_multiples[]);
 			void reset_stats();
 			void free_sieve();
