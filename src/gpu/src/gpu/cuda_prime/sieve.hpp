@@ -43,7 +43,7 @@ namespace nexusminer {
 			static const uint32_t m_max_long_chains = 32;
 			static const int m_min_chain_length = 8;
 			static const int m_start_prime = 7;
-			static const int m_small_prime_count = 15; //61 is the 15th prime starting at 7.  61 is first prime that hits each sieve word no more than 1 time.
+			static constexpr int m_small_prime_count = 15; //61 is the 15th prime starting at 7.  61 is first prime that hits each sieve word no more than 1 time.
 			//If you change the small_prime_count, make sure you also change the hardcoded list of primes in the small prime sieve in sieve_impl.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
