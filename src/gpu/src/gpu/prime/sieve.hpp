@@ -133,10 +133,6 @@ namespace nexusminer {
 
 			//each byte covers a range of 30 sieving primes 
 			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
-			//we start sieving at 7 with the small primes.  medium primes start here.
-			//uint32_t m_medium_small_start_prime;
-			//uint32_t m_sieving_start_prime;
-		
 
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve;

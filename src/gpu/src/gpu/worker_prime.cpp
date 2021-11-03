@@ -150,12 +150,14 @@ void Worker_prime::run()
 		auto sieve_stop = std::chrono::steady_clock::now();
 		auto sieve_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(sieve_stop - sieve_start);
 		sieving_ms += sieve_elapsed.count();
+		if (m_stop) break;
 		auto find_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->find_chains();
 		if (debug) m_segmented_sieve->gpu_sieve_synchronize();
 		auto find_chains_stop = std::chrono::steady_clock::now();
 		auto find_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(find_chains_stop - find_chains_start);
 		find_chains_ms += find_chains_elapsed.count();
+		if (m_stop) break;
 		//m_segmented_sieve->do_chain_trial_division_check();
 		auto test_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_run_fermat_chain_test();
@@ -163,12 +165,14 @@ void Worker_prime::run()
 		auto test_chains_stop = std::chrono::steady_clock::now();
 		auto test_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(test_chains_stop - test_chains_start);
 		test_chains_ms += test_chains_elapsed.count();
+		if (m_stop) break;
 		auto clean_chains_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_clean_chains();
 		if (debug) m_segmented_sieve->gpu_sieve_synchronize();
 		auto clean_chains_stop = std::chrono::steady_clock::now();
 		auto clean_chains_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(clean_chains_stop - clean_chains_start);
 		clean_chains_ms += clean_chains_elapsed.count();
+		if (m_stop) break;
 		//check for winners
 		m_segmented_sieve->get_long_chains();
 		//check difficulty of any chains that passed through the filter
@@ -200,7 +204,7 @@ void Worker_prime::run()
 		m_segmented_sieve->gpu_get_stats();
 		m_segmented_sieve->m_long_chain_starts = {};
 		low += sieve_batch_range;
-		
+		if (m_stop) break;
 
 		//debug
 		auto end = std::chrono::steady_clock::now();
