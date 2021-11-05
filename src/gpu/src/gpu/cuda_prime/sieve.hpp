@@ -31,11 +31,11 @@ namespace nexusminer {
 			static const int m_kernel_sieve_size_bytes = 1001 * 48;  //this is the size of the sieve segment in bytes. It should be a multiple of 4 for a 32 bit word sieve.
 			static const int m_kernel_sieve_size_words = m_kernel_sieve_size_bytes / m_sieve_word_byte_count;
 			static const int m_segment_range = m_kernel_sieve_size_words * m_sieve_word_range;
-			static const int m_kernel_segments_per_block = 32;  //number of times to repeat the sieve within a kernel call
+			static const int m_kernel_segments_per_block = 64;  //number of times to repeat the sieve within a kernel call
 			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;
 			static const uint64_t m_block_range = m_segment_range * m_kernel_segments_per_block;
 			static const int m_threads_per_block = 1024;
-			static const int m_num_blocks = 256;  //each block sieves part of the range
+			static const int m_num_blocks = 128;  //each block sieves part of the range
 			static const uint64_t m_sieve_total_size = m_kernel_sieve_size_words_per_block * m_num_blocks; //size of the sieve in words
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
 			static const int m_estimated_chains_per_million = 4;
@@ -49,6 +49,7 @@ namespace nexusminer {
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
 			static constexpr int m_medium_small_prime_count = 32 * 18;
 			static constexpr int m_medium_prime_count = 32 * 4500;
+			//static constexpr int m_medium_large_prime_count = 32 * 4500;
 			static constexpr int m_large_prime_count = 32 * 75000;
 			static const int chain_histogram_max = 10;  
 			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /16;
