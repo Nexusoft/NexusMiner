@@ -832,7 +832,7 @@ namespace nexusminer {
             int stride = num_threads;
             
             const uint32_t segment_size = Cuda_sieve::m_kernel_sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
-            const uint32_t segments = Cuda_sieve::m_kernel_segments_per_block;
+            const uint32_t segments = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks / gridDim.x;
             const uint32_t block_range = segments * segment_size;
 
             //each block sieves a different region
@@ -861,9 +861,9 @@ namespace nexusminer {
             }
 
             //reset the bucket indices
-            for (int i = index; i < Cuda_sieve::m_kernel_segments_per_block; i += stride)
+            for (int i = index; i < segments; i += stride)
             {
-                bucket_indices[block_id* Cuda_sieve::m_kernel_segments_per_block + i] = 0;
+                bucket_indices[block_id* segments + i] = 0;
             }
             __syncthreads();
 
@@ -902,7 +902,7 @@ namespace nexusminer {
                     //pack the word index and bit into one 32 bit word
                     uint32_t sieve_segment_hit = (sieve_word << 16) | sieve_bit;
                     //add the sieve hit to the segment's bucket
-                    bucket_index = atomicInc(&bucket_indices[block_id * Cuda_sieve::m_kernel_segments_per_block + next_segment], 0xFFFFFFFF);
+                    bucket_index = atomicInc(&bucket_indices[block_id * segments + next_segment], 0xFFFFFFFF);
                     //we are indexing a 1D array as if it were a 3D array. 
                     uint32_t z = block_id;
                     uint32_t y = next_segment;
@@ -927,7 +927,7 @@ namespace nexusminer {
 
             int threads = 1024;
             //one kernel block per sieve block
-            int blocks = Cuda_sieve::m_num_blocks;
+            int blocks = Cuda_sieve::m_num_blocks / 2;
             
             sort_large_primes << <blocks, threads >> > (sieve_start_offset, d_large_primes, d_large_prime_starting_multiples,
                 d_large_prime_buckets, d_bucket_indices);
