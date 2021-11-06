@@ -50,9 +50,9 @@ namespace nexusminer {
 			static constexpr int m_medium_small_prime_count = 32 * 18;
 			static constexpr int m_medium_prime_count = 32 * 4500;
 			//static constexpr int m_medium_large_prime_count = 32 * 4500;
-			static constexpr int m_large_prime_count = 32 * 75000;
+			static constexpr int m_large_prime_count = 32 * 140000;
 			static const int chain_histogram_max = 10;  
-			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /16;
+			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /32;
 			
 
 			Cuda_sieve();

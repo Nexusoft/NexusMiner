@@ -169,8 +169,7 @@ namespace nexusminer {
         //large primes hit the sieve no more than once per segment.  The large prime kernel works on a shared copy 
         //of the sieve one segment at a time.  The word and bit where the primes hit the segment are stored in the bucket array. 
         //The buckets must be filled prior to calling this kernel. We iterate through the hits in the bucket and cross off composites.  
-        __global__ void sieveLargePrimes(uint64_t sieve_start_offset, uint32_t* sieving_primes,
-            uint32_t* starting_multiples, uint32_t* large_prime_buckets, uint32_t* bucket_indices, Cuda_sieve::sieve_word_t* sieve_results)
+        __global__ void sieveLargePrimes(uint32_t* large_prime_buckets, uint32_t* bucket_indices, Cuda_sieve::sieve_word_t* sieve_results)
         {
             //each kernel block works on one segment of the sieve.  
             unsigned int num_threads = blockDim.x;
@@ -823,7 +822,7 @@ namespace nexusminer {
         }
 
         //sort large primes into buckets by where they hit the sieve
-        __global__ void sort_large_primes(uint64_t sieve_start_offset, uint32_t* large_primes,
+        __global__ void sort_large_primes(uint64_t sieve_start_offset, uint32_t* large_primes, uint32_t sieving_prime_count,
             uint32_t* starting_multiples, uint32_t* large_prime_buckets, uint32_t* bucket_indices)
         {
             int num_threads = blockDim.x;
@@ -843,6 +842,7 @@ namespace nexusminer {
             __shared__ unsigned int sieve30_index_shared[30];
             __shared__ unsigned int prime_mod30_inverse_shared[30];
             __shared__ unsigned int sieve120_index_shared[120];
+            __shared__ unsigned int prime_index;
             uint32_t bucket_index = 0;
 
             //initialize shared lookup tables.  lookup tables in shared memory are faster than global memory lookup tables.
@@ -865,10 +865,14 @@ namespace nexusminer {
             {
                 bucket_indices[block_id* segments + i] = 0;
             }
+            if (index == 0)
+            {
+                prime_index = num_threads;
+            }
             __syncthreads();
-
             //iterate through the list of primes
-            for (uint32_t i = index; i < Cuda_sieve::m_large_prime_count; i += stride)
+            for (uint32_t i = index; i < sieving_prime_count; i = atomicInc(&prime_index, 0xFFFFFFFF))
+            //for (uint32_t i = index; i < Cuda_sieve::m_large_prime_count; i += stride)
             {
                 uint32_t k = large_primes[i];
                 uint32_t j = starting_multiples[i];
@@ -929,14 +933,13 @@ namespace nexusminer {
             //one kernel block per sieve block
             int blocks = Cuda_sieve::m_num_blocks / 2;
             
-            sort_large_primes << <blocks, threads >> > (sieve_start_offset, d_large_primes, d_large_prime_starting_multiples,
-                d_large_prime_buckets, d_bucket_indices);
+            sort_large_primes << <blocks, threads >> > (sieve_start_offset, d_large_primes, Cuda_sieve::m_large_prime_count, 
+                d_large_prime_starting_multiples, d_large_prime_buckets, d_bucket_indices);
 
             //one kernel block per sieve segment
             blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
             threads = 1024;
-            sieveLargePrimes << <blocks, threads >> > (sieve_start_offset, d_large_primes, d_large_prime_starting_multiples, 
-                d_large_prime_buckets, d_bucket_indices, d_sieve);
+            sieveLargePrimes << <blocks, threads >> > (d_large_prime_buckets, d_bucket_indices, d_sieve);
             
 
         }
