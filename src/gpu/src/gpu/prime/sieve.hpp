@@ -141,6 +141,7 @@ namespace nexusminer {
 			std::vector<uint16_t>m_small_prime_offsets;
 			std::vector<uint32_t> m_sieving_primes;
 			std::vector<uint32_t> m_multiples;
+			std::vector<Prime_plus_multiple_32> m_medium_primes_plus_multiples;
 			std::vector<uint32_t> m_medium_small_primes;
 			std::vector<uint32_t> m_medium_small_multples;
 			std::vector<uint32_t> m_large_sieving_primes;

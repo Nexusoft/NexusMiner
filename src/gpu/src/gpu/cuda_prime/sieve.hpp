@@ -9,6 +9,12 @@
 namespace nexusminer {
 	namespace gpu {
 
+		struct Prime_plus_multiple_32
+		{
+			uint32_t prime;
+			uint32_t multiple;
+		};
+
 		class Cuda_sieve_impl;
 		class Cuda_sieve
 		{
@@ -35,7 +41,7 @@ namespace nexusminer {
 			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;
 			static const uint64_t m_block_range = m_segment_range * m_kernel_segments_per_block;
 			static const int m_threads_per_block = 1024;
-			static const int m_num_blocks = 256;  //each block sieves part of the range
+			static const int m_num_blocks = 384;  //each block sieves part of the range
 			static const uint64_t m_sieve_total_size = m_kernel_sieve_size_words_per_block * m_num_blocks; //size of the sieve in words
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
 			static const int m_estimated_chains_per_million = 4;
@@ -50,14 +56,16 @@ namespace nexusminer {
 			static constexpr int m_medium_small_prime_count = 32 * 18;
 			static constexpr int m_medium_prime_count = 32 * 4500;
 			//static constexpr int m_medium_large_prime_count = 32 * 4500;
-			static constexpr int m_large_prime_count = 32 * 140000;
+			static constexpr int m_large_prime_count = 32 * 180000;
+			//static constexpr int m_large_prime_2_count = 32 * 140000;
 			static const int chain_histogram_max = 10;  
-			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_large_prime_count /32;
+			static const uint64_t m_bucket_ram_budget = 4.4e9;  //bytes avaialble for storing bucket data
+			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
 			
 
 			Cuda_sieve();
 			~Cuda_sieve();
-			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[], 
+			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[],
 				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device);
 			void init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
 				uint32_t medium_small_prime_starting_multiples[]);

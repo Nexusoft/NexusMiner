@@ -40,6 +40,7 @@ namespace nexusminer {
 			//device memory pointers
 			uint32_t* d_sieving_primes;  //medium sieving primes
 			uint32_t* d_starting_multiples;
+			Prime_plus_multiple_32* d_medium_primes;
 			uint32_t* d_large_primes;
 			uint32_t* d_large_prime_starting_multiples;
 			uint16_t* d_small_prime_offsets;

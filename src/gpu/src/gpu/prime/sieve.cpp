@@ -123,6 +123,9 @@ namespace nexusminer {
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
                 m_multiples.push_back(m);
+                //Prime_plus_multiple_32 pm {s, m };
+                //m_medium_primes_plus_multiples.push_back(pm);
+
             }
             m_large_multiples = {};
             for (const auto& p : m_large_sieving_primes)
