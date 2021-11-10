@@ -3,6 +3,7 @@
 #include "sieve_impl.cuh"
 #include "sieve.hpp"
 #include "sieve_small_prime_constants.cuh"
+#include "sieve_lookup_tables.cuh"
 
 #include <cuda.h>
 #include <stdio.h>
@@ -28,38 +29,6 @@ namespace nexusminer {
         __device__  bool is_there_still_hope(CudaChain& chain);
         __device__  void get_best_fermat_chain(const CudaChain& chain, uint64_t& base_offset, int& offset, int& best_length);
 
-        __device__ const unsigned int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };
-
-        //__device__ const unsigned int sieve30_inverse_offsets[]{ 1,13,11,7,23,19,17,29 }; 
-
-        __device__ const unsigned int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
-
-        __device__ const unsigned int sieve30_index[]
-        { 0,0,1,1,1,1,1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7 };  //reverse lookup table (offset mod 30 to index)
-
-        //__device__ const unsigned int sieve30_inverse_index[]
-        //{ 0,0,3,3,3,3,3, 3, 2, 2, 2, 2, 1, 1, 6, 6, 6, 6, 5, 5, 4, 4, 4, 4, 7, 7, 7, 7, 7, 7 };  //reverse lookup table (prime inverse mod 30 to index)
-
-        __device__ const unsigned int prime_mod30_inverse[]
-        { 1,1,13,13,13,13,13, 13, 11, 11, 11, 11, 7, 7, 23, 23, 23, 23, 19, 19, 17, 17, 17, 17, 29, 29, 29, 29, 29, 29 };  //lookup table - prime % 30 to prime inverse % 30
-
-        //__device__ const unsigned int next_multiple_mod30_offset[]  //range mod30 to the next highest prime.
-        //{ 1,0,5,4,3,2,1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 5, 4, 3, 2, 1, 0 };
-
-        __device__ const unsigned int sieve120_index[]
-        {    0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 
-             8, 8, 9, 9, 9, 9, 9, 9,10,10,10,10,11,11,12,12,12,12,13,13,14,14,14,14,15,15,15,15,15,15,
-            16,16,17,17,17,17,17,17,18,18,18,18,19,19,20,20,20,20,21,21,22,22,22,22,23,23,23,23,23,23,
-            24,24,25,25,25,25,25,25,26,26,26,26,27,27,28,28,28,28,29,29,30,30,30,30,31,31,31,31,31,31
-        };  //reverse lookup table (offset mod 120 to index)
-
-
-        /*__device__  const Cuda_sieve::sieve_word_t unset_bit_mask[]{
-            ~(1u << 0),  ~(1u << 1),  ~(1u << 2),  ~(1u << 3),  ~(1u << 4),  ~(1u << 5),  ~(1u << 6),  ~(1u << 7), 
-            ~(1u << 8),  ~(1u << 9),  ~(1u << 10), ~(1u << 11), ~(1u << 12), ~(1u << 13), ~(1u << 14), ~(1u << 15),
-            ~(1u << 16), ~(1u << 17), ~(1u << 18), ~(1u << 19), ~(1u << 20), ~(1u << 21), ~(1u << 22), ~(1u << 23),
-            ~(1u << 24), ~(1u << 25), ~(1u << 26), ~(1u << 27), ~(1u << 28), ~(1u << 29), ~(1u << 30), ~(1u << 31)
-        };*/
 
         int round_up(int num, int factor)
         {
@@ -190,8 +159,7 @@ namespace nexusminer {
             {
                 sieve[j] = sieve_results[sieve_results_index + j];
             }
-            __syncthreads();
-
+            
             //the number of sieve hits in this segment
             unsigned int sieve_hits = bucket_indices[block_id * Cuda_sieve::m_kernel_segments_per_block + segment_id];
             uint32_t z = block_id;
@@ -199,6 +167,7 @@ namespace nexusminer {
             uint32_t x;
             const uint32_t ymax = Cuda_sieve::m_kernel_segments_per_block;
             const uint32_t xmax = Cuda_sieve::m_large_prime_bucket_size;
+            __syncthreads();
             //iterate through the sieve hits
             for (unsigned int i = index; i < sieve_hits; i+=stride)
             {
@@ -497,12 +466,19 @@ namespace nexusminer {
             //local shared copy of the sieve
             __shared__ Cuda_sieve::sieve_word_t sieve[Cuda_sieve::m_kernel_sieve_size_words];
             //shared mem lookup tables
-            __shared__ unsigned int sieve120_index_shared[120];
+            __shared__ uint8_t sieve120_index_shared[120];
             //__shared__  Cuda_sieve::sieve_word_t unset_bit_mask_shared[32];
-            __shared__ unsigned int sieve30_gaps_shared[8];
-            __shared__ unsigned int sieve30_index_shared[30];
-            __shared__ unsigned int prime_mod30_inverse_shared[30];
+            //mod 30 wheel
+            __shared__ uint8_t sieve30_gaps_shared[8];
+            //__shared__ unsigned int sieve30_index_shared[30];
+            //__shared__ unsigned int prime_mod30_inverse_shared[30];
             //__shared__ unsigned int next_multiple_mod30_offset_shared[30];
+            //mod 210 wheel
+            //__shared__ uint8_t wheel210_gaps_shared[48];
+            //__shared__ uint8_t wheel210_index_shared[210];
+            //__shared__ uint8_t prime_mod210_inverse_shared[210];
+            //__shared__ uint8_t next_multiple_mod210_offset_shared[210];
+
             __shared__ unsigned int prime_index;
            
             uint32_t block_id = blockIdx.x;
@@ -527,9 +503,19 @@ namespace nexusminer {
             }
             for (int i = index; i < 30; i += stride)
             {
-                sieve30_index_shared[i] = sieve30_index[i];
-                prime_mod30_inverse_shared[i] = prime_mod30_inverse[i];
+                //sieve30_index_shared[i] = sieve30_index[i];
+                //prime_mod30_inverse_shared[i] = prime_mod30_inverse[i];
                 //next_multiple_mod30_offset_shared[i] = next_multiple_mod30_offset[i];
+            }
+            for (int i = index; i < 48; i += stride)
+            {
+                //wheel210_gaps_shared[i] = wheel210_gaps[i];
+            }
+            for (int i = index; i < 210; i += stride)
+            {
+                //wheel210_index_shared[i] = wheel210_index[i];
+                //prime_mod210_inverse_shared[i] = prime_mod210_inverse[i];
+                //next_multiple_mod210_offset_shared[i] = next_multiple_mod210_offset[i];
             }
             
            
@@ -539,10 +525,10 @@ namespace nexusminer {
             uint64_t start_offset = sieve_start_offset + static_cast<uint64_t>(blockIdx.x) * Cuda_sieve::m_segment_range * segments;
             
             uint8_t wheel_index;
-            unsigned int next_wheel_gap;
+            uint8_t next_wheel_gap;
             uint32_t j;
             uint32_t k;
-            uint32_t prime_mod_inv;
+            uint8_t prime_mod_inv;
             for (int s = 0; s < segments; s++)
             {
                 //everyone in the block initialize part of the shared sieve
@@ -565,7 +551,7 @@ namespace nexusminer {
                     {
                         j = starting_multiples[i];
                         //the first time through we need to calculate the starting offsets
-                        if (start_offset >= j)
+                        if (start_offset > 0)
                         {
                             uint64_t x = start_offset - j;
                             //offset to the first integer multiple of the prime above the starting offset
@@ -576,19 +562,19 @@ namespace nexusminer {
                             m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
                             j = m;
                             //this does the same thing as above - it gets the next multiple using prime inverse mod 30 and a lookup table. 
-                            //prime_mod_inv = prime_mod30_inverse_shared[k % 30];
-                            //j = m + k * next_multiple_mod30_offset_shared[((m % 30) * prime_mod_inv) % 30];
+                            //prime_mod_inv = prime_mod30_inverse[k % 30];
+                            //j = m + k * next_multiple_mod30_offset[((m % 30) * prime_mod_inv) % 30];
                         }
-                        else
-                            j -= start_offset;
+                        //else
+                            //j -= start_offset;
                     }
                     else
                     {
                         j = multiples[block_id * sieving_prime_count + i];
                         //calculating the wheel index each time is faster than saving and retrieving it from global memory each loop
                     }
-                    prime_mod_inv = prime_mod30_inverse_shared[k % 30];
-                    wheel_index = sieve30_index_shared[(prime_mod_inv * j) % 30];
+                    prime_mod_inv = prime_mod30_inverse[k % 30];
+                    wheel_index = sieve30_index[(prime_mod_inv * j) % 30];
                     next_wheel_gap = sieve30_gaps_shared[wheel_index];
                     
                     while (j < segment_size)
@@ -605,6 +591,7 @@ namespace nexusminer {
                         j += k * next_wheel_gap;
                         wheel_index = (wheel_index + 1) % 8;
                         next_wheel_gap = sieve30_gaps_shared[wheel_index];
+                        
                     }
                     
                     //save the starting multiple for this prime for the next segment
@@ -837,11 +824,15 @@ namespace nexusminer {
             uint64_t start_offset = sieve_start_offset + static_cast<uint64_t>(block_id) * block_range;
 
             //shared mem lookup tables
-            __shared__ unsigned int sieve30_gaps_shared[8];
-            __shared__ unsigned int sieve30_index_shared[30];
-            __shared__ unsigned int prime_mod30_inverse_shared[30];
-            __shared__ unsigned int sieve120_index_shared[120];
+            __shared__ uint8_t sieve30_gaps_shared[8];
+            __shared__ uint8_t sieve30_index_shared[30];
+            __shared__ uint8_t prime_mod30_inverse_shared[30];
+            __shared__ uint32_t sieve120_index_shared[120];
             __shared__ unsigned int prime_index;
+
+            //shared copy of bucket index array
+            //this local array could be smaller than the global array
+            __shared__ uint32_t bucket_indices_shared[Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks];
             uint32_t bucket_index = 0;
 
             //initialize shared lookup tables.  lookup tables in shared memory are faster than global memory lookup tables.
@@ -862,7 +853,7 @@ namespace nexusminer {
             //reset the bucket indices
             for (int i = index; i < segments; i += stride)
             {
-                bucket_indices[block_id* segments + i] = 0;
+                bucket_indices_shared[block_id* segments + i] = 0;
             }
             if (index == 0)
             {
@@ -891,9 +882,9 @@ namespace nexusminer {
                 else
                     j -= start_offset;
                 
-                uint32_t prime_mod_inv = prime_mod30_inverse_shared[k % 30];
+                uint8_t prime_mod_inv = prime_mod30_inverse_shared[k % 30];
                 uint8_t wheel_index = sieve30_index_shared[(prime_mod_inv * j) % 30];
-                unsigned int next_wheel_gap = sieve30_gaps_shared[wheel_index];
+                uint8_t next_wheel_gap = sieve30_gaps_shared[wheel_index];
                 uint32_t next_segment = j / segment_size;
                 uint32_t segment_offset = j % segment_size;
                 uint32_t loop_count = 0;
@@ -906,7 +897,7 @@ namespace nexusminer {
                     //pack the word index and bit into one 32 bit word
                     uint32_t sieve_segment_hit = (sieve_word << 16) | sieve_bit;
                     //add the sieve hit to the segment's bucket
-                    bucket_index = atomicInc(&bucket_indices[block_id * segments + next_segment], 0xFFFFFFFF);
+                    bucket_index = atomicInc(&bucket_indices_shared[block_id * segments + next_segment], 0xFFFFFFFF);
                     //we are indexing a 1D array as if it were a 3D array. 
                     uint32_t z = block_id;
                     uint32_t y = next_segment;
@@ -921,10 +912,16 @@ namespace nexusminer {
                     next_wheel_gap = sieve30_gaps_shared[wheel_index];
                     next_segment = j / segment_size;
                     segment_offset = j % segment_size;
-                    loop_count++;
+                    //loop_count++;
                 }
                 //if (threadIdx.x == 0)
                 //    printf("%u %u\n", k, loop_count);
+            }
+            __syncthreads();
+            //copy bucket indices to global memory
+            for (int i = index; i < segments; i += stride)
+            {
+                bucket_indices[block_id * segments + i] = bucket_indices_shared[block_id * segments + i];
             }
 
         }

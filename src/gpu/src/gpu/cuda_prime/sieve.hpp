@@ -41,7 +41,7 @@ namespace nexusminer {
 			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;
 			static const uint64_t m_block_range = m_segment_range * m_kernel_segments_per_block;
 			static const int m_threads_per_block = 1024;
-			static const int m_num_blocks = 384;  //each block sieves part of the range
+			static const int m_num_blocks = 360;  //each block sieves part of the range
 			static const uint64_t m_sieve_total_size = m_kernel_sieve_size_words_per_block * m_num_blocks; //size of the sieve in words
 			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
 			static const int m_estimated_chains_per_million = 4;
@@ -54,12 +54,12 @@ namespace nexusminer {
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
 			static constexpr int m_medium_small_prime_count = 32 * 18;
-			static constexpr int m_medium_prime_count = 32 * 4500;
+			static constexpr int m_medium_prime_count = 32 * 2500;
 			//static constexpr int m_medium_large_prime_count = 32 * 4500;
-			static constexpr int m_large_prime_count = 32 * 180000;
+			static constexpr int m_large_prime_count = 32 * 200000;
 			//static constexpr int m_large_prime_2_count = 32 * 140000;
 			static const int chain_histogram_max = 10;  
-			static const uint64_t m_bucket_ram_budget = 4.4e9;  //bytes avaialble for storing bucket data
+			static const uint64_t m_bucket_ram_budget = 4.0e9;  //bytes avaialble for storing bucket data
 			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
 			
 
