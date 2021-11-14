@@ -82,11 +82,16 @@ namespace nexusminer {
         //return true if there is more testing we can do. returns false if we should give up.
         __device__  bool is_there_still_hope(CudaChain& chain)
         {
-            //nothing left to test
+            //there is nothing left to test
             if (chain.m_untested_count == 0)
             {
                 return false;
             }
+
+            //If we've already found 4, keep counting regardless. 
+            //this makes the stats look better and doesn't impact performance much since it is relatively rare
+            if (chain.m_prime_count >= 4)
+                return true;
 
             if ((chain.m_prime_count + chain.m_untested_count) < chain.m_min_chain_length)
                 return false;
