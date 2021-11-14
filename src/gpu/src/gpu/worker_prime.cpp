@@ -186,18 +186,16 @@ void Worker_prime::run()
 			if (difficulty_check(chain_start))
 			{
 				//we found a valid chain.  submit it. 
+				if (m_found_nonce_callback)
 				{
-					if (m_found_nonce_callback)
+					m_io_context->post([self = shared_from_this()]()
 					{
-						m_io_context->post([self = shared_from_this()]()
-						{
-							self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
-						});
-					}
-					else
-					{
-						m_logger->debug(m_log_leader + "Miner callback function not set.");
-					}
+						self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
+					});
+				}
+				else
+				{
+					m_logger->debug(m_log_leader + "Miner callback function not set.");
 				}
 			}
 		}

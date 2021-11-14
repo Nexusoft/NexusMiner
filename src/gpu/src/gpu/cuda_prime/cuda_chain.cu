@@ -88,25 +88,77 @@ namespace nexusminer {
                 return false;
             }
 
-            return (chain.m_prime_count + chain.m_untested_count) >= chain.m_min_chain_length;
-        }
+            if ((chain.m_prime_count + chain.m_untested_count) < chain.m_min_chain_length)
+                return false;
 
-        //get the next untested fermat candidate.  if there are none return false.
-        __device__  bool get_next_fermat_candidate(CudaChain& chain, uint64_t& base_offset, int& offset)
-        {
-            //This returns the next untested prime candidate.
-            //There are other more complex ways to do this to minimize primality testing
-            //like search for the first candidate that busts the chain if it fails
+            int extra_links = chain.m_offset_count - chain.m_min_chain_length;
+            //no failures yet
+            if (extra_links == 0)
+                return true;
+
+            //there are extra links.  check for a broken chain
             for (auto i = 0; i < chain.m_offset_count; i++)
             {
+                if (chain.m_fermat_test_status[i] == Fermat_test_status::fail)
+                {
+                    
+                    bool interior_link = ((i >= extra_links) && i < (chain.m_offset_count - extra_links));
+                    if (interior_link)
+                    {
+                        int gap = chain.m_offsets[i + 1] - chain.m_offsets[i - 1];
+                        if (gap > maxGap && chain.m_offset_count < chain.m_min_chain_length * 2)
+                            return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        //get the next untested fermat candidate.  prioritize candidates that bust the chain if they fail.  if there are no candidates return false.
+        __device__  bool get_next_fermat_candidate(CudaChain& chain, uint64_t& base_offset, int& offset)
+        {
+            // are there any extra links in the current chain?  i.e. if we are looking for 8-chains, and this chain has 9 candidates, there is one extra link.
+            int extra_links = chain.m_prime_count + chain.m_untested_count - chain.m_min_chain_length;
+            //This is to handle the special case where there are untested offsets but none are weak links.  This case should be rare.  
+            int an_untested_index = -1;
+            for (auto i = 0; i < chain.m_offset_count; i++)
+            {
+                //weak links can't be the first or last links when there are extra links.
+                bool interior_link = ((i >= extra_links) && i < (chain.m_offset_count - extra_links));
+                bool weak_link = true;
+                if (extra_links > 0)
+                {
+                    if (interior_link)
+                    {
+                        int gap = chain.m_offsets[i + 1] - chain.m_offsets[i - 1];
+                        weak_link = gap > maxGap;
+                    }
+                    else
+                    {
+                        weak_link = false;
+                    }
+                }
                 if (chain.m_fermat_test_status[i] == Fermat_test_status::untested)
                 {
-                    base_offset = chain.m_base_offset;
-                    offset = chain.m_offsets[i];
-                    //save the offset under test index for later
-                    chain.m_next_fermat_test_offset_index = i;
-                    return true;
+                    an_untested_index = i;
+                    if (weak_link)
+                    {
+                        base_offset = chain.m_base_offset;
+                        offset = chain.m_offsets[i];
+                        //save the offset under test index for later
+                        chain.m_next_fermat_test_offset_index = i;
+                        return true;
+                    }
                 }
+            }
+            //speical case - return the last known untested offset if none are weak links but there is an untested link
+            if (an_untested_index > -1)
+            {
+                base_offset = chain.m_base_offset;
+                offset = chain.m_offsets[an_untested_index];
+                chain.m_next_fermat_test_offset_index = an_untested_index;
+                return true;
             }
             return false;
         }
