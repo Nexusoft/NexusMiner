@@ -398,7 +398,7 @@ namespace nexusminer {
                             if (gap > maxGap)
                             {
                                 //We reached the end of the chain.  
-                                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length + 1)
+                                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
                                 {
                                     //increment the chain list index
                                     uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
@@ -434,7 +434,7 @@ namespace nexusminer {
                     }
                 }
                 //we reached the end of the search region.  do a final check on the chain in process
-                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length + 1)
+                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
                 {
                     //increment the chain list index
                     uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
