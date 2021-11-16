@@ -220,15 +220,15 @@ void Worker_prime::run()
 			double chains_per_sec = 1.0e3 * m_segmented_sieve->m_chain_count / elapsed_ms;
 			double fermat_positive_rate = 1.0 * fermat_prime_count / fermat_test_count;
 			double fermat_tests_per_chain = 1.0 * fermat_test_count / m_segmented_sieve->m_chain_count;
-			std::cout << std::fixed << std::setprecision(2) << m_range_searched /1.0e9 << " billion integers searched." <<
-				" Found " << m_segmented_sieve->m_chain_count << " chain candidates. (" << chains_per_mm << " chains per million integers)" << std::endl;
+			std::cout << std::fixed << std::setprecision(2) << m_range_searched /1.0e12 << " trillion integers searched." <<
+				" Found " << chains_per_mm << " chain candidates per million integers." << std::endl;
 			/*std::cout << "Avg chain length: " << std::fixed << std::setprecision(2) << 1.0 * m_segmented_sieve->m_chain_candidate_total_length / m_segmented_sieve->m_chain_count
 				<< " Max chain: " << m_segmented_sieve->m_chain_candidate_max_length << std::endl;*/
 			std::cout << "Fermat test rate: " << 1.0* fermat_tests_this_cycle /(double)test_chains_ms << "k tests/s. Fermat Positive Rate: " << std::fixed << std::setprecision(3) <<
 				100.0 * fermat_positive_rate << "% Fermat tests per million integers sieved: " <<
 				1.0e6 * fermat_test_count / m_range_searched << std::endl;
 
-			std::cout << "Search rate: " << std::fixed << std::setprecision(1) << range_searched_this_cycle / (elapsed.count() * 1.0e3) << " million integers per second." << std::endl;
+			std::cout << "Search rate: " << std::fixed << std::setprecision(2) << range_searched_this_cycle / (elapsed.count() * 1.0e6) << " billion integers per second." << std::endl;
 			std::cout << "Elapsed time: " << std::fixed << std::setprecision(2) << elapsed_ms / 1000.0 << "s. Sieving: " <<
 				100.0 * sieving_ms / elapsed_ms << "% Chain filtering: " << 100.0 * find_chains_ms / elapsed_ms
 				<< "% Fermat testing: " << 100.0 * test_chains_ms / elapsed_ms << "% Clean chains: " << 100.0 * clean_chains_ms / elapsed_ms <<
