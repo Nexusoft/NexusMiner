@@ -250,14 +250,24 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                                     self->m_connection->transmit(self->m_miner_protocol->submit_block(
                                         block_data->merkle_root.GetBytes(), uint2bytes64(block_data->nNonce)));
                                 else
+                                {
                                     self->m_logger->error("No connection. Can't submit block.");
+                                    //TODO:  retry connection.  how to do this?  I can't add wallet_endpoint to the capture block.  
+                                    //self->retry_connect(wallet_endpoint);
+                                }
                             });
                         }
                     });
                 }));
             }
             else
-            {	// data received
+            {
+                if (!self->m_connection)
+                {
+                    self->m_logger->error("No connection to wallet.");
+                    self->retry_connect(wallet_endpoint);
+                }
+                // data received
                 self->process_data(std::move(receive_buffer));
             }
         }
