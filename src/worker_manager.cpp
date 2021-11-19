@@ -240,11 +240,11 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                         self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection);
                     }
 
-                    self->m_miner_protocol->set_block_handler([self](auto block, auto nBits)
+                    self->m_miner_protocol->set_block_handler([self, wallet_endpoint](auto block, auto nBits)
                     {
                         for(auto& worker : self->m_workers)
                         {
-                            worker->set_block(block, nBits, [self](auto id, auto block_data)
+                            worker->set_block(block, nBits, [self, wallet_endpoint](auto id, auto block_data)
                             {
                                 if (self->m_connection)
                                     self->m_connection->transmit(self->m_miner_protocol->submit_block(
@@ -252,8 +252,8 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                                 else
                                 {
                                     self->m_logger->error("No connection. Can't submit block.");
-                                    //TODO:  retry connection.  how to do this?  I can't add wallet_endpoint to the capture block.  
-                                    //self->retry_connect(wallet_endpoint);
+                                    //TODO:  check this
+                                    self->retry_connect(wallet_endpoint);
                                 }
                             });
                         }
