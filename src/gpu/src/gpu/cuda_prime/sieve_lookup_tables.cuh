@@ -9,7 +9,7 @@ namespace nexusminer {
 
         __device__ const unsigned int sieve30_inverse_offsets[]{ 1,13,11,7,23,19,17,29 }; //prime inverse mod 30
 
-        __device__ const unsigned int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };  //gaps in the mod 30 wheel
+        __device__ const uint8_t sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };  //gaps in the mod 30 wheel
 
         __device__ const unsigned int sieve30_index[]  //reverse lookup table (offset mod 30 to index)
         { 0,0,1,1,1,1,1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7 };  
@@ -23,7 +23,7 @@ namespace nexusminer {
         __device__ const unsigned int next_multiple_mod30_offset[]  //range mod 30 to the next valid wheel position 
         { 1,0,5,4,3,2,1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 1, 0, 3, 2, 1, 0, 5, 4, 3, 2, 1, 0 };
 
-        __device__ const unsigned int sieve120_index[]  //reverse lookup table (offset mod 120 to index)
+        __device__ const uint8_t sieve120_index[]  //reverse lookup table (offset mod 120 to index)
         { 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7,
              8, 8, 9, 9, 9, 9, 9, 9,10,10,10,10,11,11,12,12,12,12,13,13,14,14,14,14,15,15,15,15,15,15,
             16,16,17,17,17,17,17,17,18,18,18,18,19,19,20,20,20,20,21,21,22,22,22,22,23,23,23,23,23,23,
