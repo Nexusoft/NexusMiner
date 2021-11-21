@@ -9,6 +9,7 @@
 #include <memory>
 #include <vector>
 #include <cstdint>
+#include <string>
 
 namespace nexusminer {
 namespace network {
@@ -55,6 +56,28 @@ inline bool is_ok(Code code)
 inline bool is_error(Code code)
 {
     return !is_ok(code);
+}
+
+inline std::string code_to_string(Code code)
+{
+    std::string result{};
+
+    switch (code)
+    {
+    case ok: result = "ok"; break;
+    case error: result = "error"; break;
+    case socket_ok: result = "socket_ok"; break;
+    case socket_error: result = "socket_error"; break;
+    case connection_ok: result = "connection_ok"; break;
+    case connection_error: result = "connection_error"; break;
+    case connection_closed: result = "connection_closed"; break;
+    case connection_aborted: result = "connection_aborted"; break;
+    case connection_declined: result = "connection_declined"; break;
+    case receive_ok: result = "receive_ok"; break;
+    case transmit_ok: result = "transmit_ok"; break;
+    }
+
+    return result;
 }
 
 } // namespace Result
