@@ -46,14 +46,41 @@ namespace nexusminer {
             uint32_t block_id = blockIdx.x;
             uint32_t index = block_id * num_threads + threadIdx.x;
             uint32_t stride = num_blocks * num_threads;
+            __shared__ uint16_t offsets[Cuda_sieve::m_small_prime_count];
 
-            const uint64_t increment = Cuda_sieve::m_sieve_word_range;
+            //const uint64_t increment = Cuda_sieve::m_sieve_word_range;
+            const uint32_t increment = Cuda_sieve::m_sieve_word_range;
             //uint16_t mask_indices[Cuda_sieve::m_small_prime_count];
+            for (uint32_t i = threadIdx.x; i < Cuda_sieve::m_small_prime_count; i += num_threads)
+            {
+                uint8_t start_offset = start % small_primes[i];
+                offsets[i] = (small_prime_offsets[i] + start_offset);//% small_primes[i];
+
+            }
+
+            /*offsets[0] = (small_prime_offsets[0] + start) % 7;
+            offsets[1] = (small_prime_offsets[1] + start) % 11;
+            offsets[2] = (small_prime_offsets[2] + start) % 13;
+            offsets[3] = (small_prime_offsets[3] + start) % 17;
+            offsets[4] = (small_prime_offsets[4] + start) % 19;
+            offsets[5] = (small_prime_offsets[5] + start) % 23;
+            offsets[6] = (small_prime_offsets[6] + start) % 29;
+            offsets[7] = (small_prime_offsets[7] + start) % 31;
+            offsets[8] = (small_prime_offsets[8] + start) % 37;
+            offsets[9] = (small_prime_offsets[9] + start) % 41;
+            offsets[10] = (small_prime_offsets[10] + start) % 43;
+            offsets[11] = (small_prime_offsets[11] + start) % 47;
+            offsets[12] = (small_prime_offsets[12] + start) % 53;
+            offsets[13] = (small_prime_offsets[13] + start) % 59;
+            offsets[14] = (small_prime_offsets[14] + start) % 61;*/
+
+            __syncthreads();
 
             for (uint32_t i = index; i < Cuda_sieve::m_sieve_total_size; i += stride) 
             {
                 //the offset for the sieve word in process
-                uint64_t inc = start + i * increment;
+                //uint64_t inc = start + i * increment;
+                //uint64_t inc = i * increment;
                 //get the correct rotation for the prime mask
 
                 /*Cuda_sieve::sieve_word_t word = 0xFFFFFFFF;
@@ -66,21 +93,38 @@ namespace nexusminer {
                     prime_mask_index_offset += small_primes[prime_index];
                 }*/
                 //The loop above works, but hardcoding each prime is faster.
-                uint16_t index7 = (small_prime_offsets[0] + inc) % 7;
-                uint16_t index11 = (small_prime_offsets[1] + inc) % 11;
-                uint16_t index13 = (small_prime_offsets[2] + inc) % 13;
-                uint16_t index17 = (small_prime_offsets[3] + inc) % 17;
-                uint16_t index19 = (small_prime_offsets[4] + inc) % 19;
-                uint16_t index23 = (small_prime_offsets[5] + inc) % 23;
-                uint16_t index29 = (small_prime_offsets[6] + inc) % 29;
-                uint16_t index31 = (small_prime_offsets[7] + inc) % 31;
-                uint16_t index37 = (small_prime_offsets[8] + inc) % 37;
-                uint16_t index41 = (small_prime_offsets[9] + inc) % 41;
-                uint16_t index43 = (small_prime_offsets[10] + inc) % 43;
-                uint16_t index47 = (small_prime_offsets[11] + inc) % 47;
-                uint16_t index53 = (small_prime_offsets[12] + inc) % 53;
-                uint16_t index59 = (small_prime_offsets[13] + inc) % 59;
-                uint16_t index61 = (small_prime_offsets[14] + inc) % 61;
+                //we mod intermediate values a few times to avoid needing a 64 bit variable which is slow 
+                uint16_t index7 = (offsets[0] +  i % 7 * (increment%7)) % 7;
+                uint16_t index11 = (offsets[1] + i % 11 * (increment%11)) % 11;
+                uint16_t index13 = (offsets[2] + i % 13 * (increment%13)) % 13;
+                uint16_t index17 = (offsets[3] + i % 17 * (increment%17)) % 17;
+                uint16_t index19 = (offsets[4] + i % 19 * (increment % 19)) % 19;
+                uint16_t index23 = (offsets[5] + i % 23 * (increment % 23)) % 23;
+                uint16_t index29 = (offsets[6] + i % 29 * (increment % 29)) % 29;
+                uint16_t index31 = (offsets[7] + i % 31 * (increment % 31)) % 31;
+                uint16_t index37 = (offsets[8] + i % 37 * (increment % 37)) % 37;
+                uint16_t index41 = (offsets[9] + i % 41 * (increment % 41)) % 41;
+                uint16_t index43 = (offsets[10] + i % 43 * (increment % 43)) % 43;
+                uint16_t index47 = (offsets[11] + i % 47 * (increment % 47)) % 47;
+                uint16_t index53 = (offsets[12] + i % 53 * (increment % 53)) % 53;
+                uint16_t index59 = (offsets[13] + i % 59 * (increment % 59)) % 59;
+                uint16_t index61 = (offsets[14] + i % 61 * (increment % 61)) % 61;
+                
+                //uint16_t index7 = (small_prime_offsets[0] + inc) % 7;
+                //uint16_t index11 = (small_prime_offsets[1] + inc) % 11;
+                //uint16_t index13 = (small_prime_offsets[2] + inc) % 13;
+                //uint16_t index17 = (small_prime_offsets[3] + inc) % 17;
+                //uint16_t index19 = (small_prime_offsets[4] + inc) % 19;
+                //uint16_t index23 = (small_prime_offsets[5] + inc) % 23;
+                //uint16_t index29 = (small_prime_offsets[6] + inc) % 29;
+                //uint16_t index31 = (small_prime_offsets[7] + inc) % 31;
+                //uint16_t index37 = (small_prime_offsets[8] + inc) % 37;
+                //uint16_t index41 = (small_prime_offsets[9] + inc) % 41;
+                //uint16_t index43 = (small_prime_offsets[10] + inc) % 43;
+                //uint16_t index47 = (small_prime_offsets[11] + inc) % 47;
+                //uint16_t index53 = (small_prime_offsets[12] + inc) % 53;
+                //uint16_t index59 = (small_prime_offsets[13] + inc) % 59;
+                //uint16_t index61 = (small_prime_offsets[14] + inc) % 61;
                 /*uint16_t index67 = (start + small_prime_offsets[15] + inc) % 67;
                 uint16_t index71 = (start + small_prime_offsets[16] + inc) % 71;
                 uint16_t index73 = (start + small_prime_offsets[17] + inc) % 73;
@@ -93,7 +137,7 @@ namespace nexusminer {
 
                
                 Cuda_sieve::sieve_word_t word;
-                //apply the mask.  the mask for the first prime 7 is also used to initialize the sieve (hence no &).
+                //apply the masks.  
                 word = p7[index7] & p11[index11] & p13[index13] & p17[index17] & p19[index19] & p23[index23] & p29[index29] & p31[index31] &
                     p37[index37] & p41[index41] & p43[index43] & p47[index47] & p53[index53] & p59[index59] & p61[index61];
 
