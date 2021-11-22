@@ -1344,19 +1344,19 @@ namespace nexusminer {
 
         }
 
-        //experimental combo medium small plus medium sieve in one kernel
+        //medium sieve
         void Cuda_sieve_impl::run_sieve(uint64_t sieve_start_offset)
         {
             int blocks = Cuda_sieve::m_num_blocks;// * Cuda_sieve::m_kernel_segments_per_block;
             int threads = 1024;
             m_sieve_start_offset = sieve_start_offset;
 
-            //medium_sieve << <blocks, threads >> > (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
-            //    d_starting_multiples, d_sieve, d_multiples);
+            medium_sieve << <blocks, threads >> > (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
+                d_starting_multiples, d_sieve, d_multiples);
 
 
-            do_sieve <<<blocks, threads >>> (sieve_start_offset, d_sieving_primes, d_starting_multiples, 
-                d_medium_small_primes, d_medium_small_prime_starting_multiples, d_sieve, d_multiples);
+            //do_sieve <<<blocks, threads >>> (sieve_start_offset, d_sieving_primes, d_starting_multiples, 
+            //    d_medium_small_primes, d_medium_small_prime_starting_multiples, d_sieve, d_multiples);
 
         }
 

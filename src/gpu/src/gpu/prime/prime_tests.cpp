@@ -139,7 +139,7 @@ namespace gpu
 			(double)sieve_range, Cuda_sieve::m_small_prime_count, (double)test_sieve.m_small_prime_limit, small_prime_sieve_elapsed_s,
 			sieve_range / small_prime_sieve_elapsed_s / 1e6);
 		start = std::chrono::steady_clock::now();
-		//test_sieve.gpu_sieve_medium_small_primes(0);
+		test_sieve.gpu_sieve_medium_small_primes(0);
 		test_sieve.gpu_sieve_synchronize();
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
