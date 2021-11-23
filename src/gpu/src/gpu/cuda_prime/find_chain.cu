@@ -150,7 +150,21 @@ namespace nexusminer {
                 atomicAdd(chain_stat_count, chain_count_shared);
         }
 
-        //experimental chain finder
+        __device__ void close_chain(const CudaChain& chain, uint32_t* chain_index, CudaChain* chains, uint32_t* chain_count_shared)
+        {
+            //We reached the end of the chain.  
+            if (chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
+            {
+                //increment the chain list index
+                uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
+                //copy the current chain to the global list
+                chains[chain_idx] = chain;
+                //updated block level stats
+                atomicInc(chain_count_shared, 0xFFFFFFFF);
+            }
+        }
+
+        //alternative chain finder
         //each kernel block is a sieve segment.  Each thread searches a range of 2310*4 within a segment.   
         __global__ void find_chain_kernel2(Cuda_sieve::sieve_word_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset,
             unsigned long long* chain_stat_count)
@@ -164,7 +178,7 @@ namespace nexusminer {
             unsigned int index = threadIdx.x;
             unsigned int search_regions_per_kernel_block = (total_search_regions + num_blocks - 1) / num_blocks;
             unsigned int stride = blockDim.x;
-            unsigned int gap;
+            unsigned int gap = 0;
             uint32_t chain_start;
             uint64_t segment_offset = sieve_start_offset + block_id * Cuda_sieve::m_block_range + segment_id * Cuda_sieve::m_segment_range;
             uint32_t sieve_segment_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block + segment_id * Cuda_sieve::m_kernel_sieve_size_words;
@@ -186,29 +200,66 @@ namespace nexusminer {
             {
                 chain_count_shared = 0;
             }
-
-            ////copy sieve segment from global to shared memory
-            //for (int i = index; i < Cuda_sieve::m_kernel_sieve_size_words; i += stride)
-            //{
-
-            //    sieve_shared[i] = sieve[sieve_segment_index + i];
-            //}
                 
             __syncthreads();
-
+           
+            sieve_index = sieve_segment_index + index * search_words;
             for (unsigned int region = index; region < search_regions_per_kernel_block; region += stride)
             {
                 bool chain_in_process = false;
                 CudaChain current_chain;
                 uint64_t region_offset = segment_offset + region * search_range;
                 chain_start = 0;
-                sieve_index = region * search_words + sieve_segment_index;
+                //sieve_index = region * search_words + sieve_segment_index;
+                //sieve_index += sieve_index_increment;
                 uint32_t last_offset = 0;
                 //iterate through each word in the search region
-                for (unsigned int word = 0; word < search_words; word++)
+                bool previous_word_last_bit_set = false;
+                for (unsigned int word = 0; word < search_words; word++, sieve_index++)
                 {
+                    uint32_t sieve_word = sieve[sieve_index];
+                    uint32_t next_word = word >= search_words ? 0 : sieve[sieve_index + 1];
+                    bool next_word_first_bit_set = (next_word & 1) == 1;
+                    if (chain_in_process)
+                    {
+                        uint32_t word_start = sieve_word & 0x7;
+                        bool first_bit_set = (sieve_word & 1) == 1;
+                        //if the first 3 bits are zeros any in process chain is broken
+                        //if the last bit of the previous word and the first bit of the currnet word are both 0 the chain is broken
+                        if (word_start == 0 || (!previous_word_last_bit_set && !first_bit_set))
+                        {
+                            //We reached the end of the chain.  
+                            close_chain(current_chain, chain_index, chains, &chain_count_shared);
+                            chain_in_process = false;
+                        }
+                    }
+                    bool last_bit_set = sieve_word >= 0x80000000;
+                    previous_word_last_bit_set = last_bit_set;
+                    //gross check to ensure there are enough set bits in the word to make it worthwhile to process
+                    if (!chain_in_process)
+                    {
+                        //if bits 7 and 8 are both zero, no chain originating in the first byte can make it through.  discard any set bits in the first byte
+                        uint32_t first_byte_transition = sieve_word & 0x000000180;
+                        if (first_byte_transition == 0)
+                            sieve_word &= 0xFFFFFF00;
+                        uint32_t second_byte_transition = sieve_word & 0x000018000;
+                        if (second_byte_transition == 0 && __popc(sieve_word & 0x0000FFFF) < Cuda_sieve::m_min_chain_length)
+                            sieve_word &= 0xFFFF0000;
+                        uint32_t third_byte_transition = sieve_word & 0x001800000;
+                        if (third_byte_transition == 0 && __popc(sieve_word & 0x00FFFFFF) < Cuda_sieve::m_min_chain_length)
+                            sieve_word &= 0xFF000000;
+
+                        //if the last 3 bits are all zero, or the last bit is zero and first bit of the next word is zero, any chain must end at the current word
+                        uint32_t word_end = sieve_word & 0xE0000000;
+                        bool chain_must_end = (word_end == 0 || (!last_bit_set && !next_word_first_bit_set));
+                        int popc = __popc(sieve_word);
+                        if (chain_must_end && popc < Cuda_sieve::m_min_chain_length)
+                            continue;
+                        
+                    }
+
                     //iterate through each set bit in the sieve word
-                    for (unsigned int b = sieve[sieve_index + word]; b > 0; b &= b - 1)
+                    for (unsigned int b = sieve_word; b > 0; b &= b - 1)
                     {
                         //determine the position of the set bit in the sieve word.
                         int lowest_set_bit = __ffs(b) - 1;  //__ffs is a cuda primitive that finds the index of the lowest set bit in a word (ones based).
@@ -224,18 +275,7 @@ namespace nexusminer {
                             if (gap > maxGap)
                             {
                                 //We reached the end of the chain.  
-                                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
-                                {
-                                    //increment the chain list index
-                                    uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
-                                    //copy the current chain to the global list
-                                    chains[chain_idx] = current_chain;
-                                    //updated block level stats
-                                    atomicInc(&chain_count_shared, 0xFFFFFFFF);
-                                }
-                                /*if (current_chain.m_base_offset ==  2055301)
-                                    printf("close. gap: %u len: %u block: %u segment %u: thread: %u word: %u byte: %u bit: %u offset30: %u local offset: %u\n ",
-                                        gap, current_chain.m_offset_count, block_id, segment_id, index, word, byte_index, lowest_set_bit, sieve30_offset, local_offset);*/
+                                close_chain(current_chain, chain_index, chains, &chain_count_shared);
                                 //start a new chain
                                 cuda_chain_open(current_chain, region_offset + local_offset);
                                 chain_start = local_offset;
@@ -260,15 +300,9 @@ namespace nexusminer {
                     }
                 }
                 //we reached the end of the search region.  do a final check on the chain in process
-                if (current_chain.m_offset_count >= Cuda_sieve::m_min_chain_length)
+                if (chain_in_process)
                 {
-                    //increment the chain list index
-                    uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
-                    //copy the current chain to the global list
-                    chains[chain_idx] = current_chain;
-                    //updated block level stats
-                    atomicInc(&chain_count_shared, 0xFFFFFFFF);
-          
+                    close_chain(current_chain, chain_index, chains, &chain_count_shared);
                 }
             }
             
