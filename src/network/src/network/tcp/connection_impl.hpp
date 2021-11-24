@@ -7,7 +7,6 @@
 #include "network/tcp/protocol_description.hpp"
 #include <queue>
 #include <memory>
-#include <spdlog/spdlog.h>
 
 namespace nexusminer {
 namespace network {
@@ -237,10 +236,7 @@ void Connection_impl<ProtocolDescriptionType>::transmit(Shared_payload tx_buffer
 template<typename ProtocolDescriptionType>
 void Connection_impl<ProtocolDescriptionType>::transmit_trigger()
 {
-    auto logger = spdlog::get("logger");
-
     auto const payload = m_tx_queue.front();
-    logger->debug("transmit length {}, header {:02x}", payload->size(), payload->size()>0?(*payload)[0]:0);
     ::asio::async_write(*m_asio_socket, ::asio::buffer(*payload, payload->size()),
         // don't forget to keep the payload until transmission has been completed!!!
         [weak_self = get_weak_self(), payload](auto, auto) 
