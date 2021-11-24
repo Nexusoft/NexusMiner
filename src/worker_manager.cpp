@@ -252,7 +252,6 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                                 else
                                 {
                                     self->m_logger->error("No connection. Can't submit block.");
-                                    //TODO:  check this
                                     self->retry_connect(wallet_endpoint);
                                 }
                             });
@@ -268,6 +267,14 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                     self->retry_connect(wallet_endpoint);
                 }
                 // data received
+                std::stringstream ss;
+                ss << "Message received length " << receive_buffer->size() << ": ";
+                ss << std::hex << std::setfill('0');
+                for (auto i = 0; i < receive_buffer->size(); i++)
+                {
+                    ss << std::setw(2) << +(*receive_buffer)[i] << ", ";
+                }
+                self->m_logger->debug(ss.str());
                 self->process_data(std::move(receive_buffer));
             }
         }
