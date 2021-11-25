@@ -262,8 +262,8 @@ namespace nexusminer {
                     for (unsigned int b = sieve_word; b > 0; b &= b - 1)
                     {
                         //determine the position of the set bit in the sieve word.
-                        int lowest_set_bit = __ffs(b) - 1;  //__ffs is a cuda primitive that finds the index of the lowest set bit in a word (ones based).
-                        int byte_index = lowest_set_bit / 8;
+                        uint8_t lowest_set_bit = __ffs(b) - 1;  //__ffs is a cuda primitive that finds the index of the lowest set bit in a word (ones based).
+                        uint8_t byte_index = lowest_set_bit / 8;
                         unsigned int sieve30_offset = sieve30_offsets_shared[lowest_set_bit % 8];
                         uint32_t local_offset = word * Cuda_sieve::m_sieve_word_range +
                             byte_index * Cuda_sieve::m_sieve_byte_range + sieve30_offset;

@@ -47,7 +47,7 @@ namespace nexusminer {
 			static const int m_estimated_chains_per_million = 4;
 			static const uint32_t m_max_chains = 2*m_estimated_chains_per_million*m_sieve_range/1e6;
 			static const uint32_t m_max_long_chains = 32;
-			static const int m_min_chain_length = 8;
+			static const int m_min_chain_length = 9;
 			static const int m_start_prime = 7;
 			static constexpr int m_small_prime_count = 14; //61 is the 15th prime starting at 7.  61 is first prime that hits each sieve word no more than 1 time.
 			//If you change the small_prime_count, make sure you also change the hardcoded list of primes in the small prime sieve in sieve_impl.cu
@@ -56,7 +56,7 @@ namespace nexusminer {
 			static constexpr int m_medium_small_prime_count = 32 * 18;
 			static constexpr int m_medium_prime_count = 32 * 2500;
 			//static constexpr int m_medium_large_prime_count = 32 * 4500;
-			static constexpr int m_large_prime_count = 32 * 200000;
+			static constexpr int m_large_prime_count = 32 * 100000;
 			//static constexpr int m_large_prime_2_count = 32 * 140000;
 			static const int chain_histogram_max = 10;  
 			static const uint64_t m_bucket_ram_budget = 4.0e9;  //bytes avaialble for storing bucket data
