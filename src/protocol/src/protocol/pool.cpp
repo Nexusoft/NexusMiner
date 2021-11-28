@@ -117,6 +117,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         global_stats.m_accepted_shares = 1;
         m_stats_collector->update_global_stats(global_stats);
         m_logger->info("Share Accepted By Pool.");
+        connection->transmit(get_work());
     }
     else if(packet.m_header == Packet::REJECT)
     {

@@ -26,16 +26,25 @@ namespace nexusminer {
 
         void Sieve::generate_sieving_primes()
         {
-            //small primes are hardcoded in sieve.cu
             m_logger->info("Generating sieving primes...");
             auto start = std::chrono::steady_clock::now();
+            //generate small primes
+            primesieve::generate_n_primes(Cuda_sieve::m_small_prime_count, Cuda_sieve::m_start_prime, &m_small_primes); 
+            if (m_small_primes.size() > 0)
+            {
+                m_small_prime_limit = m_small_primes.back();
+            }
+            else
+            {
+                m_small_prime_limit = Cuda_sieve::m_start_prime - 1;
+            }
             //generate medium small sieving primes
-            primesieve::generate_n_primes(Cuda_sieve::m_medium_small_prime_count, m_medium_small_start_prime, &m_medium_small_primes);
+            primesieve::generate_n_primes(Cuda_sieve::m_medium_small_prime_count, m_small_prime_limit + 1ull, &m_medium_small_primes);
             //the largest medium small sieving prime
             if (m_medium_small_primes.size() > 0)
                 m_medium_small_prime_limit = m_medium_small_primes.back();
             else
-                m_medium_small_prime_limit = m_medium_small_start_prime-1;
+                m_medium_small_prime_limit = m_small_prime_limit;
 
             //generate medium sieving primes
             primesieve::generate_n_primes(Cuda_sieve::m_medium_prime_count, m_medium_small_prime_limit + 1ull, &m_sieving_primes);
@@ -57,6 +66,20 @@ namespace nexusminer {
             ss << "Done. " << m_sieving_primes.size() + m_large_sieving_primes.size() << " primes generated in " << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds.";
             m_logger->info(ss.str());
 
+        }
+
+        //generate a sieve mask lookup table for each of the small primes.  Each lookup table has n entries, where n is the prime number.
+        //The lookup tables for each prime are aggregated into one array which is eventually copied to gpu global memory
+        void Sieve::generate_small_prime_tables()
+        {
+            m_small_prime_lookup_table = {};
+            Small_sieve_tools small_sieve_tool;
+            for (auto i = 0; i < m_small_primes.size(); i++)
+            {
+                auto p_table = small_sieve_tool.prime_mask(m_small_primes[i]);
+                for (auto mask_word : p_table)
+                    m_small_prime_lookup_table.push_back(mask_word);
+            }
         }
 
         void Sieve::set_sieve_start(boost::multiprecision::uint1024_t sieve_start)
@@ -85,8 +108,8 @@ namespace nexusminer {
             m_small_prime_offsets = {};
             for (int i = 0; i < Cuda_sieve::m_small_prime_count; i++)
             {
-                int s = Cuda_sieve::m_small_primes[i];
-                uint32_t offset = static_cast<uint32_t>(((m_sieve_start / m_sieve_range_per_byte) % s)) * m_sieve_range_per_byte;
+                int s = m_small_primes[i];
+                uint16_t offset = static_cast<uint16_t>(((m_sieve_start / m_sieve_range_per_byte) % s)) * m_sieve_range_per_byte;
                 m_small_prime_offsets.push_back(offset); 
             }
             m_medium_small_multples = {};
@@ -100,6 +123,9 @@ namespace nexusminer {
             {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
                 m_multiples.push_back(m);
+                //Prime_plus_multiple_32 pm {s, m };
+                //m_medium_primes_plus_multiples.push_back(pm);
+
             }
             m_large_multiples = {};
             for (const auto& p : m_large_sieving_primes)
@@ -111,8 +137,8 @@ namespace nexusminer {
 
         void Sieve::gpu_sieve_load(uint16_t device=0)
         {
-            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(),
-                m_medium_small_primes.data(), m_sieve_batch_buffer_size, device);
+            m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(), m_medium_small_primes.data(),
+               m_small_prime_lookup_table.data(), m_small_prime_lookup_table.size(), m_small_primes.data(), m_sieve_batch_buffer_size, device);
             m_cuda_sieve_allocated = true;
             reset_stats();
         }

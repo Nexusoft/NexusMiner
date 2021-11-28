@@ -14,8 +14,8 @@ namespace nexusminer {
 			uint64_t m_sieve_start_offset;
 			
 			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[],
-				uint32_t sieve_size, uint16_t device);
-			void init_sieve(uint32_t starting_multiples[], uint32_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
+				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device);
+			void init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
 				uint32_t medium_small_prime_multiples[]);
 			void reset_stats();
 			void free_sieve();
@@ -40,11 +40,14 @@ namespace nexusminer {
 			//device memory pointers
 			uint32_t* d_sieving_primes;  //medium sieving primes
 			uint32_t* d_starting_multiples;
+			Prime_plus_multiple_32* d_medium_primes;
 			uint32_t* d_large_primes;
 			uint32_t* d_large_prime_starting_multiples;
-			uint32_t* d_small_prime_offsets;
+			uint16_t* d_small_prime_offsets;
 			uint32_t* d_medium_small_primes;
 			uint32_t* d_medium_small_prime_starting_multiples;
+			uint32_t* d_small_prime_masks;
+			uint8_t* d_small_primes;
 			//temporary storage for sorting large primes used in large prime bucket sieve
 			uint32_t* d_large_prime_buckets;
 			uint32_t* d_bucket_indices;

@@ -284,10 +284,10 @@ namespace nexusminer {
 
         void Cuda_fermat_test_impl::fermat_run()
         {
-
-            int32_t threads_per_block = (fermat_params_t::TPB == 0) ? 64 : fermat_params_t::TPB;
-            int32_t threads_per_instance = fermat_params_t::TPI;
-            int32_t instances_per_block = threads_per_block / threads_per_instance;
+            //changing thread count seems to have negligible impact on the throughput
+            const int32_t threads_per_block = (fermat_params_t::TPB == 0) ? 64 : fermat_params_t::TPB;
+            const int32_t threads_per_instance = fermat_params_t::TPI;
+            const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             int blocks = (m_offset_count + instances_per_block - 1) / instances_per_block;
 

@@ -206,7 +206,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 result == network::Result::connection_closed ||
                 result == network::Result::connection_error)
             {
-                self->m_logger->error("Connection to wallet not sucessful. Result: {}", result);
+                self->m_logger->error("Connection to wallet not sucessful. Result: {}", network::Result::code_to_string(result));
                 self->retry_connect(wallet_endpoint);
             }
             else if (result == network::Result::connection_ok)
@@ -240,24 +240,33 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                         self->m_timer_manager.start_get_height_timer(get_height_interval, self->m_connection);
                     }
 
-                    self->m_miner_protocol->set_block_handler([self](auto block, auto nBits)
+                    self->m_miner_protocol->set_block_handler([self, wallet_endpoint](auto block, auto nBits)
                     {
                         for(auto& worker : self->m_workers)
                         {
-                            worker->set_block(block, nBits, [self](auto id, auto block_data)
+                            worker->set_block(block, nBits, [self, wallet_endpoint](auto id, auto block_data)
                             {
                                 if (self->m_connection)
                                     self->m_connection->transmit(self->m_miner_protocol->submit_block(
                                         block_data->merkle_root.GetBytes(), uint2bytes64(block_data->nNonce)));
                                 else
+                                {
                                     self->m_logger->error("No connection. Can't submit block.");
+                                    self->retry_connect(wallet_endpoint);
+                                }
                             });
                         }
                     });
                 }));
             }
             else
-            {	// data received
+            {
+                if (!self->m_connection)
+                {
+                    self->m_logger->error("No connection to wallet.");
+                    self->retry_connect(wallet_endpoint);
+                }
+                // data received
                 self->process_data(std::move(receive_buffer));
             }
         }

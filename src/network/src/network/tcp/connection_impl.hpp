@@ -152,7 +152,7 @@ template<typename ProtocolDescriptionType>
 inline void Connection_impl<ProtocolDescriptionType>::receive()
 {
     m_asio_socket->async_receive(asio::null_buffers(), [weak_self = get_weak_self()](auto error, auto) 
-	{
+	{        
         auto self = weak_self.lock();
         if (self && self->m_connection_handler) 
 		{
@@ -160,7 +160,6 @@ inline void Connection_impl<ProtocolDescriptionType>::receive()
             {
                 // read length of received message;
                 auto const length = self->m_asio_socket->available();
-
                 if (length == 0)
                 {
                     self->change(Result::Code::connection_closed);
