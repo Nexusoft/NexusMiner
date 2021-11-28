@@ -16,3 +16,5 @@ out/
 *.lib
 include/gmp.h
 include/gmpxx.h
+*.exe
+*.log
