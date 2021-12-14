@@ -81,6 +81,10 @@ inline void Printer_file<PrinterType>::print()
             ss << " Current Difficulty " << prime_stats.m_difficulty / 10000000.0;
         }
         worker_config_index++;
+        if (worker_config_index < workers.size())
+        {
+            ss << std::endl;
+        }
     }
 
     m_logger->info(ss.str());
