@@ -62,19 +62,25 @@ inline void Printer_file<PrinterType>::print()
             ss << std::setprecision(2) << std::fixed << (hash_stats.m_hash_count / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) / 1.0e6 << "MH/s. ";
             ss << (m_worker_config[worker_config_index].m_mode == config::Worker_mode::FPGA ? hash_stats.m_nonce_candidates_recieved : hash_stats.m_met_difficulty_count)
                 << " candidates found. Most difficult: " << hash_stats.m_best_leading_zeros;
+            if (m_worker_config[worker_config_index].m_mode == config::Worker_mode::FPGA)
+                ss << " Hash Errors: " << hash_stats.m_hash_error_count;
 
         }
         else
         {
             auto& prime_stats = std::get<Prime>(worker);
-
-            ss << (prime_stats.m_primes / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " PPS ";
-            ss << (prime_stats.m_chains / static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count())) << " CPS ";
-            ss << " Difficulty " << prime_stats.m_difficulty / 10000000.0;
-
+            ss << std::setprecision(2) << std::fixed;
+            //GISPS = Billion integers searched per second
+            ss << (prime_stats.m_range_searched / (1.0e9 * static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count()))) << " GISPS ";
+            ss << "Chain Count: ";
+            for (auto i = 5; i < prime_stats.m_chain_histogram.size(); i++)
+            {
+                ss << i << ":" << prime_stats.m_chain_histogram[i] << " ";
+            }
+            ss << " Best " << prime_stats.m_most_difficult_chain;
+            ss << " Current Difficulty " << prime_stats.m_difficulty / 10000000.0;
         }
         worker_config_index++;
-        ss << std::endl;
     }
 
     m_logger->info(ss.str());
