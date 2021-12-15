@@ -75,6 +75,8 @@ public:
 
 	void address(std::string& out) const;
 
+    std::string to_string() const;
+
     // Returns the port number
     std::uint16_t port() const;
 

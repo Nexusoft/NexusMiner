@@ -206,12 +206,12 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 result == network::Result::connection_closed ||
                 result == network::Result::connection_error)
             {
-                self->m_logger->error("Connection to wallet not sucessful. Result: {}", network::Result::code_to_string(result));
+                self->m_logger->error("Connection to wallet {} not sucessful. Result: {}", wallet_endpoint.to_string(), network::Result::code_to_string(result));
                 self->retry_connect(wallet_endpoint);
             }
             else if (result == network::Result::connection_ok)
             {
-                self->m_logger->info("Connection to wallet established");
+                self->m_logger->info("Connection to wallet {} established", wallet_endpoint.to_string());
 
                 // login
                 self->m_connection->transmit(self->m_miner_protocol->login(self->m_config.get_pool_config().m_username,
