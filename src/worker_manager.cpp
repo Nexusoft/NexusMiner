@@ -33,7 +33,8 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_stats_collector{std::make_shared<stats::Collector>(m_config)}
 , m_timer_manager{std::move(timer_factory)}
 {
-    if(m_config.get_use_bool())
+    auto const& pool_config = m_config.get_pool_config();
+    if(pool_config.m_use_pool)
     {
         m_miner_protocol = std::make_shared<protocol::Pool>(m_stats_collector);
     }
@@ -58,9 +59,10 @@ void Worker_manager::create_stats_printers()
             {
                 if(!printer_file_created)
                 {
+                    auto const& pool_config = m_config.get_pool_config();
                     printer_file_created = true;
                     auto& stats_printer_config_file = std::get<config::Stats_printer_config_file>(stats_printer_config.m_printer_mode);
-                    if (m_config.get_use_bool())
+                    if (pool_config.m_use_pool)
                     {
                         m_stats_printers.push_back(std::make_shared<stats::Printer_file<stats::Printer_pool>>(stats_printer_config_file.file_name,
                             m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
@@ -78,8 +80,9 @@ void Worker_manager::create_stats_printers()
             {
                 if(!printer_console_created)
                 {
+                    auto const& pool_config = m_config.get_pool_config();
                     printer_console_created = true;
-                    if (m_config.get_use_bool())
+                    if (pool_config.m_use_pool)
                     {
                         m_stats_printers.push_back(std::make_shared<stats::Printer_console<stats::Printer_pool>>(m_config.get_mining_mode(),
                             m_config.get_worker_config(), *m_stats_collector));
@@ -227,7 +230,8 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                     self->m_timer_manager.start_stats_collector_timer(print_statistics_interval, self->m_workers, self->m_stats_collector);
                     self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
 
-                    if(self->m_config.get_use_bool())
+                    auto const& pool_config = self->m_config.get_pool_config();
+                    if (pool_config.m_use_pool)
                     {
                         // pool miner sends PING to keep connection alive
                         auto const ping_interval = self->m_config.get_ping_interval();

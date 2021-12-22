@@ -10,6 +10,7 @@ namespace config
 
 struct Pool
 {
+    bool m_use_pool{ false };
     std::string m_username{};
 };
 
