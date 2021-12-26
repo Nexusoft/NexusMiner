@@ -287,22 +287,27 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 {
-    Packet packet{ std::move(receive_buffer) };
-    if (!packet.is_valid())
+    auto remaining_size = receive_buffer->size();
+    do
     {
-        m_logger->debug("Received packet is invalid. Header: {0}", packet.m_header);
-        return;
-    }
+        auto packet = extract_packet_from_buffer(receive_buffer, remaining_size, receive_buffer->size() - remaining_size);
+        if (!packet.is_valid())
+        {
+            m_logger->debug("Received packet is invalid. Header: {0}", packet.m_header);
+            continue;
+        }
 
-    if (packet.m_header == Packet::PING)
-    {
-        m_logger->trace("PING received");
+        if (packet.m_header == Packet::PING)
+        {
+            m_logger->trace("PING received");
+        }
+        else
+        {
+            // solo/pool specific messages
+            m_miner_protocol->process_messages(std::move(packet), m_connection);
+        }
     }
-    else
-    {
-        // solo/pool specific messages
-        m_miner_protocol->process_messages(std::move(packet), m_connection);
-    }
+    while (remaining_size != 0);
 }
 
 }

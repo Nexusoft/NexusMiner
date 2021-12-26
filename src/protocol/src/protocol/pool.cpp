@@ -25,11 +25,9 @@ void Pool::reset()
 network::Shared_payload Pool::login(std::string const& account_name, Login_handler handler)
 {
     m_login_handler = std::move(handler);
-    Packet packet;
-    packet.m_header = Packet::LOGIN;
+
     std::vector<std::uint8_t> username_data{account_name.begin(), account_name.end()};
-    packet.m_length = username_data.size();
-    packet.m_data = std::make_shared<std::vector<std::uint8_t>>(username_data);
+    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(username_data) }; 
     return packet.get_bytes();
 }
 
@@ -38,9 +36,7 @@ network::Shared_payload Pool::get_work()
     m_logger->info("Get new block");
 
     // get new block from wallet
-    Packet packet;
-    packet.m_header = Packet::GET_BLOCK;
-
+    Packet packet{ Packet::GET_BLOCK };
     return packet.get_bytes();    
 }
 
@@ -49,12 +45,8 @@ network::Shared_payload Pool::submit_block(std::vector<std::uint8_t> const& bloc
 {
     m_logger->info("Submitting Block...");
 
-    Packet PACKET;
-    Packet packet;
-    packet.m_header = Packet::SUBMIT_BLOCK;
-
+    Packet packet{ Packet::SUBMIT_BLOCK };
     packet.m_data = std::make_shared<std::vector<std::uint8_t>>(block_data);
-
     packet.m_data->insert(packet.m_data->end(), nonce.begin(), nonce.end());
     packet.m_length = 72;  
 
