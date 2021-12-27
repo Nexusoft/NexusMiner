@@ -2,14 +2,16 @@
 #include "packet.hpp"
 #include "network/connection.hpp"
 #include "stats/stats_collector.hpp"
+#include "stats/types.hpp"
 
 namespace nexusminer
 {
 namespace protocol
 {
 
-Pool::Pool(std::shared_ptr<stats::Collector> stats_collector)
+Pool::Pool(config::Mining_mode mining_mode, std::shared_ptr<stats::Collector> stats_collector)
 : m_logger{spdlog::get("logger")}
+, m_mining_mode{ mining_mode }
 , m_set_block_handler{}
 , m_login_handler{}
 , m_current_height{0}
@@ -103,6 +105,12 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_logger->error("No Block handler set");
         }
     }
+    else if (packet.m_header == Packet::GET_HASHRATE)
+    {
+        auto const hashrate = get_hashrate_from_workers();
+        Packet response{ Packet::HASHRATE, std::make_shared<network::Payload>(double2bytes(hashrate)) };
+        connection->transmit(response.get_bytes());
+    }
     else if(packet.m_header == Packet::ACCEPT)
     {
         stats::Global global_stats{};
@@ -132,6 +140,28 @@ network::Shared_payload Pool::extract_nbits_from_block(network::Shared_payload d
 {
     nbits = bytes2uint(std::vector<unsigned char>(data->begin(), data->begin() + 4));
     return std::make_shared<network::Payload>(data->begin() + 4, data->end());
+}
+
+double Pool::get_hashrate_from_workers()
+{
+    double hashrate = 0.0;
+    auto const workers = m_stats_collector->get_workers_stats();
+    for (auto const& worker : workers)
+    {
+        if (m_mining_mode == config::Mining_mode::HASH)
+        {
+            auto& hash_stats = std::get<stats::Hash>(worker);
+            hashrate += (hash_stats.m_hash_count / static_cast<double>(m_stats_collector->get_elapsed_time_seconds().count())) / 1.0e6;
+        }
+        else
+        {
+            auto& prime_stats = std::get<stats::Prime>(worker);
+            //GISPS = Billion integers searched per second
+            hashrate += (prime_stats.m_range_searched / (1.0e9 * static_cast<double>(m_stats_collector->get_elapsed_time_seconds().count())));
+        }
+    }
+
+    return hashrate;
 }
 
 }

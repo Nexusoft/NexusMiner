@@ -36,7 +36,7 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
     auto const& pool_config = m_config.get_pool_config();
     if(pool_config.m_use_pool)
     {
-        m_miner_protocol = std::make_shared<protocol::Pool>(m_stats_collector);
+        m_miner_protocol = std::make_shared<protocol::Pool>(m_config.get_mining_mode(), m_stats_collector);
     }
     else
     {
