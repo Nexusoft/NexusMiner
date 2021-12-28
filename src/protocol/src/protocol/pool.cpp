@@ -73,7 +73,6 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_login_handler(false);
         }
     }
-    // NexusPool sends periodically this message to set height
     else if (packet.m_header == Packet::BLOCK_HEIGHT)
     {
         auto const height = bytes2uint(*packet.m_data);
@@ -84,7 +83,6 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             connection->transmit(get_work());
         }
     }
-    // blackpool and hashpool send periodically this message to set height
     else if(packet.m_header == Packet::BLOCK_DATA)
     {
         std::uint32_t nbits{0U};

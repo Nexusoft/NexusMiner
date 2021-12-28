@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 
 add_library(protocol STATIC src/protocol/solo.cpp
-                            src/protocol/pool.cpp)
+                            src/protocol/pool.cpp 
+                            src/protocol/pool_legacy.cpp)
                     
 target_include_directories(protocol
     PUBLIC 

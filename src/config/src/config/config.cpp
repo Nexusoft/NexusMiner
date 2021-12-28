@@ -70,7 +70,12 @@ namespace config
 			if (j.count("pool") != 0)
 			{
 				m_pool_config.m_use_pool = true;
-				m_pool_config.m_username = j.at("pool")["username"];
+				json pool_json = j.at("pool");
+				m_pool_config.m_username = pool_json["username"];
+				if (pool_json.contains("use_deprecated"))
+				{
+					m_pool_config.m_use_deprecated = pool_json["use_deprecated"];
+				}
 			}
 
 			// read stats printer config
