@@ -186,43 +186,23 @@ inline Endpoint::Endpoint(Transport_protocol protocol, std::string const& addres
                           std::uint16_t port, Scope_id scope)
     : m_protocol{protocol}, m_endpoint{}
 {
-    if (address == "auto" || address == "AUTO" || address == "Auto")
+    ::asio::error_code ec;
+    auto ip_address = ::asio::ip::make_address(address, ec);
+
+    if (!ec) 
     {
-        try {
-            asio::io_context netService;
-            asio::ip::udp::resolver   resolver(netService);
-            asio::ip::udp::resolver::query query(asio::ip::udp::v4(), "google.com", "");
-            asio::ip::udp::resolver::iterator endpoints = resolver.resolve(query);
-            asio::ip::udp::endpoint ep = *endpoints;
-            asio::ip::udp::socket socket(netService);
-            socket.connect(ep);
-            asio::ip::address addr = socket.local_endpoint().address();
-            init_ip_endpoint(addr, port);
-            //std::cout << "My IP: " << addr.to_string() << std::endl;
-        }
-        catch (std::exception& e) {
-            //std::cout << "Exception: " << e.what() << std::endl;
-            m_protocol = Transport_protocol::none;
+        if ((scope != m_default_scope) && ip_address.is_v6()) 
+        {
+            auto ipv6_address = ip_address.to_v6();
+            ipv6_address.scope_id(scope);
+            ip_address = ipv6_address;
         }
     }
-    else
+    else 
     {
-
-        ::asio::error_code ec;
-        auto ip_address = ::asio::ip::make_address(address, ec);
-
-        if (!ec) {
-            if ((scope != m_default_scope) && ip_address.is_v6()) {
-                auto ipv6_address = ip_address.to_v6();
-                ipv6_address.scope_id(scope);
-                ip_address = ipv6_address;
-            }
-        }
-        else {
-            m_protocol = Transport_protocol::none;
-        }
-        init_ip_endpoint(ip_address, port);
+        m_protocol = Transport_protocol::none;
     }
+    init_ip_endpoint(ip_address, port);
 }
 
 template<typename Iterator>
