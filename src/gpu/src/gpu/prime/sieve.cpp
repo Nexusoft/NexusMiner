@@ -18,8 +18,8 @@ namespace nexusminer {
         Sieve::Sieve()
             : m_logger{ spdlog::get("logger") }
         {
-            m_sieve.resize(sieve_size);
-            m_sieve_results.resize(static_cast<uint64_t>(sieve_size) * static_cast<uint64_t>(m_segment_batch_size));
+            //m_sieve.resize(sieve_size);
+            //m_sieve_results.resize(static_cast<uint64_t>(sieve_size) * static_cast<uint64_t>(m_segment_batch_size));
             reset_stats();
             reset_sieve_batch(0);
         }
@@ -138,8 +138,10 @@ namespace nexusminer {
         void Sieve::gpu_sieve_load(uint16_t device=0)
         {
             m_cuda_sieve.load_sieve(m_sieving_primes.data(), m_sieving_primes.size(), m_large_sieving_primes.data(), m_medium_small_primes.data(),
-               m_small_prime_lookup_table.data(), m_small_prime_lookup_table.size(), m_small_primes.data(), m_sieve_batch_buffer_size, device);
+               m_small_prime_lookup_table.data(), m_small_prime_lookup_table.size(), m_small_primes.data(), device);
             m_cuda_sieve_allocated = true;
+            //sieve range is valid after load
+            m_sieve_range = Cuda_sieve::m_sieve_properties.m_sieve_range;
             reset_stats();
         }
 
@@ -147,6 +149,7 @@ namespace nexusminer {
         {
             m_cuda_sieve.init_sieve(m_multiples.data(), m_small_prime_offsets.data(), m_large_multiples.data(), m_medium_small_multples.data());
             m_sieve_run_count = 0;
+            
         }
 
         void Sieve::gpu_fermat_test_set_base_int(boost::multiprecision::uint1024_t base_big_int)
@@ -169,6 +172,8 @@ namespace nexusminer {
 
         void Sieve::gpu_get_sieve()
         {
+            m_sieve_results.resize(static_cast<uint64_t>(Cuda_sieve::m_sieve_properties.m_kernel_sieve_size_words) * 
+                static_cast<uint64_t>(m_segment_batch_size));
             m_cuda_sieve.get_sieve(m_sieve_results.data());
         }
 
@@ -218,7 +223,9 @@ namespace nexusminer {
         {
             
             reset_sieve_batch(low);
-            m_cuda_sieve.run_sieve(m_sieve_run_count* m_sieve_batch_buffer_size * m_sieve_range_per_word);
+            uint32_t sieve_batch_buffer_size = Cuda_sieve::m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
+
+            m_cuda_sieve.run_sieve(m_sieve_run_count * sieve_batch_buffer_size * m_sieve_range_per_word);
             m_sieve_run_count++;
            
         }
@@ -303,10 +310,10 @@ namespace nexusminer {
            // std::cout << "here" << std::endl;
         }
 
-        std::uint32_t Sieve::get_segment_size()
-        {
-            return m_segment_size;
-        }
+        //std::uint32_t Sieve::get_segment_size()
+        //{
+        //    return m_segment_size;
+       // }
 
         std::uint32_t Sieve::get_segment_batch_size()
         {
@@ -326,7 +333,8 @@ namespace nexusminer {
             
             m_sieve_batch_start_offset = low;
             m_sieve_results = {};
-            m_sieve_results.resize(m_sieve_batch_buffer_size);
+            uint32_t sieve_batch_buffer_size = Cuda_sieve::m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
+            m_sieve_results.resize(sieve_batch_buffer_size);
             m_long_chain_starts = {};
         }
 

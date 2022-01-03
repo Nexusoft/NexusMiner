@@ -15,10 +15,13 @@ namespace nexusminer {
 			uint32_t multiple;
 		};
 
+
 		class Cuda_sieve_impl;
 		class Cuda_sieve
 		{
 		public:
+
+			
 			//We choose to use a 32 bit word as the smallest unit of the sieve. Cuda works natively with 32 bit words. 
 			//Using a 64 bit words is slower and byte operations are not natively supported by builtin cuda functions (atomics, popcount, etc).
 			//One 32 bit sieve word represents a span of 30*4 = 120 integers.  
@@ -31,21 +34,31 @@ namespace nexusminer {
 			static const int m_sieve_chain_search_boundary = 2310;
 			static const int m_sieve_alignment = m_sieve_chain_search_boundary * m_sieve_word_byte_count;  //ensure the segment ends on a word boundary
 			static const int m_sieve_alignment_offset = 120;  //offset from the wheel start to the first gap greater than 12.  Coincidentally its span 120 is a whole word.
-			//The span of the primorial 30030 is represented by 30030/30 = 1001 bytes which conveniently is just below 1KB
-			//We size the sieve segment to fill the block shared memory which is 48KB minimum.  Newer hardware supports larger shared memory.   
-			//TODO: set the sieve size based on hardware capability.
-			static const int m_kernel_sieve_size_bytes = 1001 * 48;  //this is the size of the sieve segment in bytes. It should be a multiple of 4 for a 32 bit word sieve.
-			static const int m_kernel_sieve_size_words = m_kernel_sieve_size_bytes / m_sieve_word_byte_count;
-			static const int m_segment_range = m_kernel_sieve_size_words * m_sieve_word_range;
+			
+			struct Cuda_sieve_properties
+			{
+				int m_shared_mem_size_kbytes;
+				int m_shared_mem_size_bytes;
+				unsigned int m_kernel_sieve_size_bytes;
+				unsigned int m_kernel_sieve_size_words;
+				unsigned int m_segment_range;
+				unsigned int m_kernel_sieve_size_words_per_block;
+				uint64_t m_block_range;
+				uint64_t m_sieve_total_size; //size of the sieve in words
+				uint64_t m_sieve_range;
+			};
+			static Cuda_sieve_properties m_sieve_properties;
+			
 			static const int m_kernel_segments_per_block = 32;  //number of times to repeat the sieve within a kernel call
-			static const int m_kernel_sieve_size_words_per_block = m_kernel_sieve_size_words * m_kernel_segments_per_block;
-			static const uint64_t m_block_range = m_segment_range * m_kernel_segments_per_block;
-			static const int m_threads_per_block = 1024;
 			static const int m_num_blocks = 360;  //each block sieves part of the range
-			static const uint64_t m_sieve_total_size = m_kernel_sieve_size_words_per_block * m_num_blocks; //size of the sieve in words
-			static const uint64_t m_sieve_range = m_sieve_total_size * m_sieve_word_range;
+			
+			static const int m_threads_per_block = 1024;
+			
+			//the largest possible sieve based on max shared memory of 164K on A100 GPU
+			static const uint64_t m_sieve_max_range = 164ull * 1024 * m_sieve_byte_range * m_kernel_segments_per_block * m_num_blocks;
+
 			static const int m_estimated_chains_per_million = 4;
-			static const uint32_t m_max_chains = 2*m_estimated_chains_per_million*m_sieve_range/1e6;
+			static const uint32_t m_max_chains = 2 * Cuda_sieve::m_estimated_chains_per_million * Cuda_sieve::m_sieve_max_range / 1e6;
 			static const uint32_t m_max_long_chains = 32;
 			static const int m_min_chain_length = 9;
 			static const int m_start_prime = 7;
@@ -66,7 +79,7 @@ namespace nexusminer {
 			Cuda_sieve();
 			~Cuda_sieve();
 			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[],
-				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device);
+				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint16_t device);
 			void init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
 				uint32_t medium_small_prime_starting_multiples[]);
 			void reset_stats();

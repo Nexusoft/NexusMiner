@@ -40,7 +40,7 @@ namespace nexusminer {
 			void sieve_small_primes();
 			void sieve_batch(uint64_t low);
 			void sieve_batch_cpu(uint64_t low);
-			std::uint32_t get_segment_size();
+			//std::uint32_t get_segment_size();
 			std::uint32_t get_segment_batch_size();
 			void reset_sieve();
 			void reset_sieve_batch(uint64_t low);
@@ -87,9 +87,9 @@ namespace nexusminer {
 
 		public:
 			
-			const uint32_t sieve_size_bytes = Cuda_sieve::m_kernel_sieve_size_bytes;  //size of the sieve in bytes
-			const uint32_t sieve_size_words = Cuda_sieve::m_kernel_sieve_size_words;  //size of the sieve in words
-			const uint32_t sieve_size = Cuda_sieve::m_kernel_sieve_size_words;  
+			//const uint32_t sieve_size_bytes = Cuda_sieve::m_kernel_sieve_size_bytes;  //size of the sieve in bytes
+			//const uint32_t sieve_size_words = Cuda_sieve::m_kernel_sieve_size_words;  //size of the sieve in words
+			//const uint32_t sieve_size = Cuda_sieve::m_kernel_sieve_size_words;  
 			const uint32_t m_sieve_range_per_word = Cuda_sieve::m_sieve_word_range;  
 			const uint32_t m_sieve_range_per_byte = Cuda_sieve::m_sieve_byte_range;
 			const uint32_t m_sieve_bytes_per_word = Cuda_sieve::m_sieve_word_byte_count;
@@ -104,8 +104,8 @@ namespace nexusminer {
 			const int m_fermat_test_batch_size = 200000;
 			const int m_fermat_test_batch_size_max = 1000000;
 			const int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
-			const uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
-			const uint64_t m_sieve_range = Cuda_sieve::m_sieve_range;
+			//const uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
+			uint64_t m_sieve_range;// = Cuda_sieve::m_sieve_range;
 			static constexpr int m_min_chain_length = 8;
 			const uint32_t large_prime_count = 0;
 
@@ -132,7 +132,7 @@ namespace nexusminer {
 			std::shared_ptr<spdlog::logger> m_logger;
 
 			//each byte covers a range of 30 sieving primes 
-			const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
+			//const uint32_t m_segment_size = sieve_size_bytes * Cuda_sieve::m_sieve_byte_range;
 
 			//the sieve.  each bit that is set represents a possible prime.
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve;
