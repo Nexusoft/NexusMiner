@@ -141,7 +141,7 @@ namespace nexusminer {
                m_small_prime_lookup_table.data(), m_small_prime_lookup_table.size(), m_small_primes.data(), device);
             m_cuda_sieve_allocated = true;
             //sieve range is valid after load
-            m_sieve_range = Cuda_sieve::m_sieve_properties.m_sieve_range;
+            m_sieve_range = m_cuda_sieve.m_sieve_properties.m_sieve_range;
             reset_stats();
         }
 
@@ -172,7 +172,7 @@ namespace nexusminer {
 
         void Sieve::gpu_get_sieve()
         {
-            m_sieve_results.resize(static_cast<uint64_t>(Cuda_sieve::m_sieve_properties.m_kernel_sieve_size_words) * 
+            m_sieve_results.resize(static_cast<uint64_t>(m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words) *
                 static_cast<uint64_t>(m_segment_batch_size));
             m_cuda_sieve.get_sieve(m_sieve_results.data());
         }
@@ -223,7 +223,7 @@ namespace nexusminer {
         {
             
             reset_sieve_batch(low);
-            uint32_t sieve_batch_buffer_size = Cuda_sieve::m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
+            uint32_t sieve_batch_buffer_size = m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
 
             m_cuda_sieve.run_sieve(m_sieve_run_count * sieve_batch_buffer_size * m_sieve_range_per_word);
             m_sieve_run_count++;
@@ -333,7 +333,7 @@ namespace nexusminer {
             
             m_sieve_batch_start_offset = low;
             m_sieve_results = {};
-            uint32_t sieve_batch_buffer_size = Cuda_sieve::m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
+            uint32_t sieve_batch_buffer_size = m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
             m_sieve_results.resize(sieve_batch_buffer_size);
             m_long_chain_starts = {};
         }
@@ -671,6 +671,11 @@ namespace nexusminer {
         void Sieve::gpu_fermat_synchronize()
         {
             m_cuda_prime_test.synchronize();
+        }
+
+        Cuda_sieve::Cuda_sieve_properties Sieve::get_sieve_properties()
+        {
+            return m_cuda_sieve.m_sieve_properties;
         }
 
         void Sieve::do_chain_trial_division_check()

@@ -133,7 +133,9 @@ void Worker_prime::run()
 	uint64_t fermat_passes_this_cycle_start;
 	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start);
 
-	bool debug = true;
+	//Setting debug to true can impact performance.  we will set it to true if the log level is set to debug or more verbose.
+	//setting debug to true is required to measure individual kernel run time
+	bool debug = m_logger->level() <= spdlog::level::level_enum::debug;
 	auto start = std::chrono::steady_clock::now();
 	auto interval_start = std::chrono::steady_clock::now();
 	while (!m_stop)

@@ -127,7 +127,8 @@ namespace gpu
 		//test_sieve.reset_sieve_batch(0);
 		test_sieve.gpu_sieve_load(m_device);
 		test_sieve.gpu_sieve_init();
-		uint64_t sieve_range = Cuda_sieve::m_sieve_properties.m_sieve_range;
+		Cuda_sieve::Cuda_sieve_properties sieve_properties = test_sieve.get_sieve_properties();
+		uint64_t sieve_range = sieve_properties.m_sieve_range;
 		//test_sieve.sieve_small_primes();
 		
 		auto start = std::chrono::steady_clock::now();

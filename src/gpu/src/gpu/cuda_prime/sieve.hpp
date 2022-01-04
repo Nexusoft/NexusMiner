@@ -46,8 +46,10 @@ namespace nexusminer {
 				uint64_t m_block_range;
 				uint64_t m_sieve_total_size; //size of the sieve in words
 				uint64_t m_sieve_range;
+				uint64_t m_bucket_ram_budget;
+				int m_large_prime_bucket_size;
 			};
-			static Cuda_sieve_properties m_sieve_properties;
+			Cuda_sieve_properties m_sieve_properties;
 			
 			static const int m_kernel_segments_per_block = 32;  //number of times to repeat the sieve within a kernel call
 			static const int m_num_blocks = 360;  //each block sieves part of the range
@@ -72,8 +74,8 @@ namespace nexusminer {
 			static constexpr int m_large_prime_count = 32 * 100000;
 			//static constexpr int m_large_prime_2_count = 32 * 140000;
 			static const int chain_histogram_max = 10;  
-			static const uint64_t m_bucket_ram_budget = 4.0e9;  //bytes avaialble for storing bucket data
-			static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
+			//static const uint64_t m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
+			//static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
 			
 
 			Cuda_sieve();

@@ -33,11 +33,12 @@ namespace nexusminer {
 			void get_long_chains(CudaChain chains[], uint32_t& chain_count);
 			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
 			void synchronize();
-			void init_sieve_size(int device);
+			void init_sieve_size(int device, Cuda_sieve::Cuda_sieve_properties& sieve_properties);
 
 
 		private:
 			int m_device = 0;
+			Cuda_sieve::Cuda_sieve_properties m_sieve_properties;
 			//device memory pointers
 			uint32_t* d_sieving_primes;  //medium sieving primes
 			uint32_t* d_starting_multiples;

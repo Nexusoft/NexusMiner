@@ -78,6 +78,7 @@ namespace nexusminer {
 			void gpu_get_stats();
 			void gpu_sieve_synchronize();
 			void gpu_fermat_synchronize();
+			Cuda_sieve::Cuda_sieve_properties get_sieve_properties();
 
 		private:
 			//mod 30 wheel using primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
