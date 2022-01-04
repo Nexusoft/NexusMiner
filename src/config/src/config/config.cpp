@@ -113,7 +113,11 @@ namespace config
 				j.at("log_level").get_to(m_log_level);
 			}
 
-			j.at("logfile").get_to(m_logfile);
+			if (j.count("logfile") != 0)
+			{
+				j.at("logfile").get_to(m_logfile);
+			}
+
 			print_global_config();
 			print_worker_config();
 			return true;
