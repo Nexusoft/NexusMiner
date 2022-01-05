@@ -3,7 +3,8 @@
 #include "network/connection.hpp"
 #include "stats/stats_collector.hpp"
 #include "stats/types.hpp"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
+#include <json/json.hpp>
 
 namespace nexusminer
 {
@@ -21,8 +22,14 @@ network::Shared_payload Pool::login(Login_handler handler)
 {
     m_login_handler = std::move(handler);
 
-    std::vector<std::uint8_t> username_data{ m_config.m_username.begin(), m_config.m_username.end() };
-    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(username_data) };
+    nlohmann::json j;
+    j["protocol_version"] = 1;
+    j["username"] = m_config.m_username;
+    j["display_name"] = m_config.m_display_name;
+    auto j_string = j.dump();
+
+    network::Payload login_data{ j_string.begin(), j_string.end() };
+    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(login_data) };
     return packet.get_bytes();
 }
 
