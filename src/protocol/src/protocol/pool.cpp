@@ -51,34 +51,30 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_login_handler(false);
         }
     }
-    else if (packet.m_header == Packet::BLOCK_HEIGHT)
+    else if (packet.m_header == Packet::WORK)
     {
-        auto const height = bytes2uint(*packet.m_data);
-        if (height > m_current_height)
+        try
         {
-            m_logger->info("Nexus Network: New height {}", height);
-            m_current_height = height;
-            connection->transmit(get_work());
-        }
-    }
-    else if(packet.m_header == Packet::BLOCK_DATA)
-    {
-        std::uint32_t nbits{0U};
-        auto original_block = extract_nbits_from_block(std::move(packet.m_data), nbits);
-        auto block = deserialize_block(std::move(original_block));
-        if (block.nHeight > m_current_height)
-        {
-            m_logger->info("Nexus Network: New height {}", block.nHeight);
-            m_current_height = block.nHeight;
-        }
+            nlohmann::json j = nlohmann::json::parse(packet.m_data->begin(), packet.m_data->end());
+            auto const work_id = j.at("work_id");
+            network::Shared_payload block_data = std::make_shared<network::Payload>(j.at("block").get_binary());
 
-        if (m_set_block_handler)
-        {
-            m_set_block_handler(block, nbits);
+            std::uint32_t nbits{ 0U };
+            auto original_block = extract_nbits_from_block(block_data, nbits);
+            auto block = deserialize_block(std::move(original_block));
+
+            if (m_set_block_handler)
+            {
+                m_set_block_handler(block, nbits);
+            }
+            else
+            {
+                m_logger->error("No Block handler set");
+            }
         }
-        else
+        catch (std::exception& e)
         {
-            m_logger->error("No Block handler set");
+            m_logger->error("Invalid WORK json received. Exception: {}", e.what());
         }
     }
     else if (packet.m_header == Packet::GET_HASHRATE)

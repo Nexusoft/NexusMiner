@@ -31,6 +31,7 @@ namespace nexusminer
 			//POOL RELATED
 			LOGIN = 8,
 			HASHRATE = 9,
+			WORK = 10,
 
 			/** REQUEST PACKETS **/
 			GET_BLOCK = 129,
