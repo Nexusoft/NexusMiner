@@ -39,11 +39,11 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
     {
         if (pool_config.m_use_deprecated)
         {
-            m_miner_protocol = std::make_shared<protocol::Pool_legacy>(m_logger, m_stats_collector);
+            m_miner_protocol = std::make_shared<protocol::Pool_legacy>(m_logger, m_config.get_pool_config(), m_stats_collector);
         }
         else
         {
-            m_miner_protocol = std::make_shared<protocol::Pool>(m_logger, m_config.get_mining_mode(), m_stats_collector);
+            m_miner_protocol = std::make_shared<protocol::Pool>(m_logger, m_config.get_mining_mode(), m_config.get_pool_config(), m_stats_collector);
         }
     }
     else
@@ -100,9 +100,7 @@ void Worker_manager::create_stats_printers()
                         m_stats_printers.push_back(std::make_shared<stats::Printer_console<stats::Printer_solo>>(m_config.get_mining_mode(),
                             m_config.get_worker_config(), *m_stats_collector));
                     }
-
                 }
-
                 break;
             }
         }
@@ -225,8 +223,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 self->m_logger->info("Connection to wallet {} established", wallet_endpoint.to_string());
 
                 // login
-                self->m_connection->transmit(self->m_miner_protocol->login(self->m_config.get_pool_config().m_username,
-                [self, wallet_endpoint](bool login_result)
+                self->m_connection->transmit(self->m_miner_protocol->login([self, wallet_endpoint](bool login_result)
                 {
                     if(!login_result)
                     {

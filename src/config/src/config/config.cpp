@@ -72,6 +72,7 @@ namespace config
 				m_pool_config.m_use_pool = true;
 				json pool_json = j.at("pool");
 				m_pool_config.m_username = pool_json["username"];
+				m_pool_config.m_display_name = pool_json["display_name"];
 				if (pool_json.contains("use_deprecated"))
 				{
 					m_pool_config.m_use_deprecated = pool_json["use_deprecated"];

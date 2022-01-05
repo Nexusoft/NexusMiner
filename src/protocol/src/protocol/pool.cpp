@@ -10,10 +10,20 @@ namespace nexusminer
 namespace protocol
 {
 
-Pool::Pool(std::shared_ptr<spdlog::logger> logger, config::Mining_mode mining_mode, std::shared_ptr<stats::Collector> stats_collector)
+Pool::Pool(std::shared_ptr<spdlog::logger> logger, config::Mining_mode mining_mode, config::Pool config, std::shared_ptr<stats::Collector> stats_collector)
  : Pool_base{ std::move(logger), std::move(stats_collector) }
 , m_mining_mode{ mining_mode }
+, m_config{config}
 {
+}
+
+network::Shared_payload Pool::login(Login_handler handler)
+{
+    m_login_handler = std::move(handler);
+
+    std::vector<std::uint8_t> username_data{ m_config.m_username.begin(), m_config.m_username.end() };
+    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(username_data) };
+    return packet.get_bytes();
 }
 
 void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> connection)

@@ -24,15 +24,6 @@ void Pool_base::reset()
     m_current_height = 0;
 }
 
-network::Shared_payload Pool_base::login(std::string const& account_name, Login_handler handler)
-{
-    m_login_handler = std::move(handler);
-
-    std::vector<std::uint8_t> username_data{ account_name.begin(), account_name.end() };
-    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(username_data) };
-    return packet.get_bytes();
-}
-
 network::Shared_payload Pool_base::get_work()
 {
     m_logger->info("Get new block");

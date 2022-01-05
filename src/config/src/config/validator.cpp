@@ -72,6 +72,10 @@ bool Validator::check(std::string const& config_file)
             {
                 m_mandatory_fields.push_back(Validator_error{"pool/username", ""});
             }
+            if (j.count("pool")["display_name"] == 0)
+            {
+                m_mandatory_fields.push_back(Validator_error{ "pool/display_name", "" });
+            }
         }
 
         if (j.count("log_level") != 0)

@@ -18,7 +18,6 @@ public:
 
     Pool_base(std::shared_ptr<spdlog::logger> logger, std::shared_ptr<stats::Collector> stats_collector);
     void reset() override;
-    network::Shared_payload login(std::string const& account_name, Login_handler handler) override;
     network::Shared_payload get_work() override;
     network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data,
         std::vector<std::uint8_t> const& nonce) override;
