@@ -56,9 +56,10 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         try
         {
             nlohmann::json j = nlohmann::json::parse(packet.m_data->begin(), packet.m_data->end());
-            auto const work_id = j.at("work_id");
-            auto json_block = j.at("block");
-            network::Shared_payload block_data = std::make_shared<network::Payload>(nlohmann::json::to_bson(json_block));
+            std::uint32_t const work_id = j.at("work_id");
+            auto const json_block = j.at("block");
+            network::Shared_payload block_data = std::make_shared<network::Payload>(json_block["bytes"].get<network::Payload>());
+            m_logger->info("New work, work_id: {}", work_id);
 
             std::uint32_t nbits{ 0U };
             auto original_block = extract_nbits_from_block(block_data, nbits);
