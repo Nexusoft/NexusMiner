@@ -3,7 +3,8 @@
 #include "network/connection.hpp"
 #include "stats/stats_collector.hpp"
 #include "stats/types.hpp"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
+#include <json/json.hpp>
 
 namespace nexusminer
 {
@@ -21,8 +22,14 @@ network::Shared_payload Pool::login(Login_handler handler)
 {
     m_login_handler = std::move(handler);
 
-    std::vector<std::uint8_t> username_data{ m_config.m_username.begin(), m_config.m_username.end() };
-    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(username_data) };
+    nlohmann::json j;
+    j["protocol_version"] = 1;
+    j["username"] = m_config.m_username;
+    j["display_name"] = m_config.m_display_name;
+    auto j_string = j.dump();
+
+    network::Payload login_data{ j_string.begin(), j_string.end() };
+    Packet packet{ Packet::LOGIN, std::make_shared<network::Payload>(login_data) };
     return packet.get_bytes();
 }
 
@@ -44,34 +51,32 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_login_handler(false);
         }
     }
-    else if (packet.m_header == Packet::BLOCK_HEIGHT)
+    else if (packet.m_header == Packet::WORK)
     {
-        auto const height = bytes2uint(*packet.m_data);
-        if (height > m_current_height)
+        try
         {
-            m_logger->info("Nexus Network: New height {}", height);
-            m_current_height = height;
-            connection->transmit(get_work());
-        }
-    }
-    else if(packet.m_header == Packet::BLOCK_DATA)
-    {
-        std::uint32_t nbits{0U};
-        auto original_block = extract_nbits_from_block(std::move(packet.m_data), nbits);
-        auto block = deserialize_block(std::move(original_block));
-        if (block.nHeight > m_current_height)
-        {
-            m_logger->info("Nexus Network: New height {}", block.nHeight);
-            m_current_height = block.nHeight;
-        }
+            nlohmann::json j = nlohmann::json::parse(packet.m_data->begin(), packet.m_data->end());
+            std::uint32_t const work_id = j.at("work_id");
+            auto const json_block = j.at("block");
+            network::Shared_payload block_data = std::make_shared<network::Payload>(json_block["bytes"].get<network::Payload>());
+            m_logger->info("New work, work_id: {}", work_id);
 
-        if (m_set_block_handler)
-        {
-            m_set_block_handler(block, nbits);
+            std::uint32_t nbits{ 0U };
+            auto original_block = extract_nbits_from_block(block_data, nbits);
+            auto block = deserialize_block(std::move(original_block));
+
+            if (m_set_block_handler)
+            {
+                m_set_block_handler(block, nbits);
+            }
+            else
+            {
+                m_logger->error("No Block handler set");
+            }
         }
-        else
+        catch (std::exception& e)
         {
-            m_logger->error("No Block handler set");
+            m_logger->error("Invalid WORK json received. Exception: {}", e.what());
         }
     }
     else if (packet.m_header == Packet::GET_HASHRATE)
