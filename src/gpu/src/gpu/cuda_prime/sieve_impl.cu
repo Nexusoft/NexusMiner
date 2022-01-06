@@ -517,7 +517,7 @@ namespace nexusminer {
             //this local array could be smaller than the global array
             __shared__ uint32_t bucket_indices_shared[Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks];
             uint32_t bucket_index = 0;
-            __shared__ uint32_t max_bucket_index;
+            //__shared__ uint32_t max_bucket_index;
 
             //initialize shared lookup tables.  lookup tables in shared memory are faster than global memory lookup tables.
             for (int i = index; i < 8; i += stride)
@@ -542,7 +542,7 @@ namespace nexusminer {
             if (index == 0)
             {
                 prime_index = num_threads;
-                max_bucket_index = 0;
+                //max_bucket_index = 0;
             }
             __syncthreads();
             //iterate through the list of primes
@@ -617,7 +617,6 @@ namespace nexusminer {
        
         void Cuda_sieve_impl::run_large_prime_sieve(uint64_t sieve_start_offset)
         {
-
             int threads = 1024;
             //one kernel block per sieve block
             int blocks = Cuda_sieve::m_num_blocks ;
@@ -820,6 +819,7 @@ namespace nexusminer {
             sieve_properties.m_block_range = sieve_properties.m_segment_range * Cuda_sieve::m_kernel_segments_per_block;
             sieve_properties.m_sieve_total_size = sieve_properties.m_kernel_sieve_size_words_per_block * Cuda_sieve::m_num_blocks; //size of the sieve in words
             sieve_properties.m_sieve_range = sieve_properties.m_sieve_total_size * Cuda_sieve::m_sieve_word_range;
+
             //keep a local cache of sieve properties
             m_sieve_properties = sieve_properties;
         }
