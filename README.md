@@ -9,7 +9,7 @@ FPGA mining for the hash channel is supported.  List of supported [FPGA boards](
 The miner supports prime mining for CPU and GPU, solo and pool.  Supported GPUs are Nvidia GTX 1070 or newer.  RTX 30 series GPUs provide the best profitability on the prime channel.
 
 ## Prime Pool
-The prime pool is now open for beta testing.  To use the prime pool, set the following address and port in miner.conf:
+To use the prime pool, set the following address and port in miner.conf:
 ```
     "wallet_ip" : "154.16.159.126",
     "port" : 50000,
