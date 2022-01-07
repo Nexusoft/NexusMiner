@@ -14,7 +14,7 @@ namespace nexusminer {
 			uint64_t m_sieve_start_offset;
 			
 			void load_sieve(uint32_t primes[], uint32_t prime_count, uint32_t large_primes[], uint32_t medium_small_primes[],
-				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint32_t sieve_size, uint16_t device);
+				uint32_t small_prime_masks[], uint32_t small_prime_mask_count, uint8_t small_primes[], uint16_t device);
 			void init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_starting_multiples[],
 				uint32_t medium_small_prime_multiples[]);
 			void reset_stats();
@@ -33,10 +33,12 @@ namespace nexusminer {
 			void get_long_chains(CudaChain chains[], uint32_t& chain_count);
 			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
 			void synchronize();
+			void init_sieve_size(int device, Cuda_sieve::Cuda_sieve_properties& sieve_properties);
 
 
 		private:
 			int m_device = 0;
+			Cuda_sieve::Cuda_sieve_properties m_sieve_properties;
 			//device memory pointers
 			uint32_t* d_sieving_primes;  //medium sieving primes
 			uint32_t* d_starting_multiples;

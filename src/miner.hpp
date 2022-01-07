@@ -32,6 +32,7 @@ public:
 private:
 
 	network::Endpoint resolve_dns(std::string const& dns_name, std::uint16_t port);
+	network::Endpoint get_local_ip();
 
 	std::shared_ptr<::asio::io_context> m_io_context;
 	std::shared_ptr<::asio::signal_set> m_signals;

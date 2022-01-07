@@ -20,6 +20,7 @@
 #include "stats/stats_collector.hpp"
 #include "protocol/solo.hpp"
 #include "protocol/pool.hpp"
+#include "protocol/pool_legacy.hpp"
 #include <variant>
 
 namespace nexusminer
@@ -33,13 +34,21 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
 , m_stats_collector{std::make_shared<stats::Collector>(m_config)}
 , m_timer_manager{std::move(timer_factory)}
 {
-    if(m_config.get_use_bool())
+    auto const& pool_config = m_config.get_pool_config();
+    if(pool_config.m_use_pool)
     {
-        m_miner_protocol = std::make_shared<protocol::Pool>(m_stats_collector);
+        if (pool_config.m_use_deprecated)
+        {
+            m_miner_protocol = std::make_shared<protocol::Pool_legacy>(m_logger, m_config.get_pool_config(), m_stats_collector);
+        }
+        else
+        {
+            m_miner_protocol = std::make_shared<protocol::Pool>(m_logger, m_config.get_mining_mode(), m_config.get_pool_config(), m_stats_collector);
+        }
     }
     else
     {
-      m_miner_protocol = std::make_shared<protocol::Solo>(m_config.get_mining_mode() == config::Mining_mode::PRIME ? 1U : 2U, m_stats_collector);
+        m_miner_protocol = std::make_shared<protocol::Solo>(m_config.get_mining_mode() == config::Mining_mode::PRIME ? 1U : 2U, m_stats_collector);
     } 
   
     create_stats_printers();
@@ -58,9 +67,10 @@ void Worker_manager::create_stats_printers()
             {
                 if(!printer_file_created)
                 {
+                    auto const& pool_config = m_config.get_pool_config();
                     printer_file_created = true;
                     auto& stats_printer_config_file = std::get<config::Stats_printer_config_file>(stats_printer_config.m_printer_mode);
-                    if (m_config.get_use_bool())
+                    if (pool_config.m_use_pool)
                     {
                         m_stats_printers.push_back(std::make_shared<stats::Printer_file<stats::Printer_pool>>(stats_printer_config_file.file_name,
                             m_config.get_mining_mode(), m_config.get_worker_config(), *m_stats_collector));
@@ -78,8 +88,9 @@ void Worker_manager::create_stats_printers()
             {
                 if(!printer_console_created)
                 {
+                    auto const& pool_config = m_config.get_pool_config();
                     printer_console_created = true;
-                    if (m_config.get_use_bool())
+                    if (pool_config.m_use_pool)
                     {
                         m_stats_printers.push_back(std::make_shared<stats::Printer_console<stats::Printer_pool>>(m_config.get_mining_mode(),
                             m_config.get_worker_config(), *m_stats_collector));
@@ -89,9 +100,7 @@ void Worker_manager::create_stats_printers()
                         m_stats_printers.push_back(std::make_shared<stats::Printer_console<stats::Printer_solo>>(m_config.get_mining_mode(),
                             m_config.get_worker_config(), *m_stats_collector));
                     }
-
                 }
-
                 break;
             }
         }
@@ -206,16 +215,15 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                 result == network::Result::connection_closed ||
                 result == network::Result::connection_error)
             {
-                self->m_logger->error("Connection to wallet not sucessful. Result: {}", network::Result::code_to_string(result));
+                self->m_logger->error("Connection to wallet {} not sucessful. Result: {}", wallet_endpoint.to_string(), network::Result::code_to_string(result));
                 self->retry_connect(wallet_endpoint);
             }
             else if (result == network::Result::connection_ok)
             {
-                self->m_logger->info("Connection to wallet established");
+                self->m_logger->info("Connection to wallet {} established", wallet_endpoint.to_string());
 
                 // login
-                self->m_connection->transmit(self->m_miner_protocol->login(self->m_config.get_pool_config().m_username,
-                [self, wallet_endpoint](bool login_result)
+                self->m_connection->transmit(self->m_miner_protocol->login([self, wallet_endpoint](bool login_result)
                 {
                     if(!login_result)
                     {
@@ -227,7 +235,8 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                     self->m_timer_manager.start_stats_collector_timer(print_statistics_interval, self->m_workers, self->m_stats_collector);
                     self->m_timer_manager.start_stats_printer_timer(print_statistics_interval, self->m_stats_printers);
 
-                    if(self->m_config.get_use_bool())
+                    auto const& pool_config = self->m_config.get_pool_config();
+                    if (pool_config.m_use_pool)
                     {
                         // pool miner sends PING to keep connection alive
                         auto const ping_interval = self->m_config.get_ping_interval();
@@ -283,22 +292,27 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
 void Worker_manager::process_data(network::Shared_payload&& receive_buffer)
 {
-    Packet packet{ std::move(receive_buffer) };
-    if (!packet.is_valid())
+    auto remaining_size = receive_buffer->size();
+    do
     {
-        m_logger->debug("Received packet is invalid. Header: {0}", packet.m_header);
-        return;
-    }
+        auto packet = extract_packet_from_buffer(receive_buffer, remaining_size, receive_buffer->size() - remaining_size);
+        if (!packet.is_valid())
+        {
+            m_logger->debug("Received packet is invalid. Header: {0}", packet.m_header);
+            continue;
+        }
 
-    if (packet.m_header == Packet::PING)
-    {
-        m_logger->trace("PING received");
+        if (packet.m_header == Packet::PING)
+        {
+            m_logger->trace("PING received");
+        }
+        else
+        {
+            // solo/pool specific messages
+            m_miner_protocol->process_messages(std::move(packet), m_connection);
+        }
     }
-    else
-    {
-        // solo/pool specific messages
-        m_miner_protocol->process_messages(std::move(packet), m_connection);
-    }
+    while (remaining_size != 0);
 }
 
 }

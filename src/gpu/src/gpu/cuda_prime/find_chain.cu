@@ -32,12 +32,12 @@ namespace nexusminer {
 
         //search the sieve for chains that meet the minimum length requirement.  
         __global__ void find_chain_kernel(Cuda_sieve::sieve_word_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset,
-            unsigned long long* chain_stat_count)
+            unsigned long long* chain_stat_count, Cuda_sieve::Cuda_sieve_properties sieve_properties)
         {
 
             //const uint64_t sieve_size = Cuda_sieve::m_sieve_total_size;
             const uint32_t sieve_bits_per_word = Cuda_sieve::m_sieve_word_byte_count * 8;
-            const uint64_t sieve_total_bits = Cuda_sieve::m_sieve_total_size * sieve_bits_per_word;
+            const uint64_t sieve_total_bits = sieve_properties.m_sieve_total_size * sieve_bits_per_word;
             uint64_t num_blocks = gridDim.x;
             uint64_t num_threads = blockDim.x;
             uint64_t block_id = blockIdx.x;
@@ -74,7 +74,7 @@ namespace nexusminer {
                     continue;
                 //check if the next 4 bytes (4*30 = range of 120 integers) has enough prime candidates to form a chain 
                 //this is only valid up to min chain length 9.  above 9 requires 5 bytes.
-                if (word < Cuda_sieve::m_sieve_total_size - 1)
+                if (word < sieve_properties.m_sieve_total_size - 1)
                 {
                     unsigned int next_4_bytes = 0;
                     unsigned int byte_index = (i/8) % 4;
@@ -167,11 +167,11 @@ namespace nexusminer {
         //alternative chain finder
         //each kernel block is a sieve segment.  Each thread searches a range of 2310*4 within a segment.   
         __global__ void find_chain_kernel2(Cuda_sieve::sieve_word_t* sieve, CudaChain* chains, uint32_t* chain_index, uint64_t sieve_start_offset,
-            unsigned long long* chain_stat_count)
+            unsigned long long* chain_stat_count, Cuda_sieve::Cuda_sieve_properties sieve_properties)
         {
             const unsigned int search_range = Cuda_sieve::m_sieve_chain_search_boundary * Cuda_sieve::m_sieve_word_byte_count;
             const unsigned int search_words = search_range / Cuda_sieve::m_sieve_word_range;
-            const unsigned int total_search_regions = Cuda_sieve::m_sieve_range / search_range;
+            unsigned int total_search_regions = sieve_properties.m_sieve_range / search_range;
             unsigned int num_blocks = gridDim.x;
             unsigned int block_id = blockIdx.x / Cuda_sieve::m_kernel_segments_per_block;
             unsigned int segment_id = blockIdx.x % Cuda_sieve::m_kernel_segments_per_block;
@@ -180,8 +180,8 @@ namespace nexusminer {
             unsigned int stride = blockDim.x;
             unsigned int gap = 0;
             uint32_t chain_start;
-            uint64_t segment_offset = sieve_start_offset + block_id * Cuda_sieve::m_block_range + segment_id * Cuda_sieve::m_segment_range;
-            uint32_t sieve_segment_index = block_id * Cuda_sieve::m_kernel_sieve_size_words_per_block + segment_id * Cuda_sieve::m_kernel_sieve_size_words;
+            uint64_t segment_offset = sieve_start_offset + block_id * sieve_properties.m_block_range + segment_id * sieve_properties.m_segment_range;
+            uint32_t sieve_segment_index = block_id * sieve_properties.m_kernel_sieve_size_words_per_block + segment_id * sieve_properties.m_kernel_sieve_size_words;
             uint32_t sieve_index;
             //shared copies of lookup tables
             __shared__ unsigned int sieve30_offsets_shared[8];

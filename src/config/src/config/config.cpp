@@ -13,11 +13,11 @@ namespace config
 {
 	Config::Config(std::shared_ptr<spdlog::logger> logger)
 		: m_logger{std::move(logger)}
+		, m_version{1}
 		, m_wallet_ip{ "127.0.0.1" }
 		, m_port{ 9323 }
 		, m_local_ip{"127.0.0.1"}
 		, m_mining_mode{ Mining_mode::HASH}
-		, m_use_pool{false}
 		, m_pool_config{}
 		, m_log_level{2}	// info level
 		, m_logfile{""}		// no logfile usage, default
@@ -42,6 +42,10 @@ namespace config
 		try
 		{
 			json j = json::parse(config_file);
+			if (j.count("version") != 0)
+			{
+				j.at("version").get_to(m_version);
+			}
 			j.at("wallet_ip").get_to(m_wallet_ip);
 			j.at("port").get_to(m_port);
 			if (j.count("local_ip") != 0)
@@ -63,10 +67,16 @@ namespace config
 				m_mining_mode = Mining_mode::HASH;
 			}
 
-			j.at("use_pool").get_to(m_use_pool);
-			if (m_use_pool)
+			if (j.count("pool") != 0)
 			{
-				m_pool_config.m_username = j.at("pool")["username"];
+				m_pool_config.m_use_pool = true;
+				json pool_json = j.at("pool");
+				m_pool_config.m_username = pool_json["username"];
+				m_pool_config.m_display_name = pool_json["display_name"];
+				if (pool_json.contains("use_deprecated"))
+				{
+					m_pool_config.m_use_deprecated = pool_json["use_deprecated"];
+				}
 			}
 
 			// read stats printer config
@@ -104,7 +114,11 @@ namespace config
 				j.at("log_level").get_to(m_log_level);
 			}
 
-			j.at("logfile").get_to(m_logfile);
+			if (j.count("logfile") != 0)
+			{
+				j.at("logfile").get_to(m_logfile);
+			}
+
 			print_global_config();
 			print_worker_config();
 			return true;
@@ -208,7 +222,7 @@ namespace config
 	{
 		std::stringstream ss;
 		ss << "Mining " << (m_mining_mode == config::Mining_mode::HASH ? "HASH" : "PRIME") << " Channel in "
-			<< (m_use_pool ? "POOL" : "SOLO") << " mode";
+			<< (m_pool_config.m_use_pool ? "POOL" : "SOLO") << " mode";
 
 		m_logger->info(ss.str());
 	}

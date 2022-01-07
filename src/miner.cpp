@@ -99,7 +99,7 @@ namespace nexusminer
 		// network initialisation
 		m_network_component = network::create_component(m_io_context);
 
-		network::Endpoint local_endpoint{ network::Transport_protocol::tcp, m_config.get_local_ip(), 0 };
+		auto const local_endpoint = get_local_ip();
 		m_worker_manager = std::make_unique<Worker_manager>(m_io_context, m_config, timer_factory, 
 			m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
@@ -136,17 +136,44 @@ namespace nexusminer
 
 	network::Endpoint Miner::resolve_dns(std::string const& dns_name, std::uint16_t port)
 	{
-		//::asio::ip::tcp::resolver::query resolver_query( asio::ip::tcp::resolver::query::numeric_service);
 		::asio::ip::tcp::resolver resolver(*m_io_context);
-
 		::asio::error_code ec;
 		auto it = resolver.resolve(dns_name, std::string{std::to_string(port)}, ec);
-
 		if(ec) 
 		{
 			return network::Endpoint{};
 		}
 
 		return network::Endpoint{it->endpoint()};
+	}
+
+	network::Endpoint Miner::get_local_ip()
+	{
+		std::string local_ip = m_config.get_local_ip();
+		std::for_each(local_ip.begin(), local_ip.end(), [](char& c) { c = ::tolower(c); });
+
+		if (local_ip == "auto")
+		{
+			try 
+			{
+				asio::ip::udp::resolver resolver(*m_io_context);
+				asio::ip::udp::resolver::query query(asio::ip::udp::v4(), "google.com", "");
+				asio::ip::udp::resolver::iterator endpoints = resolver.resolve(query);
+				asio::ip::udp::endpoint ep = *endpoints;
+				asio::ip::udp::socket socket(*m_io_context);
+				socket.connect(ep);
+				asio::ip::address addr = socket.local_endpoint().address();
+				return network::Endpoint{ network::Transport_protocol::tcp, addr.to_string(), 0 };
+			}
+			catch (std::exception& e) 
+			{
+				m_logger->error("Failed to set local_ip with auto mode. Fallback to 127.0.0.1. Exception: {}", e.what());
+				return network::Endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0};
+			}
+		}
+		else
+		{
+			return network::Endpoint{ network::Transport_protocol::tcp, m_config.get_local_ip(), 0 };
+		}
 	}
 }

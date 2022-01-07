@@ -75,6 +75,8 @@ public:
 
 	void address(std::string& out) const;
 
+    std::string to_string() const;
+
     // Returns the port number
     std::uint16_t port() const;
 
@@ -179,6 +181,7 @@ inline Endpoint::Endpoint(Endpoint_tcp base_endpoint, Scope_id scope)
 {
 }
 
+
 inline Endpoint::Endpoint(Transport_protocol protocol, std::string const& address,
                           std::uint16_t port, Scope_id scope)
     : m_protocol{protocol}, m_endpoint{}
@@ -186,14 +189,17 @@ inline Endpoint::Endpoint(Transport_protocol protocol, std::string const& addres
     ::asio::error_code ec;
     auto ip_address = ::asio::ip::make_address(address, ec);
 
-    if (!ec) {
-        if ((scope != m_default_scope) && ip_address.is_v6()) {
+    if (!ec) 
+    {
+        if ((scope != m_default_scope) && ip_address.is_v6()) 
+        {
             auto ipv6_address = ip_address.to_v6();
             ipv6_address.scope_id(scope);
             ip_address = ipv6_address;
         }
     }
-    else {
+    else 
+    {
         m_protocol = Transport_protocol::none;
     }
     init_ip_endpoint(ip_address, port);

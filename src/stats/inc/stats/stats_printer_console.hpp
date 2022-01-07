@@ -75,7 +75,7 @@ inline void Printer_console<PrinterType>::print()
             //GISPS = Billion integers searched per second
             ss << (prime_stats.m_range_searched / (1.0e9 * static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count()))) << " GISPS ";
             ss << "Chain Count: ";
-            for (auto i=4; i< prime_stats.m_chain_histogram.size(); i++)
+            for (auto i=5; i< prime_stats.m_chain_histogram.size(); i++)
             {
                 ss << i << ":" << prime_stats.m_chain_histogram[i] << " ";
             }
@@ -83,7 +83,10 @@ inline void Printer_console<PrinterType>::print()
             ss << " Current Difficulty " << prime_stats.m_difficulty / 10000000.0;
         }
         worker_config_index++;
-        ss << std::endl;
+        if (worker_config_index < workers.size())
+        {
+            ss << std::endl;
+        }
     }
 
     m_logger->info(ss.str());

@@ -22,7 +22,7 @@ public:
     virtual ~Protocol() = default;
 
     virtual void reset() = 0;
-    virtual network::Shared_payload login(std::string const& account_name, Login_handler handler) = 0;
+    virtual network::Shared_payload login(Login_handler handler) = 0;
     virtual network::Shared_payload get_work() = 0;
     virtual network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data, 
         std::vector<std::uint8_t> const& nonce ) = 0;
