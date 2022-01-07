@@ -29,7 +29,7 @@ std::string Endpoint::to_string() const
     // assert
     std::string scope_id_string{};
     if ((m_protocol == Transport_protocol::udp) || (m_protocol == Transport_protocol::tcp)) {
-        scope_id_string = ((scope_id() != 0) && is_v6()) ? "" : "%" + std::to_string(scope_id());
+        scope_id_string = ((scope_id() != 0) && is_v6()) ? "%" + std::to_string(scope_id()) : "";
     }
 
     std::string result{};
