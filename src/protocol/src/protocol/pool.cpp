@@ -1,4 +1,5 @@
 #include "protocol/pool.hpp"
+#include "pool_protocol.hpp"
 #include "packet.hpp"
 #include "network/connection.hpp"
 #include "stats/stats_collector.hpp"
@@ -23,7 +24,7 @@ network::Shared_payload Pool::login(Login_handler handler)
     m_login_handler = std::move(handler);
 
     nlohmann::json j;
-    j["protocol_version"] = 1;
+    j["protocol_version"] = POOL_PROTOCOL_VERSION;
     j["username"] = m_config.m_username;
     j["display_name"] = m_config.m_display_name;
     auto j_string = j.dump();
@@ -45,7 +46,11 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
     }
     else if(packet.m_header == Packet::LOGIN_FAIL)
     {
-        m_logger->error("Login to Pool not successful");
+        nlohmann::json j = nlohmann::json::parse(packet.m_data->begin(), packet.m_data->end());
+        std::uint8_t const result_code = j.at("result_code");
+        auto const result_message = j.at("result_message");
+
+        m_logger->error("Login to Pool not successful. Result_code: {} message: {}", result_code, result_message);
         if(m_login_handler)
         {
             m_login_handler(false);
