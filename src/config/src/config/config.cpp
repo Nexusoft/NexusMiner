@@ -42,10 +42,14 @@ namespace config
 		try
 		{
 			json j = json::parse(config_file);
-			if (j.count("version") != 0)
+			j.at("version").get_to(m_version);
+			if (m_version < CONFIG_VERSION)
 			{
-				j.at("version").get_to(m_version);
+				auto const config_version = CONFIG_VERSION;
+				m_logger->critical("Config version too old. Must be version : {}", config_version);
+				return false;
 			}
+
 			j.at("wallet_ip").get_to(m_wallet_ip);
 			j.at("port").get_to(m_port);
 			if (j.count("local_ip") != 0)

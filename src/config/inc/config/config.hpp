@@ -14,6 +14,8 @@ namespace nexusminer
 {
 namespace config
 {
+#define CONFIG_VERSION 1
+
 class Config
 {
 public:
