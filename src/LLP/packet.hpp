@@ -34,6 +34,7 @@ namespace nexusminer
 			WORK = 10,
 			LOGIN_SUCCESS = 11,
 			LOGIN_FAIL = 12,
+			POOL_NOTIFICATION = 13,
 
 			/** REQUEST PACKETS **/
 			GET_BLOCK = 129,

@@ -56,6 +56,12 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_login_handler(false);
         }
     }
+    if (packet.m_header == Packet::POOL_NOTIFICATION)
+    {
+        nlohmann::json j = nlohmann::json::parse(packet.m_data->begin(), packet.m_data->end());
+        auto const message = j.at("message");
+        m_logger->info("POOL notification: {}", message);
+    }
     else if (packet.m_header == Packet::WORK)
     {
         try
@@ -112,6 +118,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         m_logger->info("Share Accepted By Pool. Found Block!");
     }
 }
+
 double Pool::get_hashrate_from_workers()
 {
     double hashrate = 0.0;
