@@ -11,7 +11,7 @@ The miner supports prime mining for CPU and GPU, solo and pool.  Supported GPUs 
 ## Prime Pool
 To use the prime pool, set the following address and port in miner.conf:
 ```
-    "wallet_ip" : "154.16.159.126",
+    "wallet_ip" : "primepool.nexus.io",
     "port" : 50000,
 ```
 
