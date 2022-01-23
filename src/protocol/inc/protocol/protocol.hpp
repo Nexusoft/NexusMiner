@@ -24,8 +24,7 @@ public:
     virtual void reset() = 0;
     virtual network::Shared_payload login(Login_handler handler) = 0;
     virtual network::Shared_payload get_work() = 0;
-    virtual network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data, 
-        std::vector<std::uint8_t> const& nonce ) = 0;
+    virtual network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data, std::uint64_t nonce ) = 0;
 
     virtual void process_messages(Packet packet, std::shared_ptr<network::Connection> connection) = 0;
     virtual void set_block_handler(Set_block_handler handler) = 0;

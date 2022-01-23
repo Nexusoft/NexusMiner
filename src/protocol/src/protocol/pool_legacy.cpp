@@ -24,6 +24,19 @@ network::Shared_payload Pool_legacy::login(Login_handler handler)
     return packet.get_bytes();
 }
 
+network::Shared_payload Pool_legacy::submit_block(std::vector<std::uint8_t> const& block_data, std::uint64_t nonce)
+{
+    m_logger->info("Submitting Block...");
+
+    Packet packet{ Packet::SUBMIT_BLOCK };
+    packet.m_data = std::make_shared<std::vector<std::uint8_t>>(block_data);
+    auto const nonce_data = uint2bytes64(nonce);
+    packet.m_data->insert(packet.m_data->end(), nonce_data.begin(), nonce_data.end());
+    packet.m_length = 72;
+
+    return packet.get_bytes();
+}
+
 void Pool_legacy::process_messages(Packet packet, std::shared_ptr<network::Connection> connection)
 {
     if (packet.m_header == Packet::LOGIN_SUCCESS)

@@ -21,6 +21,7 @@ public:
     Pool(std::shared_ptr<spdlog::logger> logger, config::Mining_mode mining_mode, config::Pool config, std::shared_ptr<stats::Collector> stats_collector);
 
     network::Shared_payload login(Login_handler handler) override;
+    network::Shared_payload submit_block(std::vector<std::uint8_t> const& block_data, std::uint64_t nonce) override;
 	void process_messages(Packet packet, std::shared_ptr<network::Connection> connection) override;
 
 private:

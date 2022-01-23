@@ -33,19 +33,6 @@ network::Shared_payload Pool_base::get_work()
     return packet.get_bytes();
 }
 
-network::Shared_payload Pool_base::submit_block(std::vector<std::uint8_t> const& block_data,
-    std::vector<std::uint8_t> const& nonce)
-{
-    m_logger->info("Submitting Block...");
-
-    Packet packet{ Packet::SUBMIT_BLOCK };
-    packet.m_data = std::make_shared<std::vector<std::uint8_t>>(block_data);
-    packet.m_data->insert(packet.m_data->end(), nonce.begin(), nonce.end());
-    packet.m_length = 72;
-
-    return packet.get_bytes();
-}
-
 network::Shared_payload Pool_base::extract_nbits_from_block(network::Shared_payload data, std::uint32_t& nbits)
 {
     nbits = bytes2uint(std::vector<unsigned char>(data->begin(), data->begin() + 4));

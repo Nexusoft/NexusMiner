@@ -34,6 +34,20 @@ network::Shared_payload Pool::login(Login_handler handler)
     return packet.get_bytes();
 }
 
+network::Shared_payload Pool::submit_block(std::vector<std::uint8_t> const& block_data, std::uint64_t nonce)
+{
+    m_logger->info("Submitting Block...");
+
+    nlohmann::json j;
+    j["work_id"] = 0;       // TODO
+    j["nonce"] = nonce;
+    auto j_string = j.dump();
+
+    network::Payload submit_data{ j_string.begin(), j_string.end() };
+    Packet packet{ Packet::SUBMIT_BLOCK, std::make_shared<network::Payload>(submit_data) };
+    return packet.get_bytes();
+}
+
 void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> connection)
 {
     if(packet.m_header == Packet::LOGIN_SUCCESS)

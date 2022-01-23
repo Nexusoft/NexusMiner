@@ -3,7 +3,7 @@
 
 namespace nexusminer
 {
-#define POOL_PROTOCOL_VERSION 1
+#define POOL_PROTOCOL_VERSION 2
 
 enum class Pool_protocol_result : std::uint8_t
 {

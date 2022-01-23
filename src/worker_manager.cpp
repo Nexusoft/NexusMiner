@@ -257,7 +257,7 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
                             {
                                 if (self->m_connection)
                                     self->m_connection->transmit(self->m_miner_protocol->submit_block(
-                                        block_data->merkle_root.GetBytes(), uint2bytes64(block_data->nNonce)));
+                                        block_data->merkle_root.GetBytes(), block_data->nNonce));
                                 else
                                 {
                                     self->m_logger->error("No connection. Can't submit block.");

@@ -39,14 +39,14 @@ network::Shared_payload Solo::get_work()
     return packet.get_bytes();     
 }
 
-network::Shared_payload Solo::submit_block(std::vector<std::uint8_t> const& block_data, 
-        std::vector<std::uint8_t> const& nonce )
+network::Shared_payload Solo::submit_block(std::vector<std::uint8_t> const& block_data, std::uint64_t nonce)
 {
     m_logger->info("Submitting Block...");
 
     Packet packet{ Packet::SUBMIT_BLOCK };
     packet.m_data = std::make_shared<network::Payload>(block_data);
-    packet.m_data->insert(packet.m_data->end(), nonce.begin(), nonce.end());
+    auto const nonce_data = uint2bytes64(nonce);
+    packet.m_data->insert(packet.m_data->end(), nonce_data.begin(), nonce_data.end());
     packet.m_length = 72;  
 
     return packet.get_bytes();  
