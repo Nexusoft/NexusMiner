@@ -32,8 +32,8 @@ namespace nexusminer
 			LOGIN = 8,
 			HASHRATE = 9,
 			WORK = 10,
-			LOGIN_SUCCESS = 11,
-			LOGIN_FAIL = 12,
+			LOGIN_V2_SUCCESS = 11,
+			LOGIN_V2_FAIL = 12,
 			POOL_NOTIFICATION = 13,
 
 			/** REQUEST PACKETS **/
@@ -42,6 +42,10 @@ namespace nexusminer
 			GET_REWARD = 131,
 			GET_PAYOUT = 132,
 			GET_HASHRATE = 133,
+
+			// LEGACY POOL
+			LOGIN_SUCCESS = 134,
+			LOGIN_FAIL = 135,
 
 
 			/** RESPONSE PACKETS **/

@@ -50,7 +50,7 @@ network::Shared_payload Pool::submit_block(std::vector<std::uint8_t> const& bloc
 
 void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> connection)
 {
-    if(packet.m_header == Packet::LOGIN_SUCCESS)
+    if(packet.m_header == Packet::LOGIN_V2_SUCCESS)
     {
         m_logger->info("Login to Pool successful");
         if(m_login_handler)
@@ -58,7 +58,7 @@ void Pool::process_messages(Packet packet, std::shared_ptr<network::Connection> 
             m_login_handler(true);
         }
     }
-    else if(packet.m_header == Packet::LOGIN_FAIL)
+    else if(packet.m_header == Packet::LOGIN_V2_FAIL)
     {
         nlohmann::json j = nlohmann::json::parse(packet.m_data->begin(), packet.m_data->end());
         std::uint8_t const result_code = j.at("result_code");
