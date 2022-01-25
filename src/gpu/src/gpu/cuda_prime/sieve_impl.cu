@@ -801,7 +801,7 @@ namespace nexusminer {
             cudaMemGetInfo(&free_mem, &total_mem);
             //printf("Total gpu memory %zu\n", total_mem);
             if (total_mem < 8.0e9)
-                sieve_properties.m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
+                sieve_properties.m_bucket_ram_budget = 4.4e9;  //bytes avaialble for storing bucket data
             else
                 sieve_properties.m_bucket_ram_budget = 6.0e9;
 

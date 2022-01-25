@@ -17,6 +17,8 @@ namespace gpu
 		void sieve_performance_test();
 		bool primality_test_cpu(boost::multiprecision::uint1024_t p);
 		void reset_stats();
+		void math_test();
+
 	private:
 		
 		std::shared_ptr<spdlog::logger> m_logger;

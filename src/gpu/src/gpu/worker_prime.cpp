@@ -31,6 +31,7 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	
 	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
 	PrimeTests prime_test(worker_config_gpu.m_device);
+	prime_test.math_test();
 	prime_test.sieve_performance_test();
 	prime_test.fermat_performance_test();
 	m_segmented_sieve->generate_sieving_primes();

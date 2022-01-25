@@ -6,6 +6,8 @@
 #include "sieve.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include <cmath>
+#include "../cuda_prime/big_int/big_int.hpp"
+#include <random>
 
 
 namespace nexusminer
@@ -274,6 +276,207 @@ namespace gpu
 	{
 		m_fermat_prime_count = 0;
 		m_fermat_test_count = 0;
+	}
+
+	void PrimeTests::math_test()
+	{
+		using namespace boost::multiprecision;
+		using namespace boost::random;
+		const uint64_t batch_size = 100000;
+		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
+		bool cpu_verify = true;
+		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
+		generator1024_type gen1024;
+		gen1024.seed(time(0));
+		
+		mpz_t* a = new mpz_t[batch_size];
+		mpz_t* b = new mpz_t[batch_size];
+		mpz_t* c = new mpz_t[batch_size];
+		mpz_t* results = new mpz_t[batch_size];
+
+		boost::multiprecision::uint1024_t a1, b1;
+
+		for (auto i = 0; i < batch_size; i++)
+		{
+			//generate a few contrived test cases
+			switch (i){
+			case 0:
+				a1.assign("0xe2792767ec01880f6178d32f5aad3a9b4c2316acf5eb694913b86b71f4497078b1dc808296c8b1e0eac87f7a4c104097d42b93000a1bd8c340ea59fcc9f6a402df7a1eeb65b814228df2ffe887935baf0bcbcadf2cd7791fd8766bdc261e27dd8a1f3dafc24fbe5e673b1cb7eb771759c6e0c5605835c27236af25c6e1ba3231");
+				b1.assign("0x46fde95a7bd8da283b895d6bb9a66cfd4e22d7686e6e1863856ff5c29aee6ebcabb073547d7bf");
+				break;
+			case 1:
+				a1 = 1;
+				b1 = -1;
+				break;
+			case 2:
+				a1 = 0;
+				b1 = 1;
+				break;
+			case 3:
+				a1 = 1;
+				b1 = 0;
+				break;
+			case 4:
+				a1 = 0;
+				b1 = -1;
+				break;
+			case 5:
+				a1 = -1;
+				b1 = 0;
+				break;
+			case 6:
+				a1 = 0;
+				b1 = 0;
+				break;
+			case 7:
+				a1 = 1;
+				b1 = 1;
+				break;
+			case 8:
+				a1 = -1;
+				b1 = -1;
+				break;
+			case 9:
+				a1 = 721948327;
+				b1 = 84461;
+				break;
+			case 10:
+				a1 = -1;
+				b1 = 2;
+				break;
+			case 11:
+				a1 = -1;
+				b1 = 1;
+				break;
+			case 12:
+				a1 = -1;
+				b1 = 4;
+				break;
+			case 13:
+				a1 = -1;
+				b1 = 5;
+				break;
+			case 14:
+				a1 = boost::multiprecision::uint1024_t(1) << (31*32);
+				b1 = 1;
+				break;
+			case 15:
+				a1 = -1;
+				b1 = boost::multiprecision::uint1024_t(1) << 32;
+				break;
+			case 16:
+				a1 = boost::multiprecision::uint1024_t(1) << (31*32);
+				b1 = boost::multiprecision::uint1024_t(1) << (30*32);
+				break;
+			case 17:
+				a1 = boost::multiprecision::uint1024_t (-1) >> 37;
+				b1 = boost::multiprecision::uint1024_t (-1) >> 666;
+				break;
+			case 18:
+				a1 = boost::multiprecision::uint1024_t(-1) >> 666;
+				b1 = boost::multiprecision::uint1024_t(-1) >> 37;
+				break;
+			default:
+				//the rest are random numbers
+				a1 = gen1024();
+				b1 = gen1024();
+				//random shift
+				std::random_device dev;
+				std::mt19937 rng(dev());
+				std::uniform_int_distribution<std::mt19937::result_type> dist(0, 1023);
+				int shift = dist(rng);
+				b1 = b1 >> shift;
+			}
+			mpz_init2(a[i],1024);
+			mpz_set(a[i], static_cast<mpz_int>(a1).backend().data());
+			mpz_init2(b[i], 1024);
+			mpz_set(b[i], static_cast<mpz_int>(b1).backend().data());
+			//initialize output containers
+			mpz_init2(c[i], 1024);
+			mpz_init2(results[i], 1024);
+		}
+		
+		m_logger->info("Test data generation complete.");
+		
+		Big_int big_int;
+		big_int.test_init(batch_size, 0);
+		m_logger->info("Loading test vectors to GPU RAM.");
+		big_int.set_input_a(a, batch_size);
+		big_int.set_input_b(b, batch_size);
+		m_logger->info("Running aritmetic/logic operation under test.");
+		auto start = std::chrono::steady_clock::now();
+		big_int.logic_test();
+		//big_int.subtract();
+		auto end = std::chrono::steady_clock::now();
+		auto add_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		m_logger->info("Copying results to CPU RAM.");
+		big_int.get_test_results(results);
+		big_int.test_free();
+		uint64_t passes = batch_size;
+		if (cpu_verify)
+		{
+			m_logger->info("Verifying Results.");
+
+			for (auto i = 0; i < batch_size; i++)
+			{
+				boost::multiprecision::uint1024_t a_1024(static_cast<mpz_int>(a[i]));
+				boost::multiprecision::uint1024_t b_1024(static_cast<mpz_int>(b[i]));
+				boost::multiprecision::uint1024_t c_1024;
+				boost::multiprecision::uint1024_t results_1024(static_cast<mpz_int>(results[i]));
+
+				//this must match the math/logic function under test used in the gpu
+				if (b_1024 != 0)
+				{
+					c_1024 = a_1024 % b_1024;
+					//if (i == 0)
+					//	std::cout << "c[0]:" << c_1024 << std::endl;
+
+					if (c_1024 != results_1024)
+					{
+
+						m_logger->debug("GPU/CPU math test mismatch at offset {}", i);
+						std::stringstream result_ss, a_ss, b_ss, c_ss;
+						result_ss << std::setfill('0') << std::hex << results_1024;
+						c_ss << std::setfill('0') << std::hex << c_1024;
+						a_ss << std::setfill('0') << std::hex << a_1024;
+						b_ss << std::setfill('0') << std::hex << b_1024;
+						m_logger->debug("Input a {}", a_ss.str());
+						m_logger->debug("Input b {}", b_ss.str());
+						m_logger->debug("Got {}", result_ss.str());
+						m_logger->debug("Expected {}", c_ss.str());
+						passes--;
+
+					}
+				}
+				
+			}
+		}
+
+		for (auto i = 0; i < batch_size; i++)
+		{
+			mpz_clear(a[i]);
+			mpz_clear(b[i]);
+			mpz_clear(c[i]);
+			mpz_clear(results[i]);
+		}
+
+		delete[] a;
+		delete[] b;
+		delete[] c;
+		delete[] results;
+
+		std::stringstream ss;
+		if (cpu_verify)
+		{
+			ss << "Test result: " << passes << "/" << batch_size << " results match.";
+			m_logger->info(ss.str());
+		}
+		
+		ss = {};
+		ss << "Run time: " << add_elapsed.count() << " ms. " << std::fixed << std::setprecision(1) << batch_size / (1.0e3 * add_elapsed.count()) << " million 1024 bit operations/second. (" << 1.0e6 * add_elapsed.count() / batch_size << "ns)";
+		m_logger->info(ss.str());
+		
+		
 	}
 
 }
