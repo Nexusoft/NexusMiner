@@ -102,7 +102,7 @@ namespace nexusminer {
             const bool divide_debug = false;  //enable printfs
             if (divisor == 0)
             {
-                //printf("gpu division by zero detected.\n");
+                if (divide_debug) printf("gpu division by zero detected.\n");
                 quotient = 0;
                 remainder = 0;
                 return;
@@ -179,7 +179,7 @@ namespace nexusminer {
             }
 
             //step 3
-            for (auto i = n; i > t /* + 1*/; i--)  //t can be 0.  i is always >= 1;
+            for (auto i = n; i > t; i--)  //t can be 0.  i is >= 1;
             {
                 
                 int j = i - t - 1;  //the index of the current quotient word.  j >= 0;
@@ -246,10 +246,7 @@ namespace nexusminer {
                 int x_index = j + t + 1;
                 uint32_t original_word = x.m_limbs[x_index];
                 uint32_t x_pre_carry = x.m_limbs[x_index] + ~multiplication_carry;
-                //propagate = x_pre_carry == 0xFFFFFFFF;
-                //generate = x_pre_carry < x.m_limbs[x_index];
                 x.m_limbs[x_index] = x_pre_carry + addition_carry;
-                //addition_carry = generate || (propagate && addition_carry) ? 1 : 0;
                 //check for overflow
                 bool overflow = x.m_limbs[x_index] > original_word;
                 if (divide_debug){
