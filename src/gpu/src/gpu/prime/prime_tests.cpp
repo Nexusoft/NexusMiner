@@ -3,6 +3,7 @@
 #include <bitset>
 #include <boost/random.hpp>
 #include <boost/multiprecision/gmp.hpp>
+#include <boost/integer/mod_inverse.hpp>
 #include "sieve.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include <cmath>
@@ -282,7 +283,7 @@ namespace gpu
 	{
 		using namespace boost::multiprecision;
 		using namespace boost::random;
-		const uint64_t batch_size = 100000;
+		const uint64_t batch_size = 10000;
 		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
 		bool cpu_verify = true;
 		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
@@ -301,16 +302,17 @@ namespace gpu
 			//generate a few contrived test cases
 			switch (i){
 			case 0:
-				a1.assign("0xe2792767ec01880f6178d32f5aad3a9b4c2316acf5eb694913b86b71f4497078b1dc808296c8b1e0eac87f7a4c104097d42b93000a1bd8c340ea59fcc9f6a402df7a1eeb65b814228df2ffe887935baf0bcbcadf2cd7791fd8766bdc261e27dd8a1f3dafc24fbe5e673b1cb7eb771759c6e0c5605835c27236af25c6e1ba3231");
-				b1.assign("0x46fde95a7bd8da283b895d6bb9a66cfd4e22d7686e6e1863856ff5c29aee6ebcabb073547d7bf");
+				a1 = 0x15d79a8e0;
+				b1 = 0x1e05d54f9;
 				break;
 			case 1:
-				a1 = 1;
-				b1 = -1;
+				a1.assign("0xeed0ea40daaec1031b6c8172b9c3714846a8784736de503369e58e9c25499cb5a034c76ec59511778affe2150ae1e07623d5418a6c2132303a22fe599add9e12ad6b5434b5fd21a84befce066758dc418832b01fce21d6be1b4519e3f3d5b9bff3effd9ba963847ffb95c8c88ea3b854bfa576e6d63badc99cbc114adb27122");
+				b1.assign("0x31ee14619978e4e6d140a40b7ffdcfa237025e66a76a06cadb095cb32158f43cb81690b5f3ae0691b793815ba4f72ae630ce27c79affc77a1ab29191d967f1a61ff6d1e5cc5580eb81d6a21c56171176cca96b8dd4417984dd85c044a08b1acead675f237e14d175319e8b572d4fee1");
+				b1 -= 2;
 				break;
 			case 2:
-				a1 = 0;
-				b1 = 1;
+				a1.assign("0xe2792767ec01880f6178d32f5aad3a9b4c2316acf5eb694913b86b71f4497078b1dc808296c8b1e0eac87f7a4c104097d42b93000a1bd8c340ea59fcc9f6a402df7a1eeb65b814228df2ffe887935baf0bcbcadf2cd7791fd8766bdc261e27dd8a1f3dafc24fbe5e673b1cb7eb771759c6e0c5605835c27236af25c6e1ba3231");
+				b1.assign("0x46fde95a7bd8da283b895d6bb9a66cfd4e22d7686e6e1863856ff5c29aee6ebcabb073547d7bf");
 				break;
 			case 3:
 				a1 = 1;
@@ -385,8 +387,13 @@ namespace gpu
 				std::mt19937 rng(dev());
 				std::uniform_int_distribution<std::mt19937::result_type> dist(0, 1023);
 				int shift = dist(rng);
-				b1 = b1 >> shift;
+				//b1 = b1 >> shift;
+				//a1 = a1 >> (1023 - 32);
+				//b1 = b1 >> (1023 - 32);
+
 			}
+			//make b1 odd
+			b1 += (b1 % 2 == 0) ? 1 : 0;
 			mpz_init2(a[i],1024);
 			mpz_set(a[i], static_cast<mpz_int>(a1).backend().data());
 			mpz_init2(b[i], 1024);
@@ -421,13 +428,16 @@ namespace gpu
 			{
 				boost::multiprecision::uint1024_t a_1024(static_cast<mpz_int>(a[i]));
 				boost::multiprecision::uint1024_t b_1024(static_cast<mpz_int>(b[i]));
-				boost::multiprecision::uint1024_t c_1024;
+				boost::multiprecision::uint1024_t c_1024 = 0;
 				boost::multiprecision::uint1024_t results_1024(static_cast<mpz_int>(results[i]));
+				
+
 
 				//this must match the math/logic function under test used in the gpu
-				if (b_1024 != 0)
+				if (a_1024 != 0 && b_1024 > 1)
 				{
-					c_1024 = a_1024 % b_1024;
+					mpz_int c = boost::integer::mod_inverse(static_cast<mpz_int>(a[i]), static_cast<mpz_int>(b[i]));
+					c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
 					//if (i == 0)
 					//	std::cout << "c[0]:" << c_1024 << std::endl;
 

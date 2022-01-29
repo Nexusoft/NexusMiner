@@ -256,7 +256,7 @@ namespace nexusminer {
             uint32_t index = block_id * num_threads + thread_index;
             if (index < *test_vector_size)
             {
-                results[index] = a[index] % b[index];
+                results[index] = a[index].modinv(b[index]);
 
             }
 

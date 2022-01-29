@@ -2,7 +2,7 @@
 #define NEXUSMINER_GPU_CU1K_CUH
 
 //1024 bit cuda unsigned int
-//The class stores the 1024 bit unsigned int in 32 x 32-bit unsigned ints
+//The class stores the 1024 bit unsigned int in 32 x 32-bit unsigned ints plus one extra word for used with division normalization
 
 #include <stdint.h>
 #include <gmp.h>
@@ -28,7 +28,8 @@ namespace nexusminer {
 			__device__ void divide(const Cu1k& divisor, Cu1k& quotient, Cu1k& remainder) const;
 			__host__ __device__ Cu1k operator << (int) const;
 			__host__ __device__ Cu1k operator >> (int) const;
-
+			__host__ __device__ Cu1k operator ~ () const;
+			__host__ __device__ Cu1k modinv(const Cu1k&) const;
 
 			__host__ __device__ int compare(const Cu1k&) const;
 
@@ -38,10 +39,7 @@ namespace nexusminer {
 
 			//the least significant word is stored in array element 0
 			uint32_t m_limbs[LIMBS];  
-			//for negative nunmbers sign is -1.  Positive numbers the sign could be 0 or 1. 
-			//int32_t m_sign;
-			//The final carry after an add or subtraction. not valid for all operations. 
-			//uint32_t m_carry;
+			
 		};
 
 		__host__ __device__ Cu1k operator + (const Cu1k& lhs, const Cu1k& rhs);
@@ -54,10 +52,6 @@ namespace nexusminer {
 		__host__ __device__ bool operator >= (const Cu1k& lhs, const Cu1k& rhs);
 		__host__ __device__ bool operator <= (const Cu1k& lhs, const Cu1k& rhs);
 		__host__ __device__ bool operator != (const Cu1k& lhs, const Cu1k& rhs);
-
-
-
-
 
 
 		//for debug

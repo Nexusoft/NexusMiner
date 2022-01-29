@@ -1,7 +1,4 @@
-
 #include "cu1k.cuh"
-
-
 
 namespace nexusminer {
     namespace gpu {
@@ -346,6 +343,138 @@ namespace nexusminer {
             return result;
         }
 
+        __host__ __device__ Cu1k Cu1k::operator~() const
+        {
+            Cu1k result;
+            for (auto i = 0; i < LIMBS; i++)
+            {
+                result.m_limbs[i] = ~m_limbs[i];
+            }
+            return result;
+        }
+
+        //return the modular inverse if it exists using the binary extended gcd algorithm 
+        //Reference HAC chapter 14 algorithm 14.61
+        //The modulus m must be odd
+        __host__ __device__ Cu1k Cu1k::modinv(const Cu1k& m) const
+        {
+            //the modulus m must be odd and greater than 1 and the number to invert must be non zero plus other restrictions
+            if (m.m_limbs[0] % 2 == 0 || m < 1 || *this == 0 )
+                return 0;
+            const bool debug = false;
+            //const Cu1k y = *this;
+            const Cu1k x = m;  //x == m is odd and > 0
+            Cu1k u = m;  //u, x >= 0
+            Cu1k v = *this;  //v, y >= 0
+            //steps 1 and 2 don't happen if m is odd
+            //step 3
+            Cu1k B = 0, D = 1;  //B and D can be negative, we must deal with the signs    
+            int i = 0;
+            if (debug)
+            {
+                char us[400], vs[400], Bs[400], Ds[400];
+                u.to_cstr(us);
+                v.to_cstr(vs);
+                B.to_cstr(Bs);
+                D.to_cstr(Ds);
+                printf("iteration %i\nu=%s\nv=%s\nB=%s\nD=%s\n", i, us, vs, Bs, Ds);
+            }
+            //max iterations is 2 * (2 * 1024 + 2) = 4100
+            while (u != 0 && !u.m_limbs[LIMBS - 1])  //if u goes negative, stop.  something is wrong
+            {
+                //step 4
+                while (!(u.m_limbs[0] & 1))  //while u is even
+                {
+                    u = u >> 1;
+                    if (B.m_limbs[0] & 1)  //if B is odd
+                    {
+                        B = B - x;  //x is always odd so B should be even after this
+                    }
+                    
+                    B = B >> 1;  //divide by 2
+                    //copy the top bit to preserve the sign
+                    B.m_limbs[LIMBS - 1] = B.m_limbs[LIMBS - 1] | ((B.m_limbs[LIMBS - 1] & (1u << 30)) << 1);
+                    if (debug)
+                    {
+                        char us[400], vs[400], Bs[400], Ds[400];
+                        u.to_cstr(us);
+                        v.to_cstr(vs);
+                        B.to_cstr(Bs);
+                        D.to_cstr(Ds);
+                        printf("4. u was even.  iteration %i\nu=%s\nv=%s\nB=%s\nD=%s\n", i, us, vs, Bs, Ds);
+                    }
+                    ++i;
+                }
+                //step 5
+                while (!(v.m_limbs[0] & 1))  //while v is even
+                {
+                    v = v >> 1;
+                    if (D.m_limbs[0] & 1)
+                    {
+                        D = D - x;  //x is always odd.  D should be even after this.
+                    }
+                    D = D >> 1;  //divide by 2
+                    //copy the top bit to preserve the sign
+                    D.m_limbs[LIMBS - 1] = D.m_limbs[LIMBS - 1] | ((D.m_limbs[LIMBS - 1] & (1u << 30)) << 1);
+                    if (debug)
+                    {
+                        char us[400], vs[400], Bs[400], Ds[400];
+                        u.to_cstr(us);
+                        v.to_cstr(vs);
+                        B.to_cstr(Bs);
+                        D.to_cstr(Ds);
+                        printf("5. v was even.  iteration %i\nu=%s\nv=%s\nB=%s\nD=%s\n", i, us, vs, Bs, Ds);
+                    }
+                    ++i;
+                }
+                //step 6
+                if (u >= v)
+                {
+                    u -= v;
+                    B -= D;
+                }
+                else
+                {
+                    v -= u;
+                    D -= B;
+                }
+                if (debug)
+                {
+                    
+                    char us[400], vs[400], Bs[400], Ds[400];
+                    u.to_cstr(us);
+                    v.to_cstr(vs);
+                    B.to_cstr(Bs);
+                    D.to_cstr(Ds);
+                    printf("6. u=%s\nv=%s\nB=%s\nD=%s\n", us, vs, Bs, Ds);
+                }
+                
+            }
+            //if the result is negative, add moduli
+            while (D.m_limbs[LIMBS - 1] & (1u << 31))
+                D += m;
+
+            //if the result is larger than the modulus, subtract moduli
+            while (D > m)
+                D -= m;
+
+            if (debug)
+            {
+                char Ds[400];
+                char vs[400];
+                D.to_cstr(Ds);
+                v.to_cstr(vs);
+                printf("result=%s\nv=%s\n", Ds, vs);
+            }
+
+            //the inverse modulus does not exist
+            if (v != 1)
+                return 0;
+
+            return D;
+
+        }
+
         //returns 1 if the integer is greater than the value to compare, 0 if equal, -1 if less than
         __host__ __device__ int Cu1k::compare(const Cu1k& b) const
         {
@@ -443,17 +572,13 @@ namespace nexusminer {
             return lhs.compare(rhs) != 0;
         }
 
+        //convert the cuda 1024 bit unsigned int to a gmp multiprecision integer
         __host__ void Cu1k::to_mpz(mpz_t r)
         {
-
             mpz_import(r, LIMBS, -1, sizeof(uint32_t), 0, 0, m_limbs);
-            /*if (m_sign < 0)
-            {
-                mpz_neg(r, r);
-            }*/
-          
         }
 
+        //convert a gmp multiprecision integer to a cuda 1024 bit unsigned int 
         __host__ void Cu1k::from_mpz(mpz_t s) {
             size_t words = 0;
 
@@ -468,8 +593,6 @@ namespace nexusminer {
             while (words < LIMBS)
                 m_limbs[words++] = 0;
 
-            //m_sign = mpz_sgn(s);
-            //m_carry = 0;
         }
 
 
