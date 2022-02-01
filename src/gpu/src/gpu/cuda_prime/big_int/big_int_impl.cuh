@@ -2,7 +2,7 @@
 #define NEXUSMINER_GPU_CUDA_BIG_INT_IMPL_CUH
 
 #include "big_int.hpp"
-#include "cu1k.cuh"
+#include "cump.cuh"
 #include "../cuda_chain.cuh"
 #include <stdint.h>
 #include <gmp.h>
@@ -43,15 +43,15 @@ namespace nexusminer {
             //intputs to the fermat test
             uint64_t* d_offsets;  //64 bit offsets from the 1024 bit base integer
             uint64_t* d_offset_count;  //pointer to array of offsets
-            Cu1k* d_base_int; //the 1024 bit base integer
+            Cump<1024>* d_base_int; //the 1024 bit base integer
 
             //results of the fermat test
             uint8_t* d_results;
             
             //test vectors
-            Cu1k* d_test_a;
-            Cu1k* d_test_b;
-            Cu1k* d_test_results;
+            Cump<1024>* d_test_a;
+            Cump<1024>* d_test_b;
+            Cump<1024>* d_test_results;
             uint64_t* d_test_vector_size;
 
             unsigned long long* d_fermat_test_count;

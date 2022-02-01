@@ -283,7 +283,7 @@ namespace gpu
 	{
 		using namespace boost::multiprecision;
 		using namespace boost::random;
-		const uint64_t batch_size = 10000;
+		const uint64_t batch_size = 100000;
 		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
 		bool cpu_verify = true;
 		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
@@ -392,6 +392,7 @@ namespace gpu
 				//b1 = b1 >> (1023 - 32);
 
 			}
+			
 			//make b1 odd
 			b1 += (b1 % 2 == 0) ? 1 : 0;
 			mpz_init2(a[i],1024);
@@ -428,16 +429,28 @@ namespace gpu
 			{
 				boost::multiprecision::uint1024_t a_1024(static_cast<mpz_int>(a[i]));
 				boost::multiprecision::uint1024_t b_1024(static_cast<mpz_int>(b[i]));
-				boost::multiprecision::uint1024_t c_1024 = 0;
+				boost::multiprecision::uint1024_t c_1024 = 0, d_1024 = 0;
 				boost::multiprecision::uint1024_t results_1024(static_cast<mpz_int>(results[i]));
 				
-
 
 				//this must match the math/logic function under test used in the gpu
 				if (a_1024 != 0 && b_1024 > 1)
 				{
-					mpz_int c = boost::integer::mod_inverse(static_cast<mpz_int>(a[i]), static_cast<mpz_int>(b[i]));
+
+					//c_1024 = a_1024 % b_1024;
+					mpz_int c = 1;
+					c = c << (2*1024);
+					c = c % static_cast<mpz_int>(b[i]);
 					c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
+
+					/*
+					mpz_int d = 1;
+					d = d << 1024;
+					d = d % static_cast<mpz_int>(b[i]);
+					d = d << 1024;
+					d = d % static_cast<mpz_int>(b[i]);
+					d_1024 = static_cast<boost::multiprecision::uint1024_t>(d);*/
+					//results_1024 = d_1024;
 					//if (i == 0)
 					//	std::cout << "c[0]:" << c_1024 << std::endl;
 

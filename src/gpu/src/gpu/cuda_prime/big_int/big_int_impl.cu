@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <inttypes.h>
+#include "../big_int/fermat_utils.cuh"
 
 
 #ifndef checkCudaErrors
@@ -87,7 +88,7 @@ namespace nexusminer {
         void Big_int_impl::set_base_int(mpz_t base_big_int)
         {
             checkCudaErrors(cudaSetDevice(m_device));
-            Cu1k cuda_base_big_int;
+            Cump<1024> cuda_base_big_int;
             cuda_base_big_int.from_mpz(base_big_int);
             checkCudaErrors(cudaMemcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), cudaMemcpyHostToDevice));
             mpz_set(m_base_int, base_big_int);
@@ -154,7 +155,7 @@ namespace nexusminer {
         void Big_int_impl::set_input_a(mpz_t* a, uint64_t count)
         {
             m_test_vector_a_size = count;
-            Cu1k* vector_a = new Cu1k[count];
+            Cump<1024>* vector_a = new Cump<1024>[count];
             for (auto i = 0; i < count; i++)
             {
                 vector_a[i].from_mpz(a[i]);
@@ -167,7 +168,7 @@ namespace nexusminer {
         void Big_int_impl::set_input_b(mpz_t* b, uint64_t count)
         {
             m_test_vector_b_size = count;
-            Cu1k* vector_b = new Cu1k[count];
+            Cump<1024>* vector_b = new Cump<1024>[count];
             for (auto i = 0; i < count; i++)
             {
                 vector_b[i].from_mpz(b[i]);
@@ -180,7 +181,7 @@ namespace nexusminer {
 
         void Big_int_impl::get_test_results(mpz_t* test_results)
         {
-            Cu1k* results = new Cu1k[m_test_vector_a_size];
+            Cump<1024>* results = new Cump<1024>[m_test_vector_a_size];
             checkCudaErrors(cudaMemcpy(results, d_test_results, sizeof(*d_test_results) * m_test_vector_a_size, cudaMemcpyDeviceToHost));
             for (auto i = 0; i < m_test_vector_a_size; i++)
             {
@@ -190,23 +191,23 @@ namespace nexusminer {
             delete[] results;
         }
 
-        __global__ void add_kernel(Cu1k* a, Cu1k* b, Cu1k* results, uint64_t* test_vector_size)
-        {
-            unsigned int num_threads = blockDim.x;
-            unsigned int block_id = blockIdx.x;
-            unsigned int thread_index = threadIdx.x;
-            
-            uint32_t index = block_id * num_threads + thread_index;
-            //printf("index: %u\n", index);
-            if (index < *test_vector_size)
-            {
-                results[index] = a[index] + b[index];
-                //char s[400];
-                //results[index].to_cstr(s);
-                //printf("%s\n", s);
-            }
-            
-        }
+        //__global__ void add_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
+        //{
+        //    unsigned int num_threads = blockDim.x;
+        //    unsigned int block_id = blockIdx.x;
+        //    unsigned int thread_index = threadIdx.x;
+        //    
+        //    uint32_t index = block_id * num_threads + thread_index;
+        //    //printf("index: %u\n", index);
+        //    if (index < *test_vector_size)
+        //    {
+        //        results[index] = a[index] + b[index];
+        //        //char s[400];
+        //        //results[index].to_cstr(s);
+        //        //printf("%s\n", s);
+        //    }
+        //    
+        //}
 
         void Big_int_impl::add()
         {
@@ -216,12 +217,12 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            add_kernel <<<blocks, threads_per_block >>> (d_test_a, d_test_b, d_test_results, d_test_vector_size);
+            //add_kernel <<<blocks, threads_per_block >>> (d_test_a, d_test_b, d_test_results, d_test_vector_size);
             checkCudaErrors(cudaPeekAtLastError());
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
-        __global__ void subtract_kernel(Cu1k* a, Cu1k* b, Cu1k* results, uint64_t* test_vector_size)
+        /*__global__ void subtract_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
         {
             unsigned int num_threads = blockDim.x;
             unsigned int block_id = blockIdx.x;
@@ -233,7 +234,7 @@ namespace nexusminer {
                 results[index] = a[index] - b[index];
             }
 
-        }
+        }*/
 
         void Big_int_impl::subtract()
         {
@@ -242,21 +243,65 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            subtract_kernel << <blocks, threads_per_block >> > (d_test_a, d_test_b, d_test_results, d_test_vector_size);
+            //subtract_kernel << <blocks, threads_per_block >> > (d_test_a, d_test_b, d_test_results, d_test_vector_size);
             checkCudaErrors(cudaPeekAtLastError());
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
-        __global__ void logic_test_kernel(Cu1k* a, Cu1k* b, Cu1k* results, uint64_t* test_vector_size)
+        __global__ void logic_test_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
         {
             unsigned int num_threads = blockDim.x;
             unsigned int block_id = blockIdx.x;
             unsigned int thread_index = threadIdx.x;
 
             uint32_t index = block_id * num_threads + thread_index;
+            
             if (index < *test_vector_size)
             {
-                results[index] = a[index].modinv(b[index]);
+                /*Cump<1024>* d = new Cump<1024>;
+                Cump<1024>* Q = new Cump<1024>; 
+                Cump<1024>* rem = new Cump<1024>;
+                d->m_limbs[0] = 1;
+                *d = *d << 128;*/
+                
+                //bb.m_limbs[0] = b[index].m_limbs[0];
+                //d->divide(b[index], *Q, *rem);
+                //Cump<2048> d2, divisor2, Q2, rem2;
+                //d2 = rem << 1024
+                /*for (auto i = 0; i < d.LIMBS; i++)
+                {
+                    divisor2.m_limbs[0] = b[index].m_limbs[0];
+                    d2.m_limbs[i+ rem.LIMBS-1] = rem.m_limbs[i];
+                }
+
+                d2.divide(divisor2, Q2, rem2);
+                for (auto i = 0; i < results[index].LIMBS; i++)
+                {
+                    results[index].m_limbs[i] = rem2.m_limbs[i];
+                }*/
+
+                //Cump<1024> R = 1;
+                
+                //R <<= 1024;
+                //R.remainder(b[index], results[index]);
+
+                Cump<2048> dividend, divisor, result_2048;
+                //dividend = rem << 1024
+                dividend.m_limbs[dividend.LIMBS - 1] = 1;
+                for (auto i = 0; i < b[index].LIMBS; i++)
+                {
+                    divisor.m_limbs[i] = b[index].m_limbs[i];
+                    //dividend.m_limbs[i+ R.LIMBS-1] = results[index].m_limbs[i];
+                }
+
+                dividend.remainder(divisor, result_2048);
+                for (auto i = 0; i < results[index].LIMBS; i++)
+                {
+                    results[index].m_limbs[i] = result_2048.m_limbs[i];
+                }
+
+                
+               /* delete d, Q, rem;*/
 
             }
 

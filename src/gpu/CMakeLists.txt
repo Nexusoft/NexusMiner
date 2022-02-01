@@ -8,7 +8,9 @@ if(WITH_PRIME)
         src/gpu/cuda_prime/cuda_chain.cu src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/sieve.cu
         src/gpu/cuda_prime/sieve_impl.cu src/gpu/cuda_prime/fermat_test_impl.cu src/gpu/cuda_prime/find_chain.cu
         src/gpu/prime/small_sieve_tools.cpp
-        src/gpu/cuda_prime/big_int/cu1k.cu src/gpu/cuda_prime/big_int/big_int.cu src/gpu/cuda_prime/big_int/big_int_impl.cu)
+        src/gpu/cuda_prime/big_int/big_int.cu src/gpu/cuda_prime/big_int/big_int_impl.cu
+        src/gpu/cuda_prime/big_int/fermat_utils.cu
+    )
 endif()
 
 set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
