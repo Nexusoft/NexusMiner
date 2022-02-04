@@ -20,7 +20,10 @@ namespace nexusminer {
 			static const int BITS_PER_WORD = 32;
 			//LIMBS is the number of machine words used to store the big int
 			//we allocate one extra word to handle overflow and normalization in division algorithm
-			static const int LIMBS = 1 + (BITS + BITS_PER_WORD - 1)/BITS_PER_WORD; //round up and add 1
+			static const int EXTRA_WORDS = 2;
+			static const int HIGH_WORD = (BITS + BITS_PER_WORD - 1) / BITS_PER_WORD - 1; //round up 
+			static const int LIMBS = HIGH_WORD + 1 + EXTRA_WORDS;  //extra word(s) for overflow
+			
 			
 			__host__ __device__ Cump(uint32_t);
 			__host__ __device__ Cump(int);
@@ -31,21 +34,27 @@ namespace nexusminer {
 			__host__ __device__ void operator += (const Cump&);
 			__host__ __device__ void decrement(const Cump&);
 			__host__ __device__ void operator -= (const Cump&);
-			__device__ void divide(const Cump& divisor, Cump& quotient, Cump& remainder) const;
 			__host__ __device__ Cump operator << (int) const;
 			__host__ __device__ void operator <<= (int);
 			__host__ __device__ Cump operator >> (int) const;
 			__host__ __device__ void operator >>= (int);
 			__host__ __device__ Cump operator ~ () const;
+			__host__ __device__ Cump multiply(uint32_t) const;
+			__host__ __device__ Cump multiply(const Cump&) const;
+
+			__host__ __device__ void operator *= (uint32_t);
+			__host__ __device__ void operator *= (const Cump&);
+
+
+
 			__host__ __device__ Cump modinv(const Cump&) const;
-			__device__ void R_mod_m(Cump& R) const;
+			__device__ void divide(const Cump& divisor, Cump& quotient, Cump& remainder) const;
+			__device__ Cump R_mod_m() const;
 			__device__ void remainder(const Cump& divisor, Cump& remainder) const;
-
-
 
 			__host__ __device__ int compare(const Cump&) const;
 
-			__host__ __device__ void to_cstr(char* s);
+			__host__ __device__ void to_cstr(char* s) const;
 			__host__ void to_mpz(mpz_t r);
 			__host__ void from_mpz(mpz_t s);
 
@@ -57,6 +66,8 @@ namespace nexusminer {
 		
 		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
+		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, uint32_t);
+		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __device__ Cump<BITS> operator / (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __device__ Cump<BITS> operator % (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ bool operator > (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
@@ -71,6 +82,11 @@ namespace nexusminer {
 		template<int BITS> __host__ __device__ bool operator <= (const Cump<BITS>& lhs, int rhs);
 		template<int BITS> __host__ __device__ bool operator != (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ bool operator != (const Cump<BITS>& lhs, int rhs);
+
+		template<int BITS> __device__ Cump<BITS> montgomery_multiply(const Cump<BITS>& x, const Cump<BITS>& y, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& m, const Cump<BITS>& rmodm, uint32_t m_primed);
+		template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m);
 
 
 

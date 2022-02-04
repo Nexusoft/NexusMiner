@@ -258,50 +258,35 @@ namespace nexusminer {
             
             if (index < *test_vector_size)
             {
-                /*Cump<1024>* d = new Cump<1024>;
-                Cump<1024>* Q = new Cump<1024>; 
-                Cump<1024>* rem = new Cump<1024>;
-                d->m_limbs[0] = 1;
-                *d = *d << 128;*/
-                
-                //bb.m_limbs[0] = b[index].m_limbs[0];
-                //d->divide(b[index], *Q, *rem);
-                //Cump<2048> d2, divisor2, Q2, rem2;
-                //d2 = rem << 1024
-                /*for (auto i = 0; i < d.LIMBS; i++)
-                {
-                    divisor2.m_limbs[0] = b[index].m_limbs[0];
-                    d2.m_limbs[i+ rem.LIMBS-1] = rem.m_limbs[i];
-                }
+                uint32_t m_primed = -mod_inverse_32(b[index].m_limbs[0]);
+                Cump<1024> Rmodm = b[index].R_mod_m();
+                //results[index] = montgomery_multiply(Rmodm, Rmodm, b[index], m_primed);
+                results[index] = powm_2(b[index], Rmodm, m_primed);
 
-                d2.divide(divisor2, Q2, rem2);
-                for (auto i = 0; i < results[index].LIMBS; i++)
-                {
-                    results[index].m_limbs[i] = rem2.m_limbs[i];
-                }*/
+                //results[index] = results[index] - Rmodm;
+                //results[index] += 1;
 
                 //Cump<1024> R = 1;
                 
                 //R <<= 1024;
                 //R.remainder(b[index], results[index]);
 
-                Cump<2048> dividend, divisor, result_2048;
-                //dividend = rem << 1024
-                dividend.m_limbs[dividend.LIMBS - 1] = 1;
-                for (auto i = 0; i < b[index].LIMBS; i++)
-                {
-                    divisor.m_limbs[i] = b[index].m_limbs[i];
-                    //dividend.m_limbs[i+ R.LIMBS-1] = results[index].m_limbs[i];
-                }
+                //Cump<2048> dividend, divisor, result_2048;
+                ////dividend = rem << 1024
+                //dividend.m_limbs[dividend.LIMBS - 1] = 1;
+                //for (auto i = 0; i < b[index].LIMBS; i++)
+                //{
+                //    divisor.m_limbs[i] = b[index].m_limbs[i];
+                //    //dividend.m_limbs[i+ R.LIMBS-1] = results[index].m_limbs[i];
+                //}
 
-                dividend.remainder(divisor, result_2048);
-                for (auto i = 0; i < results[index].LIMBS; i++)
-                {
-                    results[index].m_limbs[i] = result_2048.m_limbs[i];
-                }
+                //dividend.remainder(divisor, result_2048);
+                //for (auto i = 0; i < results[index].LIMBS; i++)
+                //{
+                //    results[index].m_limbs[i] = result_2048.m_limbs[i];
+                //}
 
                 
-               /* delete d, Q, rem;*/
 
             }
 

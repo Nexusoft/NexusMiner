@@ -283,7 +283,7 @@ namespace gpu
 	{
 		using namespace boost::multiprecision;
 		using namespace boost::random;
-		const uint64_t batch_size = 100000;
+		const uint64_t batch_size = 1000;
 		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
 		bool cpu_verify = true;
 		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
@@ -301,14 +301,13 @@ namespace gpu
 		{
 			//generate a few contrived test cases
 			switch (i){
-			case 0:
+			case 1:
 				a1 = 0x15d79a8e0;
 				b1 = 0x1e05d54f9;
 				break;
-			case 1:
+			case 0:
 				a1.assign("0xeed0ea40daaec1031b6c8172b9c3714846a8784736de503369e58e9c25499cb5a034c76ec59511778affe2150ae1e07623d5418a6c2132303a22fe599add9e12ad6b5434b5fd21a84befce066758dc418832b01fce21d6be1b4519e3f3d5b9bff3effd9ba963847ffb95c8c88ea3b854bfa576e6d63badc99cbc114adb27122");
-				b1.assign("0x31ee14619978e4e6d140a40b7ffdcfa237025e66a76a06cadb095cb32158f43cb81690b5f3ae0691b793815ba4f72ae630ce27c79affc77a1ab29191d967f1a61ff6d1e5cc5580eb81d6a21c56171176cca96b8dd4417984dd85c044a08b1acead675f237e14d175319e8b572d4fee1");
-				b1 -= 2;
+				b1.assign("0xfe0584cba13b76ba4d468a779f158f2f6d2a4ba21e19383cff0ab2918db49f4a52ac1550fcdc3a600efedf7c47883a8f61425118dc7679b50291fafe0115315406c855e074ed3c78bbaf1d3ad74ea046a682900a01e10b810b795381c0c971222d88b8b27ad13de26129110c97be2aaf5807a90c7151ee383c01808f94faf5df");
 				break;
 			case 2:
 				a1.assign("0xe2792767ec01880f6178d32f5aad3a9b4c2316acf5eb694913b86b71f4497078b1dc808296c8b1e0eac87f7a4c104097d42b93000a1bd8c340ea59fcc9f6a402df7a1eeb65b814228df2ffe887935baf0bcbcadf2cd7791fd8766bdc261e27dd8a1f3dafc24fbe5e673b1cb7eb771759c6e0c5605835c27236af25c6e1ba3231");
@@ -385,9 +384,9 @@ namespace gpu
 				//random shift
 				std::random_device dev;
 				std::mt19937 rng(dev());
-				std::uniform_int_distribution<std::mt19937::result_type> dist(0, 1023);
+				std::uniform_int_distribution<std::mt19937::result_type> dist(0, 15);
 				int shift = dist(rng);
-				//b1 = b1 >> shift;
+				b1 = b1 >> shift;
 				//a1 = a1 >> (1023 - 32);
 				//b1 = b1 >> (1023 - 32);
 
@@ -420,7 +419,8 @@ namespace gpu
 		m_logger->info("Copying results to CPU RAM.");
 		big_int.get_test_results(results);
 		big_int.test_free();
-		uint64_t passes = batch_size;
+		uint64_t passes = 0;
+		uint64_t attempts = 0;
 		if (cpu_verify)
 		{
 			m_logger->info("Verifying Results.");
@@ -434,22 +434,46 @@ namespace gpu
 				
 
 				//this must match the math/logic function under test used in the gpu
-				if (a_1024 != 0 && b_1024 > 1)
+				if (boost::multiprecision::msb(b_1024) >= 992)
 				{
 
-					//c_1024 = a_1024 % b_1024;
-					mpz_int c = 1;
-					c = c << (2*1024);
-					c = c % static_cast<mpz_int>(b[i]);
+					//c_1024 = a_1024 * b_1024;
+					mpz_int bm = static_cast<mpz_int>(b[i]);
+					mpz_int two = 2;
+					mpz_int c = boost::multiprecision::powm(two,bm - 1, bm);
+					//c = c << (2*1024);
+					//c = c % static_cast<mpz_int>(b[i]);
 					c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
 
-					/*
-					mpz_int d = 1;
-					d = d << 1024;
-					d = d % static_cast<mpz_int>(b[i]);
-					d = d << 1024;
-					d = d % static_cast<mpz_int>(b[i]);
-					d_1024 = static_cast<boost::multiprecision::uint1024_t>(d);*/
+					
+					//mpz_int d = 1;
+					//d = d << 1024;
+					//mpz_int m = static_cast<mpz_int>(b[i]);
+					//int leading_zeros = 1023 - boost::multiprecision::msb(m);
+					//mpz_int m_primed = m << leading_zeros;
+					//mpz_int r = d; 
+					//int counta = 0, countb = 0;
+					//while (r > m)
+					//{
+					//	counta++;
+					//	//std::cout << "outer" << std::endl;
+					//	//std::cout << "r " << std::setfill('0') << std::hex << r << std::endl;
+					//	//std::cout << "m " << std::setfill('0') << std::hex << m << std::endl;
+					//	//std::cout << "m_primed " << std::setfill('0') << std::hex << m_primed << std::endl;
+					//	while (r > m_primed)
+					//	{
+					//		r -= m_primed;
+					//		//std::cout << "inner" << std::endl;
+					//		//std::cout << "r " << std::setfill('0') << std::hex << r << std::endl;
+					//		//std::cout << "m " << std::setfill('0') << std::hex << m << std::endl;
+					//		//std::cout << "m_primed " << std::setfill('0') << std::hex << m_primed << std::endl;
+					//		countb++;
+					//	}
+					//	leading_zeros = boost::multiprecision::msb(m_primed) - boost::multiprecision::msb(r);
+					//	m_primed = m_primed >> 1;// std::max(leading_zeros, 1);
+					//}
+					//std::cout << "a " << counta << " b " << countb << std::endl;
+					//d_1024 = static_cast<boost::multiprecision::uint1024_t>(r);
 					//results_1024 = d_1024;
 					//if (i == 0)
 					//	std::cout << "c[0]:" << c_1024 << std::endl;
@@ -467,9 +491,14 @@ namespace gpu
 						m_logger->debug("Input b {}", b_ss.str());
 						m_logger->debug("Got {}", result_ss.str());
 						m_logger->debug("Expected {}", c_ss.str());
-						passes--;
+						
 
 					}
+					else
+					{
+						passes++;
+					}
+					attempts++;
 				}
 				
 			}
@@ -491,12 +520,16 @@ namespace gpu
 		std::stringstream ss;
 		if (cpu_verify)
 		{
-			ss << "Test result: " << passes << "/" << batch_size << " results match.";
+			ss << "Test result: " << passes << "/" << attempts << " results match.";
 			m_logger->info(ss.str());
+		}
+		else
+		{
+			attempts = batch_size;
 		}
 		
 		ss = {};
-		ss << "Run time: " << add_elapsed.count() << " ms. " << std::fixed << std::setprecision(1) << batch_size / (1.0e3 * add_elapsed.count()) << " million 1024 bit operations/second. (" << 1.0e6 * add_elapsed.count() / batch_size << "ns)";
+		ss << "Run time: " << add_elapsed.count() << " ms. " << std::fixed << std::setprecision(1) << attempts / (add_elapsed.count()) << " thousand operations/second. (" << (attempts > 0 ? 1.0e3 * add_elapsed.count() / attempts : -999) << "us)";
 		m_logger->info(ss.str());
 		
 		

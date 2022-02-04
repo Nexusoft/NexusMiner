@@ -3,7 +3,7 @@ namespace nexusminer {
     namespace gpu {
 
         //find the modular mutiplicative inverse of d mod 2^32
-        //uses newtown's method.  See Hackers' Delight 10-16
+        //using newtown's method.  See Hackers' Delight 10-16
         //d must be odd
         __host__ __device__ uint32_t mod_inverse_32(uint32_t d)
         {

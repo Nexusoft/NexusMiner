@@ -1,5 +1,8 @@
-#include "cump.cuh"
+//this file is included in cump.cuh
+#include "cump_multiplication.cu"
 #include "cump_division.cu"
+#include "cump_montgomery.cu"
+
 
 namespace nexusminer {
     namespace gpu {
@@ -387,14 +390,9 @@ namespace nexusminer {
         //the caller must allocate memory for the string prior to calling - use 384 bytes.   
         //use for debugging device code
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::to_cstr(char* s)
+        __host__ __device__ void Cump<BITS>::to_cstr(char* s) const
         {
             int string_index = 0;
-            /*if (m_sign < 0)
-            {
-                s[0] = '-';
-                string_index = 1;
-            }*/
             
             for (auto i = LIMBS - 1; i >= 0; i--)
             {
@@ -506,6 +504,8 @@ namespace nexusminer {
         {
             return lhs.compare(rhs) != 0;
         }
+
+        
 
         //convert the cuda big unsigned int to a gmp multiprecision integer
         template<int BITS>
