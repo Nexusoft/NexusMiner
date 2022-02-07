@@ -33,17 +33,18 @@ namespace nexusminer {
         //returns xxR^-1
         template<int BITS> __device__ Cump<BITS> montgomery_square(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
-            Cump<BITS> A, u;
+            Cump<BITS> A;
+            
             //unroll the first iteration to save a few operations
-            u.m_limbs[0] = x.m_limbs[0] * x.m_limbs[0] * m_primed;
-            A = x * x.m_limbs[0] + m * u.m_limbs[0];
+            uint32_t u = x.m_limbs[0] * x.m_limbs[0] * m_primed;
+            A = x * x.m_limbs[0] + m * u;
             A >>= 32;
             for (auto i = 1; i <= A.HIGH_WORD; i++)
             {
-                u.m_limbs[i] = (A.m_limbs[0] + x.m_limbs[i] * x.m_limbs[0]) * m_primed;
+                u = (A.m_limbs[0] + x.m_limbs[i] * x.m_limbs[0]) * m_primed;
                 //this step requires two extra words to handle "double" overflow that can happen when the top bit of m is set
                 A += x * x.m_limbs[i];
-                A += m * u.m_limbs[i];
+                A += m * u;
                 //divide by 32 (right shift one whole word)
                 //A >>= 32;
                 for (int j = 0; j < A.LIMBS - 1; j++)
@@ -53,6 +54,7 @@ namespace nexusminer {
                 A.m_limbs[A.LIMBS - 1] = 0;
                 
             }
+
             if (A >= m)
             {
                 A -= m;
