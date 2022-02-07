@@ -283,9 +283,9 @@ namespace gpu
 	{
 		using namespace boost::multiprecision;
 		using namespace boost::random;
-		const uint64_t batch_size = 1000;
+		const uint64_t batch_size = 100000;
 		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
-		bool cpu_verify = true;
+		bool cpu_verify = false;
 		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
 		generator1024_type gen1024;
 		gen1024.seed(time(0));

@@ -29,11 +29,23 @@ namespace nexusminer {
 			__host__ __device__ Cump(int);
 			__host__ __device__ Cump();
 			__host__ __device__ Cump add(const Cump&) const;
+			__host__ __device__ Cump add(int) const;
+			__host__ __device__ Cump add(uint32_t) const;
 			__host__ __device__ Cump sub(const Cump&) const;
+			__host__ __device__ Cump sub(int) const;
+			__host__ __device__ Cump sub(uint32_t) const;
 			__host__ __device__ void increment(const Cump&);
+			__host__ __device__ void increment(int);
+			__host__ __device__ void increment(uint32_t);
 			__host__ __device__ void operator += (const Cump&);
+			__host__ __device__ void operator += (int);
+			__host__ __device__ void operator += (uint32_t);
 			__host__ __device__ void decrement(const Cump&);
+			__host__ __device__ void decrement(int);
+			__host__ __device__ void decrement(uint32_t);
 			__host__ __device__ void operator -= (const Cump&);
+			__host__ __device__ void operator -= (int);
+			__host__ __device__ void operator -= (uint32_t);
 			__host__ __device__ Cump operator << (int) const;
 			__host__ __device__ void operator <<= (int);
 			__host__ __device__ Cump operator >> (int) const;
@@ -65,7 +77,9 @@ namespace nexusminer {
 
 		
 		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
+		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
+		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, int rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, uint32_t);
 		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __device__ Cump<BITS> operator / (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
@@ -84,6 +98,7 @@ namespace nexusminer {
 		template<int BITS> __host__ __device__ bool operator != (const Cump<BITS>& lhs, int rhs);
 
 		template<int BITS> __device__ Cump<BITS> montgomery_multiply(const Cump<BITS>& x, const Cump<BITS>& y, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ Cump<BITS> montgomery_square(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& m, const Cump<BITS>& rmodm, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m);

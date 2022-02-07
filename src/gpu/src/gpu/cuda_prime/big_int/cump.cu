@@ -51,6 +51,31 @@ namespace nexusminer {
         }
 
         template<int BITS>
+        __host__ __device__ Cump<BITS> Cump<BITS>::add(int b) const
+        {
+            if (b < 0)
+            {
+                return sub(static_cast<uint32_t>(-b));
+            }
+            return add(static_cast<uint32_t>(b));
+           
+        }
+
+        template<int BITS>
+        __host__ __device__ Cump<BITS> Cump<BITS>::add(uint32_t b) const
+        {
+            Cump result;
+            result.m_limbs[0] = m_limbs[0] + b;
+            uint32_t carry = result.m_limbs[0] < m_limbs[0] ? 1 : 0;
+            for (int i = 1; i < LIMBS; i++)
+            {
+                result.m_limbs[i] = m_limbs[i] + carry;
+                carry = result.m_limbs[i] < m_limbs[i] ? 1 : 0;
+            }
+            return result;
+        }
+
+        template<int BITS>
         __host__ __device__ Cump<BITS> Cump<BITS>::sub(const Cump<BITS>& b) const
         {
             //subtraction as 2s complement addition.  for some reason this uses more registers than addition.
@@ -66,6 +91,30 @@ namespace nexusminer {
                 propagate = x == 0xFFFFFFFF;
                 generate = x < m_limbs[i];
                 carry = generate || (propagate && carry) ? 1 : 0;
+            }
+            return result;
+        }
+
+        template<int BITS>
+        __host__ __device__ Cump<BITS> Cump<BITS>::sub(int b) const
+        {
+            if (b < 0)
+            {
+                return add(static_cast<uint32_t>(-b));
+            }
+            return sub(static_cast<uint32_t>(b));
+        }
+
+        template<int BITS>
+        __host__ __device__ Cump<BITS> Cump<BITS>::sub(uint32_t b) const
+        {
+            Cump result;
+            result.m_limbs[0] = m_limbs[0] - b;
+            uint32_t carry = result.m_limbs[0] > m_limbs[0] ? 1 : 0;
+            for (int i = 1; i < LIMBS; i++)
+            {
+                result.m_limbs[i] = m_limbs[i] - carry;
+                carry = result.m_limbs[i] > m_limbs[i] ? 1 : 0;
             }
             return result;
         }
@@ -89,7 +138,43 @@ namespace nexusminer {
         }
 
         template<int BITS>
+        __host__ __device__ void Cump<BITS>::increment(int b)
+        {
+            if (b < 0)
+                decrement(static_cast<uint32_t>(-b));
+            else
+                increment(static_cast<uint32_t>(b));
+
+        }
+
+        template<int BITS>
+        __host__ __device__ void Cump<BITS>::increment(uint32_t b)
+        {
+            uint32_t temp = m_limbs[0];
+            m_limbs[0] += b;
+            uint32_t carry = m_limbs[0] < temp ? 1 : 0;
+            for (int i = 1; i < LIMBS; i++)
+            {
+                temp = m_limbs[i];
+                m_limbs[i] += carry;
+                carry = m_limbs[i] < temp ? 1 : 0;
+            }
+        }
+
+        template<int BITS>
         __host__ __device__ void Cump<BITS>::operator+=(const Cump<BITS>& b)
+        {
+            increment(b);
+        }
+
+        template<int BITS>
+        __host__ __device__ void Cump<BITS>::operator+=(int b)
+        {
+            increment(b);
+        }
+
+        template<int BITS>
+        __host__ __device__ void Cump<BITS>::operator+=(uint32_t b)
         {
             increment(b);
         }
@@ -113,12 +198,45 @@ namespace nexusminer {
         }
 
         template<int BITS>
+        __host__ __device__ void Cump<BITS>::decrement(int b)
+        {
+            if (b < 0)
+                increment(static_cast<uint32_t>(-b));
+            else
+                decrement(static_cast<uint32_t>(b));
+        }
+
+        template<int BITS>
+        __host__ __device__ void Cump<BITS>::decrement(uint32_t b)
+        {
+            uint32_t temp = m_limbs[0];
+            m_limbs[0] -= b;
+            uint32_t carry = m_limbs[0] > temp ? 1 : 0;
+            for (int i = 1; i < LIMBS; i++)
+            {
+                temp = m_limbs[i];
+                m_limbs[i] -= carry;
+                carry = m_limbs[i] > temp ? 1 : 0;
+            }
+        }
+
+        template<int BITS>
         __host__ __device__ void Cump<BITS>::operator-=(const Cump<BITS>& b)
         {
             decrement(b);
         }
 
-        
+        template<int BITS>
+        __host__ __device__ void Cump<BITS>::operator-=(int b)
+        {
+            decrement(b);
+        }
+
+        template<int BITS>
+        __host__ __device__ void Cump<BITS>::operator-=(uint32_t b)
+        {
+            decrement(b);
+        }
 
         template<int BITS>
         __host__ __device__ Cump<BITS> Cump<BITS>::operator<<(int shift) const
@@ -418,7 +536,19 @@ namespace nexusminer {
         }
 
         template<int BITS>
+        __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs)
+        {
+            return lhs.add(rhs);
+        }
+
+        template<int BITS>
         __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
+        {
+            return lhs.sub(rhs);
+        }
+
+        template<int BITS>
+        __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, int rhs)
         {
             return lhs.sub(rhs);
         }

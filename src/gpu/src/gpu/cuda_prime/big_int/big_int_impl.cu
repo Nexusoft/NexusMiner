@@ -248,7 +248,10 @@ namespace nexusminer {
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
-        __global__ void logic_test_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
+        
+        __global__ void 
+        __launch_bounds__(128, 1)
+        logic_test_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
         {
             unsigned int num_threads = blockDim.x;
             unsigned int block_id = blockIdx.x;
@@ -294,7 +297,7 @@ namespace nexusminer {
 
         void Big_int_impl::logic_test()
         {
-            const int32_t threads_per_block = 32 * 8;
+            const int32_t threads_per_block = 32 * 4;
             const int32_t threads_per_instance = 1;
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
