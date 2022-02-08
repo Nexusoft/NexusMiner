@@ -283,7 +283,7 @@ namespace gpu
 	{
 		using namespace boost::multiprecision;
 		using namespace boost::random;
-		const uint64_t batch_size = 100000;
+		const uint64_t batch_size = 1000000;
 		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
 		bool cpu_verify = false;
 		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
@@ -436,14 +436,15 @@ namespace gpu
 				//this must match the math/logic function under test used in the gpu
 				if (boost::multiprecision::msb(b_1024) >= 992)
 				{
-
-					//c_1024 = a_1024 * b_1024;
-					mpz_int bm = static_cast<mpz_int>(b[i]);
-					mpz_int two = 2;
-					mpz_int c = boost::multiprecision::powm(two,bm - 1, bm);
-					//c = c << (2*1024);
-					//c = c % static_cast<mpz_int>(b[i]);
-					c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
+					//mpz_int c = static_cast<mpz_int>(a[i]) * static_cast<mpz_int>(a[i]);
+					//c = c >> 1024;
+					
+					c_1024 = a_1024 * (b_1024 & 0xFFFFFFFF);
+					//c_1024.assign(1);
+					//mpz_int bm = static_cast<mpz_int>(b[i]);
+					//mpz_int two = 2;
+					//mpz_int c = boost::multiprecision::powm(two,bm - 1, bm);
+					//c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
 
 					
 					//mpz_int d = 1;
@@ -529,7 +530,7 @@ namespace gpu
 		}
 		
 		ss = {};
-		ss << "Run time: " << add_elapsed.count() << " ms. " << std::fixed << std::setprecision(1) << attempts / (add_elapsed.count()) << " thousand operations/second. (" << (attempts > 0 ? 1.0e3 * add_elapsed.count() / attempts : -999) << "us)";
+		ss << "Run time: " << add_elapsed.count() << " ms. " << std::fixed << std::setprecision(1) << (double)attempts / (add_elapsed.count()) << " thousand operations/second. (" << (attempts > 0 ? 1.0e3 * add_elapsed.count() / attempts : -999) << "us)";
 		m_logger->info(ss.str());
 		
 		

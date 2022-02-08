@@ -250,7 +250,7 @@ namespace nexusminer {
 
         
         __global__ void 
-        __launch_bounds__(128, 1)
+        //__launch_bounds__(128, 1)
         logic_test_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
         {
             unsigned int num_threads = blockDim.x;
@@ -261,33 +261,20 @@ namespace nexusminer {
             
             if (index < *test_vector_size)
             {
-                uint32_t m_primed = -mod_inverse_32(b[index].m_limbs[0]);
-                Cump<1024> Rmodm = b[index].R_mod_m();
-                //results[index] = montgomery_multiply(Rmodm, Rmodm, b[index], m_primed);
-                results[index] = powm_2(b[index], Rmodm, m_primed);
+                //uint32_t m_primed = -mod_inverse_32(b[index].m_limbs[0]);
+                //Cump<1024> Rmodm = b[index].R_mod_m();
+                //results[index] = montgomery_square_2(Rmodm, b[index], m_primed);
+                //results[index] = montgomery_square(Rmodm, b[index], m_primed);
+
+                
+                
+                results[index] = a[index] * b[index].m_limbs[0];
+                //results[index] = powm_2(b[index], Rmodm, m_primed);
 
                 //results[index] = results[index] - Rmodm;
                 //results[index] += 1;
 
-                //Cump<1024> R = 1;
                 
-                //R <<= 1024;
-                //R.remainder(b[index], results[index]);
-
-                //Cump<2048> dividend, divisor, result_2048;
-                ////dividend = rem << 1024
-                //dividend.m_limbs[dividend.LIMBS - 1] = 1;
-                //for (auto i = 0; i < b[index].LIMBS; i++)
-                //{
-                //    divisor.m_limbs[i] = b[index].m_limbs[i];
-                //    //dividend.m_limbs[i+ R.LIMBS-1] = results[index].m_limbs[i];
-                //}
-
-                //dividend.remainder(divisor, result_2048);
-                //for (auto i = 0; i < results[index].LIMBS; i++)
-                //{
-                //    results[index].m_limbs[i] = result_2048.m_limbs[i];
-                //}
 
                 
 

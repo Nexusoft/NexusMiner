@@ -45,16 +45,10 @@ namespace nexusminer {
                 //this step requires two extra words to handle "double" overflow that can happen when the top bit of m is set
                 A += x * x.m_limbs[i];
                 A += m * u;
-                //divide by 32 (right shift one whole word)
-                //A >>= 32;
-                for (int j = 0; j < A.LIMBS - 1; j++)
-                {
-                    A.m_limbs[j] = A.m_limbs[j + 1];
-                }
-                A.m_limbs[A.LIMBS - 1] = 0;
+                A >>= 32;
                 
             }
-
+            
             if (A >= m)
             {
                 A -= m;
@@ -62,18 +56,81 @@ namespace nexusminer {
             return A;
         }
 
+        //full width square followed by montgomery reduction
+        //HAC 14.16 
+        //returns xxR^-1
+        //this is 10x slower than montgomery_square
+        template<int BITS> __device__ Cump<BITS> montgomery_square_2(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
+        {
+            //square
+            const int t = x.HIGH_WORD + 1;
+            uint64_t w[2*t];
+            for (int i = 0; i < 2 * t; i++)
+            {
+                w[i] = 0;
+            }
+            for (int i = 0; i < t; i++)
+            {
+                
+                uint64_t uv = w[2 * i] + static_cast<uint64_t>(x.m_limbs[i]) * x.m_limbs[i];
+                w[2 * i] = uv & 0xFFFFFFFF;
+                uint64_t c = uv >> 32;
+                for (int j = i + 1; j < t; j++)
+                {
+                    uv = static_cast<uint64_t>(x.m_limbs[j]) * x.m_limbs[i];
+                    bool carry = uv & (0x1ull << 63);
+                    uv = w[i + j] + 2 * uv + c;
+                    w[i + j] = uv & 0xFFFFFFFF;
+                    c = (uv >> 32) | (carry ? (1ull << 32) : 0);
+                }
+                w[i + t] = c;
+            }
+
+            //reduce
+            Cump<2*BITS> A, m2, um;
+            for (auto i = 0; i <= A.HIGH_WORD; i++)
+            {
+                A.m_limbs[i] = w[i];
+            }
+
+            for (auto i = 0; i <= m.HIGH_WORD; i++)
+            {
+                m2.m_limbs[i] = m.m_limbs[i];
+            }
+
+            for (auto i = 0; i <= m.HIGH_WORD; i++)
+            {
+                uint32_t u = A.m_limbs[i] * m_primed;
+                um = (m2 * u) << (32 * i);
+                A += um;
+            }
+            A >>= (32 * (m.HIGH_WORD + 1));
+            
+            Cump<BITS> C;
+            for (auto i = 0; i <= C.HIGH_WORD; i++)
+            {
+                C.m_limbs[i] = A.m_limbs[i];
+            }
+            if (C >= m)
+            {
+                C -= m;
+            }
+
+            return C;
+            
+        }
+
         //reduce x to xR^-1 mod m
         //this is the same as montgomery multiply replacing y with 1
         template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
-            Cump<BITS> A, u;
+            Cump<BITS> A;
             for (auto i = 0; i <= A.HIGH_WORD; i++)
             {
-                u.m_limbs[i] = (A.m_limbs[0] + x.m_limbs[i]) * m_primed;
-                A += m * u.m_limbs[i];
+                uint32_t u = (A.m_limbs[0] + x.m_limbs[i]) * m_primed;
+                A += m * u;
                 A += x.m_limbs[i];
                 A >>= 32;
-
             }
             if (A >= m)
             {
