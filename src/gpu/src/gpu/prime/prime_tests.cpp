@@ -57,7 +57,25 @@ namespace gpu
 		std::vector<uint8_t> primality_test_results;
 		primality_test_results.resize(primality_test_batch_size);
 		//bool primality_test_results[primality_test_batch_size];
-		Cuda_fermat_test cuda_fermat_test;
+
+		//cump
+		Big_int cuda_fermat_test_cump;
+		cuda_fermat_test_cump.fermat_init(primality_test_batch_size, m_device);
+		cuda_fermat_test_cump.set_base_int(base_as_mpz_t);
+		cuda_fermat_test_cump.set_offsets(offsets.data(), primality_test_batch_size);
+		auto start = std::chrono::steady_clock::now();
+		cuda_fermat_test_cump.fermat_run();
+		auto end = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		cuda_fermat_test_cump.get_results(primality_test_results.data());
+		uint64_t cuda_primality_test_count, cuda_primality_pass_count;
+		cuda_fermat_test_cump.get_stats(cuda_primality_test_count, cuda_primality_pass_count);
+		cuda_fermat_test_cump.fermat_free();
+
+
+
+		//cgbn library
+		/*Cuda_fermat_test cuda_fermat_test;
 		cuda_fermat_test.fermat_init(primality_test_batch_size, m_device);
 		cuda_fermat_test.set_base_int(base_as_mpz_t);
 		cuda_fermat_test.set_offsets(offsets.data(), primality_test_batch_size);
@@ -68,7 +86,8 @@ namespace gpu
 		cuda_fermat_test.get_results(primality_test_results.data());
 		uint64_t cuda_primality_test_count, cuda_primality_pass_count;
 		cuda_fermat_test.get_stats(cuda_primality_test_count, cuda_primality_pass_count);
-		cuda_fermat_test.fermat_free();
+		cuda_fermat_test.fermat_free();*/
+
 		mpz_clear(base_as_mpz_t);
 
 		
@@ -283,9 +302,9 @@ namespace gpu
 	{
 		using namespace boost::multiprecision;
 		using namespace boost::random;
-		const uint64_t batch_size = 1000000;
+		const uint64_t batch_size = 100;
 		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
-		bool cpu_verify = false;
+		bool cpu_verify = true;
 		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
 		generator1024_type gen1024;
 		gen1024.seed(time(0));
@@ -439,12 +458,12 @@ namespace gpu
 					//mpz_int c = static_cast<mpz_int>(a[i]) * static_cast<mpz_int>(a[i]);
 					//c = c >> 1024;
 					
-					c_1024 = a_1024 * (b_1024 & 0xFFFFFFFF);
+					//c_1024 = a_1024 + b_1024;
 					//c_1024.assign(1);
-					//mpz_int bm = static_cast<mpz_int>(b[i]);
-					//mpz_int two = 2;
-					//mpz_int c = boost::multiprecision::powm(two,bm - 1, bm);
-					//c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
+					mpz_int bm = static_cast<mpz_int>(b[i]);
+					mpz_int two = 2;
+					mpz_int c = boost::multiprecision::powm(two,bm - 1, bm);
+					c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
 
 					
 					//mpz_int d = 1;

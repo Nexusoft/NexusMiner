@@ -1,8 +1,8 @@
 //this file is included in cump.cuh
+#include "cump_addition.cu"
 #include "cump_multiplication.cu"
 #include "cump_division.cu"
 #include "cump_montgomery.cu"
-
 
 namespace nexusminer {
     namespace gpu {
@@ -29,50 +29,6 @@ namespace nexusminer {
                     m_limbs[i] = ~(0u);
                 }
             }
-        }
-
-        template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(const Cump<BITS>& b) const
-        {
-            Cump result;
-            bool propagate = false;
-            bool generate = false;
-            uint32_t carry = 0;
-            uint32_t x = 0;
-            for (auto i = 0; i < LIMBS; i++)
-            {
-                x = m_limbs[i] + b.m_limbs[i];
-                result.m_limbs[i] = x + carry;
-                propagate = x == 0xFFFFFFFF;
-                generate = x < m_limbs[i];
-                carry = generate || (propagate && carry) ? 1 : 0;
-            }
-            return result;
-        }
-
-        template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(int b) const
-        {
-            if (b < 0)
-            {
-                return sub(static_cast<uint32_t>(-b));
-            }
-            return add(static_cast<uint32_t>(b));
-           
-        }
-
-        template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(uint32_t b) const
-        {
-            Cump result;
-            result.m_limbs[0] = m_limbs[0] + b;
-            uint32_t carry = result.m_limbs[0] < m_limbs[0] ? 1 : 0;
-            for (int i = 1; i < LIMBS; i++)
-            {
-                result.m_limbs[i] = m_limbs[i] + carry;
-                carry = result.m_limbs[i] < m_limbs[i] ? 1 : 0;
-            }
-            return result;
         }
 
         template<int BITS>
@@ -119,65 +75,7 @@ namespace nexusminer {
             return result;
         }
 
-        //same as add, but results are stored in the current object
-        template<int BITS>
-        __host__ __device__ void Cump<BITS>::increment(const Cump<BITS>& b)
-        {
-            bool propagate = false;
-            bool generate = false;
-            uint32_t carry = 0;
-            uint32_t x = 0;
-            for (auto i = 0; i < LIMBS; i++)
-            {
-                x = m_limbs[i] + b.m_limbs[i];
-                propagate = x == 0xFFFFFFFF;
-                generate = x < m_limbs[i];
-                m_limbs[i] = x + carry;
-                carry = generate || (propagate && carry) ? 1 : 0;
-            }
-        }
-
-        template<int BITS>
-        __host__ __device__ void Cump<BITS>::increment(int b)
-        {
-            if (b < 0)
-                decrement(static_cast<uint32_t>(-b));
-            else
-                increment(static_cast<uint32_t>(b));
-
-        }
-
-        template<int BITS>
-        __host__ __device__ void Cump<BITS>::increment(uint32_t b)
-        {
-            uint32_t temp = m_limbs[0];
-            m_limbs[0] += b;
-            uint32_t carry = m_limbs[0] < temp ? 1 : 0;
-            for (int i = 1; i < LIMBS; i++)
-            {
-                temp = m_limbs[i];
-                m_limbs[i] += carry;
-                carry = m_limbs[i] < temp ? 1 : 0;
-            }
-        }
-
-        template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(const Cump<BITS>& b)
-        {
-            increment(b);
-        }
-
-        template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(int b)
-        {
-            increment(b);
-        }
-
-        template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(uint32_t b)
-        {
-            increment(b);
-        }
+        
 
         //same as subtract, but results are stored in the current object
         template<int BITS>
@@ -529,17 +427,7 @@ namespace nexusminer {
             s[string_index] = '\0';
         }
 
-        template<int BITS>
-        __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
-        {
-            return lhs.add(rhs);
-        }
-
-        template<int BITS>
-        __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs)
-        {
-            return lhs.add(rhs);
-        }
+        
 
         template<int BITS>
         __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
@@ -549,6 +437,12 @@ namespace nexusminer {
 
         template<int BITS>
         __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, int rhs)
+        {
+            return lhs.sub(rhs);
+        }
+
+        template<int BITS>
+        __host__ __device__ Cump<BITS> operator-(const Cump<BITS>& lhs, uint32_t rhs)
         {
             return lhs.sub(rhs);
         }

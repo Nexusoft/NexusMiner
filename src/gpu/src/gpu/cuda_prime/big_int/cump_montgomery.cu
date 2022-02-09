@@ -34,7 +34,6 @@ namespace nexusminer {
         template<int BITS> __device__ Cump<BITS> montgomery_square(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
             Cump<BITS> A;
-            
             //unroll the first iteration to save a few operations
             uint32_t u = x.m_limbs[0] * x.m_limbs[0] * m_primed;
             A = x * x.m_limbs[0] + m * u;

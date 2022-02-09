@@ -31,15 +31,19 @@ namespace nexusminer {
 			__host__ __device__ Cump add(const Cump&) const;
 			__host__ __device__ Cump add(int) const;
 			__host__ __device__ Cump add(uint32_t) const;
+			__host__ __device__ Cump add(uint64_t) const;
+			__device__ Cump add_ptx(const Cump&) const;
 			__host__ __device__ Cump sub(const Cump&) const;
 			__host__ __device__ Cump sub(int) const;
 			__host__ __device__ Cump sub(uint32_t) const;
 			__host__ __device__ void increment(const Cump&);
 			__host__ __device__ void increment(int);
 			__host__ __device__ void increment(uint32_t);
+			__device__ void increment_ptx(const Cump&);
 			__host__ __device__ void operator += (const Cump&);
 			__host__ __device__ void operator += (int);
 			__host__ __device__ void operator += (uint32_t);
+			__host__ __device__ void operator += (uint64_t);
 			__host__ __device__ void decrement(const Cump&);
 			__host__ __device__ void decrement(int);
 			__host__ __device__ void decrement(uint32_t);
@@ -53,6 +57,7 @@ namespace nexusminer {
 			__host__ __device__ Cump operator ~ () const;
 			__host__ __device__ Cump multiply(uint32_t) const;
 			__host__ __device__ Cump multiply(const Cump&) const;
+			__device__ Cump multiply_ptx(uint32_t x) const;
 
 			__host__ __device__ void operator *= (uint32_t);
 			__host__ __device__ void operator *= (const Cump&);
@@ -78,8 +83,11 @@ namespace nexusminer {
 		
 		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs);
+		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint32_t rhs);
+		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint64_t rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, int rhs);
+		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, uint32_t rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, uint32_t);
 		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __device__ Cump<BITS> operator / (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
