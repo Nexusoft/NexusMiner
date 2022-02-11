@@ -418,7 +418,7 @@ namespace nexusminer {
                 {
                     r -= m_primed;
                 }
-                m_primed = m_primed >> 1;
+                m_primed >>= 1;
             }
 
             return r;

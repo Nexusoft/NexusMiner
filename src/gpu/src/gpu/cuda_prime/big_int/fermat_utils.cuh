@@ -10,10 +10,10 @@ namespace nexusminer {
 	namespace gpu {
 
 		
-		__host__ __device__ uint32_t mod_inverse_32(uint32_t d);
+		__device__ uint32_t mod_inverse_32(uint32_t d);
 		//for debug printing
-		__host__ __device__ void reverse(char str[], int length);
-		__host__ __device__ char* itoa(unsigned int num, char* str);
+		__device__ void reverse(char str[], int length);
+		__device__ char* itoa(unsigned int num, char* str);
 		
 	}
 }

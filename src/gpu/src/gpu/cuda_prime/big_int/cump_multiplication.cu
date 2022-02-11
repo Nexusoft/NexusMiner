@@ -148,6 +148,7 @@ namespace nexusminer {
                 "mad.lo.cc.u32   %32, %66, %68, %32;\n\t"
                 "madc.hi.u32     %33, %66, %68,  0;\n\t"
                 "mad.lo.u32      %33, %67, %68, %33;\n\t"
+
                 "}"
                 : "=r"(result.m_limbs[0]), "=r"(result.m_limbs[1]), "=r"(result.m_limbs[2]), "=r"(result.m_limbs[3]),
                 "=r"(result.m_limbs[4]), "=r"(result.m_limbs[5]), "=r"(result.m_limbs[6]), "=r"(result.m_limbs[7]),

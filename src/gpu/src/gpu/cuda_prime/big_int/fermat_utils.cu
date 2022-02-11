@@ -5,7 +5,7 @@ namespace nexusminer {
         //find the modular mutiplicative inverse of d mod 2^32
         //using newtown's method.  See Hackers' Delight 10-16
         //d must be odd
-        __host__ __device__ uint32_t mod_inverse_32(uint32_t d)
+        __device__ uint32_t mod_inverse_32(uint32_t d)
         {
             uint32_t xn, t;
             //initialize the estimate so that it is correct to 4 bits
@@ -23,7 +23,7 @@ namespace nexusminer {
 
         //for debug/printing
         /* A utility function to reverse a string  */
-        __host__ __device__ void reverse(char str[], int length)
+        __device__ void reverse(char str[], int length)
         {
             int start = 0;
             int end = length - 1;
@@ -39,7 +39,7 @@ namespace nexusminer {
         }
 
         // unsigned itoa() always use base 16
-        __host__ __device__ char* itoa(unsigned int num, char* str)
+        __device__ char* itoa(unsigned int num, char* str)
         {
             int i = 0;
             int base = 16;

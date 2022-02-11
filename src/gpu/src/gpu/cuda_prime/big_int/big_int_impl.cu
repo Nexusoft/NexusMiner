@@ -25,28 +25,35 @@ namespace nexusminer {
     namespace gpu {
 
         __global__ void
+        //__launch_bounds__(512, 8)
+
             kernel_fermat(uint64_t* offsets, uint64_t* offset_count,
                 Cump<1024>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count)
         {
-            unsigned int num_threads = blockDim.x;
-            unsigned int block_id = blockIdx.x;
-            unsigned int thread_index = threadIdx.x;
+            const unsigned int num_threads = blockDim.x;
+            const unsigned int block_id = blockIdx.x;
+            const unsigned int thread_index = threadIdx.x;
+            const int threads_per_instance = 1;
 
-            uint32_t index = block_id * num_threads + thread_index;
+            const uint32_t index = block_id * num_threads/threads_per_instance + thread_index/threads_per_instance;
+            
 
             if (index < *offset_count)
             {
-                Cump<1024> prime_candidate = *base_int + offsets[index];
-                uint32_t m_primed = -mod_inverse_32(prime_candidate.m_limbs[0]);
-                Cump<1024> Rmodm = prime_candidate.R_mod_m();
                 
-                bool is_prime = powm_2(prime_candidate, Rmodm, m_primed) == 1;
-                if (is_prime)
+                
+                const bool is_prime = powm_2(*base_int, offsets[index]) == 1;
+                if (thread_index % threads_per_instance == 0)
                 {
-                    atomicAdd(pass_count, 1);
+                    if (is_prime)
+                    {
+                        atomicAdd(pass_count, 1);
+                    }
+                    results[index] = is_prime ? 1 : 0;
+                    atomicAdd(test_count, 1);
+
                 }
-                results[index] = is_prime ? 1 : 0;
-                atomicAdd(test_count, 1);
+                
                 
             }
 
@@ -55,7 +62,7 @@ namespace nexusminer {
         void Big_int_impl::fermat_run()
         {
             //changing thread count seems to have negligible impact on the throughput
-            const int32_t threads_per_block = 128;
+            const int32_t threads_per_block = 32*2;
             const int32_t threads_per_instance = 1;
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
@@ -289,13 +296,13 @@ namespace nexusminer {
             
             if (index < *test_vector_size)
             {
-                uint32_t m_primed = -mod_inverse_32(b[index].m_limbs[0]);
-                Cump<1024> Rmodm = b[index].R_mod_m();
+                //uint32_t m_primed = -mod_inverse_32(b[index].m_limbs[0]);
+                //Cump<1024> Rmodm = b[index].R_mod_m();
                 //results[index] = montgomery_square_2(Rmodm, b[index], m_primed);
                 //results[index] = montgomery_square(Rmodm, b[index], m_primed);
                 
                 //results[index] = a[index].add_ptx(b[index]);
-                results[index] = powm_2(b[index], Rmodm, m_primed);
+                //results[index] = powm_2(b[index]);
 
                 //results[index] = results[index] - Rmodm;
                 //results[index] += 1;

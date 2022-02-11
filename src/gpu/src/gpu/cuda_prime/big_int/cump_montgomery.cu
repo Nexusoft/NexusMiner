@@ -33,21 +33,14 @@ namespace nexusminer {
         //returns xxR^-1
         template<int BITS> __device__ Cump<BITS> montgomery_square(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
-            Cump<BITS> A;
-            //unroll the first iteration to save a few operations
-            uint32_t u = x.m_limbs[0] * x.m_limbs[0] * m_primed;
-            A = x * x.m_limbs[0] + m * u;
-            A >>= 32;
-            for (auto i = 1; i <= A.HIGH_WORD; i++)
+           
+            Cump<BITS> A;            
+            for (auto i = 0; i <= A.HIGH_WORD; i++)
             {
-                u = (A.m_limbs[0] + x.m_limbs[i] * x.m_limbs[0]) * m_primed;
-                //this step requires two extra words to handle "double" overflow that can happen when the top bit of m is set
-                A += x * x.m_limbs[i];
-                A += m * u;
+                uint32_t u = (A.m_limbs[0] + x.m_limbs[i] * x.m_limbs[0]) * m_primed;  
+                A = A + x * x.m_limbs[i] + m * u;
                 A >>= 32;
-                
             }
-            
             if (A >= m)
             {
                 A -= m;
@@ -58,11 +51,11 @@ namespace nexusminer {
         //full width square followed by montgomery reduction
         //HAC 14.16 
         //returns xxR^-1
-        //this is 10x slower than montgomery_square
+        //this is 4x slower than the other montgomery_square and doesn't work
         template<int BITS> __device__ Cump<BITS> montgomery_square_2(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
             //square
-            const int t = x.HIGH_WORD + 1;
+            const int t = x.LIMBS;
             uint64_t w[2*t];
             for (int i = 0; i < 2 * t; i++)
             {
@@ -86,34 +79,13 @@ namespace nexusminer {
             }
 
             //reduce
-            Cump<2*BITS> A, m2, um;
-            for (auto i = 0; i <= A.HIGH_WORD; i++)
+            Cump<2 * BITS> A;
+            for (int i = 0; i < 2 * t; i++)
             {
                 A.m_limbs[i] = w[i];
             }
 
-            for (auto i = 0; i <= m.HIGH_WORD; i++)
-            {
-                m2.m_limbs[i] = m.m_limbs[i];
-            }
-
-            for (auto i = 0; i <= m.HIGH_WORD; i++)
-            {
-                uint32_t u = A.m_limbs[i] * m_primed;
-                um = (m2 * u) << (32 * i);
-                A += um;
-            }
-            A >>= (32 * (m.HIGH_WORD + 1));
-            
-            Cump<BITS> C;
-            for (auto i = 0; i <= C.HIGH_WORD; i++)
-            {
-                C.m_limbs[i] = A.m_limbs[i];
-            }
-            if (C >= m)
-            {
-                C -= m;
-            }
+            Cump<BITS> C = montgomery_reduce(A, m, m_primed);
 
             return C;
             
@@ -121,10 +93,11 @@ namespace nexusminer {
 
         //reduce x to xR^-1 mod m
         //this is the same as montgomery multiply replacing y with 1
-        template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
+        //x can have different width than the modulus.  BITS <= BITS2 <= 2*BITS
+        template<int BITS, int BITS2> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS2>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
             Cump<BITS> A;
-            for (auto i = 0; i <= A.HIGH_WORD; i++)
+            for (auto i = 0; i <= x.HIGH_WORD; i++)
             {
                 uint32_t u = (A.m_limbs[0] + x.m_limbs[i]) * m_primed;
                 A += m * u;
@@ -141,38 +114,44 @@ namespace nexusminer {
         //returns 2^(m-1) mod m
         //m_primed and rmodm are precalculated values.  See hac 14.94.  
         //R^2 mod m is not needed because with base 2 is trivial to calculate 2*R mod m given R mod m
-        template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& m, const Cump<BITS>& rmodm, uint32_t m_primed)
+        template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& base_m, uint64_t offset)
         {
+            const Cump<BITS>& m = base_m + offset;
+            
+            //precalculation of some constants based on the modulus
+            const uint32_t m_primed = -mod_inverse_32(m.m_limbs[0]);
+
             //initialize the product to R mod m, the equivalent of 1 in the montgomery domain
-            Cump<BITS> A = rmodm;
-            Cump<BITS> exp = m - 1;
+            Cump<BITS> A = m.R_mod_m();
+            
+            //Cump<BITS> exp = m - 1;  //m is odd, so m-1 only changes the lowest bit of m from 1 to 0. 
 
-            //unroll the first few iterations manually - we are squaring small numbers
-            //The first iteration requires no squaring
+            //perform the first few iterations without montgomery multiplication - we are multiplying by small powers of 2
             int word = A.HIGH_WORD;
-            int bit = (A.BITS_PER_WORD - 1) % A.BITS_PER_WORD;
-            uint32_t mask = 1 << bit;
-            bool bit_is_set = (exp.m_limbs[word] & mask) != 0;
-            if (bit_is_set)
-            {
-                //multiply by the base (2) if the exponent bit is set
-                A = double_and_reduce(A, m);
-            }
-
-            for (auto i = BITS - 2; i >= 0; i--)
+            const int top_bits_window = 4;
+            int shift = (A.BITS_PER_WORD - top_bits_window) % A.BITS_PER_WORD;
+            int mask = ((1 << top_bits_window) - 1) << shift;
+            int top_bits = (m.m_limbs[word] & mask) >> shift;
+            A = double_and_reduce(A, m, top_bits);
+            //Go through each bit of the exponment.  We assume all words except the lower three match the base big int
+            for (auto i = BITS - top_bits_window - 1; i >= 1; i--)
             {
                 //square
                 A = montgomery_square(A, m, m_primed);
                 word = i / A.BITS_PER_WORD;
-                bit = i % A.BITS_PER_WORD;
+                int bit = i % A.BITS_PER_WORD;
                 mask = 1 << bit;
-                bit_is_set = (exp.m_limbs[word] & mask) != 0;
+                bool bit_is_set = (m.m_limbs[word] & mask) != 0;
                 if (bit_is_set)
                 {
                     //multiply by the base (2) if the exponent bit is set
-                    A = double_and_reduce(A, m);
+                    A = double_and_reduce(A, m, 1);
                 }
             }
+           
+            //the final iteration. the exponent m-1 lowest bit is always 0 so we never need to double and reduce after squaring
+            A = montgomery_square(A, m, m_primed);
+
             //convert back from montgomery domain
             A = montgomery_reduce(A, m, m_primed);
             return A;
@@ -181,10 +160,10 @@ namespace nexusminer {
         
         // return 2 * x mod m given x and m using shift and subtract.
         //For this to be efficient, m must be similar magnitude (within a few bits) of x. 
-        template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m)
+        template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m, int shift)
         {
-            Cump<BITS> A = x << 1;
-            while (A >= m)
+            Cump<BITS> A = x << shift;
+            while (A >= m) 
             {
                 A -= m;
             }
