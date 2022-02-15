@@ -25,7 +25,7 @@ namespace nexusminer {
     namespace gpu {
 
         __global__ void
-        //__launch_bounds__(512, 8)
+        //__launch_bounds__(256, 1)
 
             kernel_fermat(uint64_t* offsets, uint64_t* offset_count,
                 Cump<1024>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count)

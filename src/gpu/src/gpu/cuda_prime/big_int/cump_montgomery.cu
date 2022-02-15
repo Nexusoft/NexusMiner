@@ -78,13 +78,9 @@ namespace nexusminer {
             //return A;
             //low half of the square
             Cump<BITS> AA, BB, y, result;
-            //xx = x;
             const int y_size = x.HIGH_WORD + 2;
             uint32_t yy[y_size + 1];
-            for (int i = 0; i <= y_size; i++)
-            {
-                yy[i] = 0;
-            }
+            
 #pragma unroll
             for (int i = 0; i <= x.HIGH_WORD/2; i++)
             {
@@ -309,7 +305,7 @@ namespace nexusminer {
         template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
             Cump<BITS> A = x;
-            
+#pragma unroll
             for (auto i = 0; i <= m.HIGH_WORD; i++)
             {
                 uint32_t u = A.m_limbs[0] * m_primed;
@@ -375,7 +371,7 @@ namespace nexusminer {
             }
            
             //the final iteration. the exponent m-1 lowest bit is always 0 so we never need to double and reduce after squaring
-            A = montgomery_square(A, m, m_primed);
+            A = montgomery_square_2(A, m, m_primed);
 
             //convert back from montgomery domain
             A = montgomery_reduce(A, m, m_primed);
