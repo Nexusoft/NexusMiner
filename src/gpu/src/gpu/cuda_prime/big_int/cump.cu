@@ -10,11 +10,13 @@ namespace nexusminer {
         template<int BITS>
         __host__ __device__ Cump<BITS>::Cump() : m_limbs{}
         {
+           
         }
 
         template<int BITS>
         __host__ __device__ Cump<BITS>::Cump(uint32_t init32) : m_limbs{}
         {
+           
             m_limbs[0] = init32;
         }
 
@@ -29,6 +31,7 @@ namespace nexusminer {
                     m_limbs[i] = ~(0u);
                 }
             }
+           
         }
 
         template<int BITS>

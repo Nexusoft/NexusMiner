@@ -59,6 +59,7 @@ namespace nexusminer {
 			__host__ __device__ Cump multiply(const Cump&) const;
 			__device__ Cump multiply_ptx(uint32_t x) const;
 
+
 			__host__ __device__ void operator *= (uint32_t);
 			__host__ __device__ void operator *= (const Cump&);
 
@@ -108,7 +109,8 @@ namespace nexusminer {
 		template<int BITS> __device__ Cump<BITS> montgomery_multiply(const Cump<BITS>& x, const Cump<BITS>& y, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> montgomery_square(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> montgomery_square_2(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
-		template<int BITS, int BITS2> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS2>& x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ void montgomery_reduce(Cump<BITS>& A, uint32_t x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& m, uint64_t offset);
 		template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m, int shift);
 

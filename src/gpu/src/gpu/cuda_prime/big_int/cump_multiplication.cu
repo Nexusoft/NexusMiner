@@ -23,6 +23,8 @@ namespace nexusminer {
             return result;
         }
 
+        
+
         template<int BITS>
         __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
         {
@@ -52,6 +54,43 @@ namespace nexusminer {
             return result;
         }
 
+        
+
+        /*template<int BITS> 
+        __device__ Cump<2 * BITS> Cump<BITS>::square(const Cump<BITS>& x)
+        {
+            const int t = x.LIMBS;
+            uint64_t w[2 * t];
+            for (int i = 0; i < 2 * t; i++)
+            {
+                w[i] = 0;
+            }
+            for (int i = 0; i < t; i++)
+            {
+
+                uint64_t uv = w[2 * i] + static_cast<uint64_t>(x.m_limbs[i]) * x.m_limbs[i];
+                w[2 * i] = uv & 0xFFFFFFFF;
+                uint64_t c = uv >> 32;
+                for (int j = i + 1; j < t; j++)
+                {
+                    uv = static_cast<uint64_t>(x.m_limbs[j]) * x.m_limbs[i];
+                    bool carry = uv & (0x1ull << 63);
+                    uv = w[i + j] + 2 * uv + c;
+                    w[i + j] = uv & 0xFFFFFFFF;
+                    c = (uv >> 32) | (carry ? (1ull << 32) : 0);
+                }
+                w[i + t] = c;
+            }
+            Cump<2 * BITS> result;
+            for (int i = 0; i < 2 * t; i++)
+            {
+                result.m_limbs = w[i];
+            }
+            return result;
+        }*/
+
+
+
         template<int BITS>
         __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, uint32_t rhs)
         {
@@ -74,7 +113,7 @@ namespace nexusminer {
 
 
         //multiply a 1024 bit uint by one uint32_t directly in ptx (cuda assembly code)
-        //this works but compiles to very similar code as the c++
+        //this works but compiles to similar code as the c++.  The performance is slightly worse compared to the c++.
         template<int BITS>
         __device__ Cump<BITS> Cump<BITS>::multiply_ptx(uint32_t x) const
         {

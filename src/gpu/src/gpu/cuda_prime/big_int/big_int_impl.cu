@@ -71,7 +71,7 @@ namespace nexusminer {
            kernel_fermat << <blocks, threads_per_block >> > (d_offsets, d_offset_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
-
+            checkCudaErrors(cudaPeekAtLastError());
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
