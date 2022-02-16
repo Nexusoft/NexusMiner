@@ -1,12 +1,13 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#include "big_int_impl.cuh"
+#include "fermat_prime_impl.cuh"
 #include <cuda.h>
 #include <stdio.h>
 #include <math.h>
 #include <inttypes.h>
-#include "../big_int/fermat_utils.cuh"
+#include "../fermat_prime/fermat_utils.cuh"
+#include "../cuda_chain.cuh"
 
 
 #ifndef checkCudaErrors
@@ -24,6 +25,9 @@
 namespace nexusminer {
     namespace gpu {
 
+        __device__  bool get_next_fermat_candidate(CudaChain& chain, uint64_t& base_offset, int& offset);
+        __device__  bool update_fermat_status(CudaChain& chain, bool is_prime);
+
         __global__ void
         //__launch_bounds__(256, 1)
 
@@ -40,8 +44,6 @@ namespace nexusminer {
 
             if (index < *offset_count)
             {
-                
-                
                 const bool is_prime = powm_2(*base_int, offsets[index]) == 1;
                 if (thread_index % threads_per_instance == 0)
                 {
@@ -53,13 +55,12 @@ namespace nexusminer {
                     atomicAdd(test_count, 1);
 
                 }
-                
-                
+
             }
 
         }
 
-        void Big_int_impl::fermat_run()
+        void Fermat_prime_impl::fermat_run()
         {
             //changing thread count seems to have negligible impact on the throughput
             const int32_t threads_per_block = 32*2;
@@ -75,25 +76,60 @@ namespace nexusminer {
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
-        void Big_int_impl::fermat_chain_run()
-        {
 
-            int32_t threads_per_block = 256;
-            int32_t threads_per_instance = 1;
-            int32_t instances_per_block = threads_per_block / threads_per_instance;
+        __global__ void fermat_test_chains(CudaChain* chains, uint32_t* chain_count,
+            Cump<1024>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count) {
+            
+            const unsigned int num_threads = blockDim.x;
+            const unsigned int block_id = blockIdx.x;
+            const unsigned int thread_index = threadIdx.x;
+            const int threads_per_instance = 1;
+            const uint32_t index = block_id * num_threads / threads_per_instance + thread_index / threads_per_instance;
+
+
+            if (index >= *chain_count)
+                return;
+
+            uint64_t offset64, base_offset;
+            int relative_offset;
+            get_next_fermat_candidate(chains[index], base_offset, relative_offset);
+            offset64 = base_offset + relative_offset;
+           
+            const bool is_prime = powm_2(*base_int, offset64) == 1;
+            update_fermat_status(chains[index], is_prime);
+            if (thread_index % threads_per_instance == 0)
+            {
+                if (is_prime)
+                {
+                    atomicAdd(pass_count, 1);
+                }
+                results[index] = is_prime ? 1 : 0;
+                atomicAdd(test_count, 1);
+
+            }
+
+        }
+
+
+        void Fermat_prime_impl::fermat_chain_run()
+        {
+            const int32_t threads_per_block = 32 * 2;
+            const int32_t threads_per_instance = 1;
+            const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             uint32_t chain_count;
             checkCudaErrors(cudaMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
+            fermat_test_chains << <blocks, threads_per_block >> > (d_chains, d_chain_count, d_base_int,
+                d_results, d_fermat_test_count, d_fermat_pass_count);
 
-            /*fermat_test_chains << <blocks, threads_per_block >> > (d_report, d_chains, d_chain_count, d_base_int,
-                d_results, d_fermat_test_count, d_fermat_pass_count);*/
-
-            //checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(cudaPeekAtLastError());
+            checkCudaErrors(cudaDeviceSynchronize());
         }
 
         //allocate device memory for gpu fermat testing.  we use a fixed maximum batch size and allocate device memory once at the beginning. 
-        void Big_int_impl::fermat_init(uint64_t batch_size, int device)
+        void Fermat_prime_impl::fermat_init(uint64_t batch_size, int device)
         {
 
             m_device = device;
@@ -109,7 +145,7 @@ namespace nexusminer {
 
         }
 
-        void Big_int_impl::fermat_free()
+        void Fermat_prime_impl::fermat_free()
         {
             checkCudaErrors(cudaSetDevice(m_device));
             checkCudaErrors(cudaFree(d_base_int));
@@ -120,7 +156,7 @@ namespace nexusminer {
             checkCudaErrors(cudaFree(d_fermat_pass_count));
         }
 
-        void Big_int_impl::set_base_int(mpz_t base_big_int)
+        void Fermat_prime_impl::set_base_int(mpz_t base_big_int)
         {
             checkCudaErrors(cudaSetDevice(m_device));
             Cump<1024> cuda_base_big_int;
@@ -129,31 +165,31 @@ namespace nexusminer {
             mpz_set(m_base_int, base_big_int);
         }
 
-        void Big_int_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
+        void Fermat_prime_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
         {
             checkCudaErrors(cudaMemcpy(d_offsets, offsets, sizeof(*offsets) * offset_count, cudaMemcpyHostToDevice));
             checkCudaErrors(cudaMemcpy(d_offset_count, &offset_count, sizeof(offset_count), cudaMemcpyHostToDevice));
             m_offset_count = offset_count;
         }
 
-        void Big_int_impl::get_results(uint8_t results[])
+        void Fermat_prime_impl::get_results(uint8_t results[])
         {
             checkCudaErrors(cudaMemcpy(results, d_results, sizeof(uint8_t) * m_offset_count, cudaMemcpyDeviceToHost));
         }
 
-        void Big_int_impl::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes)
+        void Fermat_prime_impl::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes)
         {
             checkCudaErrors(cudaMemcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), cudaMemcpyDeviceToHost));
             checkCudaErrors(cudaMemcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), cudaMemcpyDeviceToHost));
         }
 
-        void Big_int_impl::reset_stats()
+        void Fermat_prime_impl::reset_stats()
         {
             checkCudaErrors(cudaMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
             checkCudaErrors(cudaMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
         }
 
-        void Big_int_impl::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
+        void Fermat_prime_impl::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
         {
             d_chains = chains;
             d_chain_count = chain_count;
@@ -161,12 +197,12 @@ namespace nexusminer {
             checkCudaErrors(cudaMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
         }
 
-        void Big_int_impl::synchronize()
+        void Fermat_prime_impl::synchronize()
         {
             checkCudaErrors(cudaDeviceSynchronize());
         }
 
-        void Big_int_impl::test_init(uint64_t batch_size, int device)
+        void Fermat_prime_impl::test_init(uint64_t batch_size, int device)
         {
             m_device = device;
             checkCudaErrors(cudaSetDevice(device));
@@ -177,7 +213,7 @@ namespace nexusminer {
 
         }
 
-        void Big_int_impl::test_free()
+        void Fermat_prime_impl::test_free()
         {
             checkCudaErrors(cudaSetDevice(m_device));
             checkCudaErrors(cudaFree(d_test_a));
@@ -187,7 +223,7 @@ namespace nexusminer {
 
         }
 
-        void Big_int_impl::set_input_a(mpz_t* a, uint64_t count)
+        void Fermat_prime_impl::set_input_a(mpz_t* a, uint64_t count)
         {
             m_test_vector_a_size = count;
             Cump<1024>* vector_a = new Cump<1024>[count];
@@ -200,7 +236,7 @@ namespace nexusminer {
             delete[] vector_a;
         }
 
-        void Big_int_impl::set_input_b(mpz_t* b, uint64_t count)
+        void Fermat_prime_impl::set_input_b(mpz_t* b, uint64_t count)
         {
             m_test_vector_b_size = count;
             Cump<1024>* vector_b = new Cump<1024>[count];
@@ -214,7 +250,7 @@ namespace nexusminer {
 
         
 
-        void Big_int_impl::get_test_results(mpz_t* test_results)
+        void Fermat_prime_impl::get_test_results(mpz_t* test_results)
         {
             Cump<1024>* results = new Cump<1024>[m_test_vector_a_size];
             checkCudaErrors(cudaMemcpy(results, d_test_results, sizeof(*d_test_results) * m_test_vector_a_size, cudaMemcpyDeviceToHost));
@@ -226,63 +262,7 @@ namespace nexusminer {
             delete[] results;
         }
 
-        //__global__ void add_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
-        //{
-        //    unsigned int num_threads = blockDim.x;
-        //    unsigned int block_id = blockIdx.x;
-        //    unsigned int thread_index = threadIdx.x;
-        //    
-        //    uint32_t index = block_id * num_threads + thread_index;
-        //    //printf("index: %u\n", index);
-        //    if (index < *test_vector_size)
-        //    {
-        //        results[index] = a[index] + b[index];
-        //        //char s[400];
-        //        //results[index].to_cstr(s);
-        //        //printf("%s\n", s);
-        //    }
-        //    
-        //}
-
-        void Big_int_impl::add()
-        {
-            
-            const int32_t threads_per_block = 32*16;
-            const int32_t threads_per_instance = 1;
-            const int32_t instances_per_block = threads_per_block / threads_per_instance;
-
-            int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            //add_kernel <<<blocks, threads_per_block >>> (d_test_a, d_test_b, d_test_results, d_test_vector_size);
-            checkCudaErrors(cudaPeekAtLastError());
-            checkCudaErrors(cudaDeviceSynchronize());
-        }
-
-        /*__global__ void subtract_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)
-        {
-            unsigned int num_threads = blockDim.x;
-            unsigned int block_id = blockIdx.x;
-            unsigned int thread_index = threadIdx.x;
-
-            uint32_t index = block_id * num_threads + thread_index;
-            if (index < *test_vector_size)
-            {
-                results[index] = a[index] - b[index];
-            }
-
-        }*/
-
-        void Big_int_impl::subtract()
-        {
-            const int32_t threads_per_block = 32 * 12;
-            const int32_t threads_per_instance = 1;
-            const int32_t instances_per_block = threads_per_block / threads_per_instance;
-
-            int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            //subtract_kernel << <blocks, threads_per_block >> > (d_test_a, d_test_b, d_test_results, d_test_vector_size);
-            checkCudaErrors(cudaPeekAtLastError());
-            checkCudaErrors(cudaDeviceSynchronize());
-        }
-
+        
         
         __global__ void 
         //__launch_bounds__(128, 1)
@@ -315,7 +295,7 @@ namespace nexusminer {
 
         }
 
-        void Big_int_impl::logic_test()
+        void Fermat_prime_impl::logic_test()
         {
             const int32_t threads_per_block = 32 * 8;
             const int32_t threads_per_instance = 1;

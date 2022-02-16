@@ -9,6 +9,7 @@
 #include "sieve_utils.hpp"
 #include "chain.hpp"
 #include "../cuda_prime/fermat_test.hpp"
+#include "../cuda_prime/fermat_prime/fermat_prime.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include "gpu/prime_common.hpp"
 
@@ -160,7 +161,9 @@ namespace nexusminer {
 			uint64_t m_sieve_run_count = 0;
 
 			Cuda_sieve m_cuda_sieve;
-			Cuda_fermat_test m_cuda_prime_test;
+			//Cuda_fermat_test m_cuda_prime_test;
+			Fermat_prime m_cuda_prime_test;
+
 			bool m_cuda_sieve_allocated = false;
 
 		};

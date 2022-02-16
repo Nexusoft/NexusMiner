@@ -7,7 +7,7 @@
 #include "sieve.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include <cmath>
-#include "../cuda_prime/big_int/big_int.hpp"
+#include "../cuda_prime/fermat_prime/fermat_prime.hpp"
 #include <random>
 
 
@@ -59,7 +59,7 @@ namespace gpu
 		//bool primality_test_results[primality_test_batch_size];
 
 		//cump
-		Big_int cuda_fermat_test_cump;
+		Fermat_prime cuda_fermat_test_cump;
 		cuda_fermat_test_cump.fermat_init(primality_test_batch_size, m_device);
 		cuda_fermat_test_cump.set_base_int(base_as_mpz_t);
 		cuda_fermat_test_cump.set_offsets(offsets.data(), primality_test_batch_size);
@@ -424,7 +424,7 @@ namespace gpu
 		
 		m_logger->info("Test data generation complete.");
 		
-		Big_int big_int;
+		Fermat_prime big_int;
 		big_int.test_init(batch_size, 0);
 		m_logger->info("Loading test vectors to GPU RAM.");
 		big_int.set_input_a(a, batch_size);

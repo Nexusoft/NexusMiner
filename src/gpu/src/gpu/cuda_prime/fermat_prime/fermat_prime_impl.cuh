@@ -1,7 +1,7 @@
-#ifndef NEXUSMINER_GPU_CUDA_BIG_INT_IMPL_CUH
-#define NEXUSMINER_GPU_CUDA_BIG_INT_IMPL_CUH
+#ifndef NEXUSMINER_GPU_CUDA_FERMAT_PRIME_IMPL_CUH
+#define NEXUSMINER_GPU_CUDA_FERMAT_PRIME_IMPL_CUH
 
-#include "big_int.hpp"
+#include "fermat_prime.hpp"
 #include "cump.cuh"
 #include "../cuda_chain.cuh"
 #include <stdint.h>
@@ -10,7 +10,7 @@
 namespace nexusminer {
 	namespace gpu {
 
-		class Big_int_impl
+		class Fermat_prime_impl
 		{
         public:
 
@@ -32,8 +32,6 @@ namespace nexusminer {
             void set_input_a(mpz_t* a, uint64_t count);
             void set_input_b(mpz_t* b, uint64_t count);
             void get_test_results(mpz_t* test_results);
-            void add();
-            void subtract();
             void logic_test();
 
 

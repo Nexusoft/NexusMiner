@@ -5,13 +5,14 @@ add_library(gpu STATIC "src/gpu/worker_hash.cpp" "src/gpu/cuda_hash/util.cu" "sr
 if(WITH_PRIME)
     target_sources(gpu PRIVATE src/gpu/worker_prime.cpp src/gpu/prime/prime.cpp src/gpu/prime/prime_tests.cpp
         src/gpu/prime/chain.cpp src/gpu/prime/sieve.cpp
-        src/gpu/cuda_prime/cuda_chain.cu src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/sieve.cu
-        src/gpu/cuda_prime/sieve_impl.cu src/gpu/cuda_prime/fermat_test_impl.cu src/gpu/cuda_prime/find_chain.cu
+        src/gpu/cuda_prime/cuda_chain.cu  src/gpu/cuda_prime/sieve.cu
+        src/gpu/cuda_prime/sieve_impl.cu  src/gpu/cuda_prime/find_chain.cu
         src/gpu/prime/small_sieve_tools.cpp
-        src/gpu/cuda_prime/big_int/big_int.cu src/gpu/cuda_prime/big_int/big_int_impl.cu
-        src/gpu/cuda_prime/big_int/fermat_utils.cu
+        src/gpu/cuda_prime/fermat_prime/fermat_prime.cu src/gpu/cuda_prime/fermat_prime/fermat_prime_impl.cu
+        src/gpu/cuda_prime/fermat_prime/fermat_utils.cu src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/fermat_test_impl.cu
     )
 endif()
+# src/gpu/cuda_prime/fermat_test.cu src/gpu/cuda_prime/fermat_test_impl.cu
 
 set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES 61 75 86)

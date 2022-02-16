@@ -1,4 +1,5 @@
 //this file is included in cump.cuh
+#include "asm.cu"
 #include "cump_addition.cu"
 #include "cump_multiplication.cu"
 #include "cump_division.cu"

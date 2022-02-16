@@ -1,7 +1,7 @@
-#ifndef NEXUSMINER_GPU_BIG_INT_HPP
-#define NEXUSMINER_GPU_BIG_INT_HPP
+#ifndef NEXUSMINER_GPU_FERMAT_PRIME_HPP
+#define NEXUSMINER_GPU_FERMAT_PRIME_HPP
 
-//big int library sufficient for primality testing 1024 bit unsigned integers.
+//cuda library for primality testing 1024 bit unsigned integers.
 
 #include <stdint.h>
 #include <gmp.h>
@@ -11,13 +11,13 @@
 namespace nexusminer {
 	namespace gpu {
 
-		class Big_int_impl;
-		class Big_int
+		class Fermat_prime_impl;
+		class Fermat_prime
 		{
 		public:
 
-			Big_int();
-			~Big_int();
+			Fermat_prime();
+			~Fermat_prime();
 			
 			void fermat_run();
 			void fermat_chain_run();
@@ -36,12 +36,10 @@ namespace nexusminer {
 			void set_input_a(mpz_t* a, uint64_t count);
 			void set_input_b(mpz_t* b, uint64_t count);
 			void get_test_results(mpz_t* test_results);
-			void add();
-			void subtract();
 			void logic_test();
 
 		private:
-			std::unique_ptr<Big_int_impl> m_impl;
+			std::unique_ptr<Fermat_prime_impl> m_impl;
 			
 
 		};

@@ -115,13 +115,17 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                y = 0;
+                //y = 0;
+                AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
 #pragma unroll
-                for (int j = 0; j <= y_size - i; j++)
+                for (int j = 1; j <= y_size - i; j++)
                 {
-                    y.m_limbs[j] = yy[j];
+                    AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+                    //y.m_limbs[j] = yy[j];
+                                    
                 }
-                AA += y;
+                //AA.m_limbs[y_size - i + 1] = addc(0, 0);
+                //AA += y;
 
                 //The lowest two terms are now complete and can be moved to the reduction step.
                 BB.m_limbs[2 * i] = AA.m_limbs[0];
@@ -132,7 +136,7 @@ namespace nexusminer {
                 AA >>= 64;
             }
 
-           /* static bool first = true;
+            /*static bool first = true;
             if (blockIdx.x == 0 && threadIdx.x == 0 && first)
             {
 
@@ -183,13 +187,15 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                y = 0;
+                //y = 0;
+                AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
 #pragma unroll
-                for (int j = 0; j <= y_size - i - (x.HIGH_WORD + 1) / 2; j++)
+                for (int j = 1; j <= y_size - i - (x.HIGH_WORD + 1) / 2; j++)
                 {
-                    y.m_limbs[j] = yy[j];
+                    //y.m_limbs[j] = yy[j];
+                    AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
                 }
-                AA += y;
+                //AA += y;
 
                 //The lowest two terms are now complete and can be moved to the reduction step.
                 BB.m_limbs[2 * i] = AA.m_limbs[0];
