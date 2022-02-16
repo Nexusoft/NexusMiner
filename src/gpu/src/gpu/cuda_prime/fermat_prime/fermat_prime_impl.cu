@@ -263,7 +263,7 @@ namespace nexusminer {
         }
 
         
-        
+        //this is a generic test kernel for evaluating big int math functions
         __global__ void 
         //__launch_bounds__(128, 1)
         logic_test_kernel(Cump<1024>* a, Cump<1024>* b, Cump<1024>* results, uint64_t* test_vector_size)

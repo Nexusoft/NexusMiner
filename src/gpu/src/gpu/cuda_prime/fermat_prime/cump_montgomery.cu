@@ -44,38 +44,12 @@ namespace nexusminer {
             return A;
         }
 
-        //montgomery square
+        //montgomery square - optimized to take advantage of symmetry of squaring operation
+        //Fermat testing spends most of its time inside this function
         //returns xxR^-1
         template<int BITS> __device__ Cump<BITS> montgomery_square_2(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed)
         {
-            //Cump<2*BITS> W;
-            //Cump<BITS> A, B;
-            //uint32_t c;
-            //for (int i = 0; i <= x.HIGH_WORD; i++) 
-            //{
-            //    c = 0;
-            //    for (int j = 0; j <= x.HIGH_WORD; j++) 
-            //    {
-            //        uint64_t uv = W.m_limbs[i + j] + static_cast<uint64_t>(x.m_limbs[j]) * x.m_limbs[i] + c;
-            //        W.m_limbs[i + j] = uv;  //store the lower bits
-            //        c = uv >> 32;  //the upper bits is the carry
-            //    }
-            //    W.m_limbs[i + x.HIGH_WORD + 1] = c;
-            //}
-            //for (int i = 0; i <= A.HIGH_WORD; i++)
-            //{
-            //    B.m_limbs[i] = W.m_limbs[i + B.HIGH_WORD + 1];
-            //    A.m_limbs[i] = W.m_limbs[i];
-            //}
-            //A = montgomery_reduce(A, m, m_primed);
-            //A += B;
-
-            //if (A >= m)
-            //{
-            //    A -= m;
-            //}
-
-            //return A;
+            
             //low half of the square
             Cump<BITS> AA, BB, y, result;
             const int y_size = x.HIGH_WORD + 2;
@@ -115,41 +89,23 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                //y = 0;
                 AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
 #pragma unroll
                 for (int j = 1; j <= y_size - i; j++)
                 {
                     AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
-                    //y.m_limbs[j] = yy[j];
                                     
                 }
-                //AA.m_limbs[y_size - i + 1] = addc(0, 0);
-                //AA += y;
-
+                
                 //The lowest two terms are now complete and can be moved to the reduction step.
                 BB.m_limbs[2 * i] = AA.m_limbs[0];
                 BB.m_limbs[2 * i + 1] = AA.m_limbs[1];
-                //montgomery_reduce(result, AA.m_limbs[0], m, m_primed);
-                //montgomery_reduce(result, AA.m_limbs[1], m, m_primed);
+              
                 //we are done with the lowest word
                 AA >>= 64;
             }
-
-            /*static bool first = true;
-            if (blockIdx.x == 0 && threadIdx.x == 0 && first)
-            {
-
-                for (int i = 0; i < BB.LIMBS; i++)
-                {
-                    printf("W[%i] = 0x%08x BB[%i] = 0x%08x\n", i, W.m_limbs[i], i, BB.m_limbs[i]);
-
-                }
-                first = false;
-            }*/
             
             result = montgomery_reduce(BB, m, m_primed);
-           // BB = 0;
 
             //repeat for the top half of the square
 #pragma unroll
@@ -187,68 +143,22 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                //y = 0;
                 AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
 #pragma unroll
                 for (int j = 1; j <= y_size - i - (x.HIGH_WORD + 1) / 2; j++)
                 {
-                    //y.m_limbs[j] = yy[j];
                     AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
                 }
-                //AA += y;
 
                 //The lowest two terms are now complete and can be moved to the reduction step.
                 BB.m_limbs[2 * i] = AA.m_limbs[0];
                 BB.m_limbs[2 * i + 1] = AA.m_limbs[1];
-                //montgomery_reduce(result, AA.m_limbs[0], m, m_primed);
-                //montgomery_reduce(result, AA.m_limbs[1], m, m_primed);
+                
                 //we are done with the lowest word
                 AA >>= 64;
             }
 
             result += BB;
-
-            
-
-
-            //xx = x >> (32 * (x.HIGH_WORD + 1)/ 2);
-            //for (int i = 0; i <= x.HIGH_WORD / 2; i++)
-            //{
-            //    uint32_t w = xx.m_limbs[0];
-            //    xx >>= 32;
-            //    //the square term
-            //    uint64_t sq = static_cast<uint64_t>(w) * w;
-            //    y = xx * w;
-            //    y <<= 33;
-            //    //add the square term to the doubled terms
-            //    y.m_limbs[0] = sq;
-            //    uint32_t sq_upper = sq >> 32;
-            //    y.m_limbs[1] += sq_upper;
-            //    //the carry can propogate max 1 word since all the double terms are even
-            //    y.m_limbs[2] += (y.m_limbs[1] < sq_upper ? 1 : 0);
-            //    //Accumulate
-            //    AA += y;
-            //    //AA += sq;
-            //    //the lowest two terms are complete and can be added to the reduction
-            //    BB.m_limbs[2 * i] = AA.m_limbs[0];
-            //    BB.m_limbs[2 * i + 1] = AA.m_limbs[1];
-            //    //uint64_t t = static_cast<uint64_t>(A.m_limbs[0]) | (static_cast<uint64_t>(A.m_limbs[1]) << 32);
-            //    //we are done with the lowest word
-            //    AA >>= 64;
-            //}
-            //result += BB;
-
-            /*static bool f1 = true;
-            if (blockIdx.x == 0 && threadIdx.x == 0 && f1)
-            {
-
-                for (int i = 0; i < BB.LIMBS; i++)
-                {
-                    printf("W[%i] = 0x%08x BB[%i] = 0x%08x\n", i + BB.HIGH_WORD + 1, W.m_limbs[i + BB.HIGH_WORD + 1], i, BB.m_limbs[i]);
-
-                }
-                f1 = false;
-            }*/
 
             if (result >= m)
             {
@@ -256,53 +166,6 @@ namespace nexusminer {
             }
 
             return result;
-            
-            ////square
-            //const int t = x.LIMBS;
-            //uint64_t w[2*t];
-            //for (int i = 0; i < 2 * t; i++)
-            //{
-            //    w[i] = 0;
-            //}
-            //for (int i = 0; i < t; i++)
-            //{
-            //    
-            //    uint64_t uv = w[2 * i] + static_cast<uint64_t>(x.m_limbs[i]) * x.m_limbs[i];
-            //    w[2 * i] = uv & 0xFFFFFFFF;
-            //    uint64_t c = uv >> 32;
-            //    for (int j = i + 1; j < t; j++)
-            //    {
-            //        uv = static_cast<uint64_t>(x.m_limbs[j]) * x.m_limbs[i];
-            //        bool carry = uv & (0x1ull << 63);
-            //        uv = w[i + j] + 2 * uv + c;
-            //        w[i + j] = uv & 0xFFFFFFFF;
-            //        c = (uv >> 32) | (carry ? (1ull << 32) : 0);
-            //    }
-            //    w[i + t] = c;
-            //}
-
-            //Cump<BITS> A;
-            //for (int i = 0; i <= A.HIGH_WORD; i++)
-            //{
-            //    A.m_limbs[i] = w[i];
-
-            //}
-
-            //Cump<BITS> result = montgomery_reduce(A, m, m_primed);
-            //for (int i = 0; i <= A.HIGH_WORD; i++)
-            //{
-            //    A.m_limbs[i] = w[i + A.HIGH_WORD + 1];
-
-            //}
-            //result += A;
-
-
-            //if (result >= m)
-            //{
-            //    result -= m;
-            //}
-
-            //return result;
             
         }
 

@@ -20,7 +20,7 @@ namespace nexusminer {
 			static const int BITS_PER_WORD = 32;
 			//LIMBS is the number of machine words used to store the big int
 			//we allocate one extra word to handle overflow and normalization in division algorithm
-			static const int EXTRA_WORDS = 2;
+			static const int EXTRA_WORDS = 1;
 			static const int HIGH_WORD = (BITS + BITS_PER_WORD - 1) / BITS_PER_WORD - 1; //round up 
 			static const int LIMBS = HIGH_WORD + 1 + EXTRA_WORDS;  //extra word(s) for overflow
 			
