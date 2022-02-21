@@ -95,7 +95,7 @@ namespace nexusminer {
             get_next_fermat_candidate(chains[index], base_offset, relative_offset);
             offset64 = base_offset + relative_offset;
            
-            const bool is_prime = powm_2(*base_int, offset64) == 1;
+            const bool is_prime = powm_2(*base_int, offset64);
             update_fermat_status(chains[index], is_prime);
             if (thread_index % threads_per_instance == 0)
             {

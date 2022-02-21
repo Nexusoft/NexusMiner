@@ -111,7 +111,7 @@ namespace nexusminer {
 		template<int BITS> __device__ Cump<BITS> montgomery_square_2(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ void montgomery_reduce(Cump<BITS>& A, uint32_t x, const Cump<BITS>& m, uint32_t m_primed);
-		template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& m, uint64_t offset);
+		template<int BITS> __device__ bool powm_2(const Cump<BITS>& m, uint64_t offset);
 		template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m, int shift);
 
 

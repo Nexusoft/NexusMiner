@@ -201,10 +201,10 @@ namespace nexusminer {
             A >>= 32;
         }
 
-        //returns 2^(m-1) mod m
+        //returns true if 2^(m-1) mod m == 1, false otherwise
         //m_primed and rmodm are precalculated values.  See hac 14.94.  
         //R^2 mod m is not needed because with base 2 is trivial to calculate 2*R mod m given R mod m
-        template<int BITS> __device__ Cump<BITS> powm_2(const Cump<BITS>& base_m, uint64_t offset)
+        template<int BITS> __device__ bool powm_2(const Cump<BITS>& base_m, uint64_t offset)
         {
             const Cump<BITS>& m = base_m + offset;
             
@@ -236,15 +236,21 @@ namespace nexusminer {
                 {
                     //multiply by the base (2) if the exponent bit is set
                     A = double_and_reduce(A, m, 1);
-                }
-            }
-           
-            //the final iteration. the exponent m-1 lowest bit is always 0 so we never need to double and reduce after squaring
-            A = montgomery_square_2(A, m, m_primed);
 
+                }
+                
+            }
+            //the final iteration happens here. the exponent m-1 lowest bit is always 0 so we never need to double and reduce after squaring
+            //The final squaring can be avoided if we check the if the current value is +1 or -1 in the montgomery domain 
+            bool pass = false;
+            if (A == m.R_mod_m() || A == (m - m.R_mod_m()))
+            {
+                pass = true;
+            }    
+            //A = montgomery_square_2(A, m, m_primed);
             //convert back from montgomery domain
-            A = montgomery_reduce(A, m, m_primed);
-            return A;
+            //A = montgomery_reduce(A, m, m_primed);
+            return pass;
 
         }
         
