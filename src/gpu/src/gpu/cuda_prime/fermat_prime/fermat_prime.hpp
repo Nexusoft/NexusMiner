@@ -11,6 +11,12 @@
 namespace nexusminer {
 	namespace gpu {
 
+		struct trial_divisors_uint32_t
+		{
+			uint32_t divisor;
+			uint32_t starting_multiple;
+		};
+
 		class Fermat_prime_impl;
 		class Fermat_prime
 		{
@@ -27,9 +33,14 @@ namespace nexusminer {
 			void set_chain_ptr(CudaChain* chains, uint32_t* chain_count);
 			void set_offsets(uint64_t offsets[], uint64_t offset_count);
 			void get_results(uint8_t results[]);
-			void get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes);
+			void get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes, uint64_t& trial_division_tests,
+				uint64_t& trial_division_composites);
 			void reset_stats();
 			void synchronize();
+
+			void trial_division_chain_run();
+			void trial_division_init(uint32_t trial_divisor_count, trial_divisors_uint32_t trial_divisors[], int device);
+			void trial_division_free();
 
 			void test_init(uint64_t batch_size, int device);
 			void test_free();

@@ -73,6 +73,8 @@ namespace nexusminer {
 			//static constexpr int m_medium_large_prime_count = 32 * 4500;
 			static constexpr int m_large_prime_count = 32 * 50000;
 			//static constexpr int m_large_prime_2_count = 32 * 140000;
+			static constexpr int m_trial_division_prime_count = 32 * 100000;
+
 			static const int chain_histogram_max = 10;  
 			//static const uint64_t m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
 			//static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;

@@ -68,8 +68,8 @@ namespace gpu
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		cuda_fermat_test_cump.get_results(primality_test_results.data());
-		uint64_t cuda_primality_test_count, cuda_primality_pass_count;
-		cuda_fermat_test_cump.get_stats(cuda_primality_test_count, cuda_primality_pass_count);
+		uint64_t cuda_primality_test_count, cuda_primality_pass_count, trial_division_count, composite_count;
+		cuda_fermat_test_cump.get_stats(cuda_primality_test_count, cuda_primality_pass_count, trial_division_count, composite_count);
 		cuda_fermat_test_cump.fermat_free();
 
 
@@ -242,11 +242,21 @@ namespace gpu
 		//range_per_eight_chain = 1 / expected_chain_density;
 		//m_logger->info("Approximate range to find one 8-chain: {:.1E} ", range_per_eight_chain);
 		//process chains
+		//trial divsision test
 		test_sieve.gpu_reset_fermat_stats();
+		start = std::chrono::steady_clock::now();
+		test_sieve.gpu_run_trial_division_chain_test();
+		end = std::chrono::steady_clock::now();
+		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		double trial_divsion_elapsed_s = elapsed.count() / 1000.0;
+		test_sieve.gpu_fermat_synchronize();
 		test_sieve.gpu_run_fermat_chain_test();
 		test_sieve.gpu_fermat_synchronize();
-		uint64_t test_attempts, passes;
-		test_sieve.gpu_get_fermat_stats(test_attempts, passes);
+		uint64_t test_attempts, passes, trial_divisions, composites;
+		test_sieve.gpu_get_fermat_stats(test_attempts, passes, trial_divisions, composites);
+		m_logger->info("Trial division composites: {}/{} ({:.3f}%) in {:.4f} seconds. {:.2f}us/chain.",
+			composites, test_attempts, 100.0 * composites / test_attempts, trial_divsion_elapsed_s, 1.0e6*trial_divsion_elapsed_s/ test_attempts);
+
 		m_logger->info("Fermat primes: {}/{} ({:.3f}%). Expected about {:.3f}%.",
 			passes, test_attempts, 100.0*passes/test_attempts, fermat_positive_rate_expected * 100.0);
 		//test_sieve.clear_chains();

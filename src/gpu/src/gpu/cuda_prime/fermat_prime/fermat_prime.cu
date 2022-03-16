@@ -50,9 +50,10 @@ namespace nexusminer {
             m_impl->get_results(results);
         }
 
-        void Fermat_prime::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes)
+        void Fermat_prime::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes,
+            uint64_t& trial_division_tests, uint64_t& trial_division_composites)
         {
-            m_impl->get_stats(fermat_tests, fermat_passes);
+            m_impl->get_stats(fermat_tests, fermat_passes, trial_division_tests, trial_division_composites);
         }
 
         void Fermat_prime::reset_stats()
@@ -63,6 +64,21 @@ namespace nexusminer {
         void Fermat_prime::synchronize()
         {
             m_impl->synchronize();
+        }
+
+        void Fermat_prime::trial_division_chain_run()
+        {
+            m_impl->trial_division_chain_run();
+        }
+
+        void Fermat_prime::trial_division_init(uint32_t trial_divisor_count, trial_divisors_uint32_t trial_divisors[], int device)
+        {
+            m_impl->trial_division_init(trial_divisor_count, trial_divisors, device);
+        }
+
+        void Fermat_prime::trial_division_free()
+        {
+            m_impl->trial_division_free();
         }
 
         void Fermat_prime::test_init(uint64_t batch_size, int device)

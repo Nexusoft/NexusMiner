@@ -54,7 +54,8 @@ namespace nexusminer {
 			void get_long_chains();
 			void gpu_clean_chains();
 			void gpu_run_fermat_chain_test();
-			void gpu_get_fermat_stats(uint64_t& tests, uint64_t& passes);
+			void gpu_run_trial_division_chain_test();
+			void gpu_get_fermat_stats(uint64_t& tests, uint64_t& passes, uint64_t& trial_division_tests, uint64_t& trial_division_composites);
 			void gpu_reset_fermat_stats();
 			uint32_t get_chain_count();
 			uint64_t count_fermat_primes(int sample_size, uint16_t device);
@@ -74,12 +75,13 @@ namespace nexusminer {
 			std::vector<sieve_word_t> get_sieve(); //return a copy of the raw sieve
 			std::vector<uint64_t> get_prime_candidate_offsets();
 			std::vector<uint32_t> get_sieving_primes();
-			bool chain_trial_division(Chain& chain);
-			void do_chain_trial_division_check();
+			//bool chain_trial_division(Chain& chain);
+			//void do_chain_trial_division_check();
 			void gpu_get_stats();
 			void gpu_sieve_synchronize();
 			void gpu_fermat_synchronize();
 			Cuda_sieve::Cuda_sieve_properties get_sieve_properties();
+			void generate_trial_divisors();
 
 		private:
 			//mod 30 wheel using primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
@@ -102,6 +104,7 @@ namespace nexusminer {
 			uint32_t m_medium_small_prime_limit;
 			uint32_t m_sieving_prime_limit;
 			uint32_t m_large_prime_limit;
+			uint32_t m_trial_division_prime_limit;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
 			const int m_fermat_test_batch_size = 200000;
 			const int m_fermat_test_batch_size_max = 1000000;
@@ -149,10 +152,11 @@ namespace nexusminer {
 			std::vector<uint32_t> m_large_sieving_primes;
 			std::vector<uint32_t> m_large_multiples;
 			std::vector<uint32_t> m_small_prime_lookup_table;
+			std::vector<trial_divisors_uint32_t> m_trial_divisors;
 
 			std::vector<Chain> m_chain;
 			std::vector<CudaChain>m_cuda_chains;
-			std::vector<double>m_large_prime_mod_constants;
+			//std::vector<double>m_large_prime_mod_constants;
 
 			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;

@@ -91,7 +91,7 @@ namespace nexusminer {
                 //Accumulate
                 AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
 #pragma unroll
-                for (int j = 1; j <= y_size - i; j++)
+                for (int j = 1; j <= y_size - i - 1; j++)
                 {
                     AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
                                     
@@ -223,7 +223,7 @@ namespace nexusminer {
             int mask = ((1 << top_bits_window) - 1) << shift;
             int top_bits = (m.m_limbs[word] & mask) >> shift;
             A = double_and_reduce(A, m, top_bits);
-            //Go through each bit of the exponment.  We assume all words except the lower three match the base big int
+            //Go through each bit of the exponent.  We assume all words except the lower three match the base big int
             for (auto i = BITS - top_bits_window - 1; i >= 1; i--)
             {
                 //square
