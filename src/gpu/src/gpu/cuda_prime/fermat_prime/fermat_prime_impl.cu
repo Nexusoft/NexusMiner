@@ -1,22 +1,22 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+//#include "hip/hip_runtime.h"
+//#include "hip/hip_runtime.h"
+//#include "device_launch_parameters.h"
 
 #include "fermat_prime_impl.cuh"
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <stdio.h>
 #include <math.h>
 #include <inttypes.h>
 #include "../fermat_prime/fermat_utils.cuh"
 #include "../cuda_chain.cuh"
 
-
 #ifndef checkCudaErrors
 #define checkCudaErrors(call)                                \
   do {                                                        \
-    cudaError_t err = call;                                   \
-    if (err != cudaSuccess) {                                 \
+    hipError_t err = call;                                   \
+    if (err != hipSuccess) {                                 \
       printf("CUDA error at %s %d: %s\n", __FILE__, __LINE__, \
-             cudaGetErrorString(err));                        \
+             hipGetErrorString(err));                        \
       exit(EXIT_FAILURE);                                     \
     }                                                         \
   } while (0)
@@ -69,11 +69,11 @@ namespace nexusminer {
 
             int blocks = (m_offset_count + instances_per_block - 1) / instances_per_block;
 
-           kernel_fermat << <blocks, threads_per_block >> > (d_offsets, d_offset_count, d_base_int,
+           kernel_fermat <<<blocks, threads_per_block >>> (d_offsets, d_offset_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
-            checkCudaErrors(cudaPeekAtLastError());
-            checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(hipPeekAtLastError());
+            checkCudaErrors(hipDeviceSynchronize());
         }
 
 
@@ -118,14 +118,14 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             uint32_t chain_count;
-            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
             
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
-            fermat_test_chains << <blocks, threads_per_block >> > (d_chains, d_chain_count, d_base_int,
+            fermat_test_chains <<<blocks, threads_per_block >>> (d_chains, d_chain_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
-            checkCudaErrors(cudaPeekAtLastError());
-            checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(hipPeekAtLastError());
+            checkCudaErrors(hipDeviceSynchronize());
         }
 
         //allocate device memory for gpu fermat testing.  we use a fixed maximum batch size and allocate device memory once at the beginning. 
@@ -134,71 +134,71 @@ namespace nexusminer {
 
             m_device = device;
 
-            checkCudaErrors(cudaSetDevice(device));
-            checkCudaErrors(cudaMalloc(&d_base_int, sizeof(*d_base_int)));
-            checkCudaErrors(cudaMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
-            checkCudaErrors(cudaMalloc(&d_results, sizeof(*d_results) * batch_size));
-            checkCudaErrors(cudaMalloc(&d_offset_count, sizeof(*d_offset_count)));
-            checkCudaErrors(cudaMalloc(&d_fermat_test_count, sizeof(*d_fermat_test_count)));
-            checkCudaErrors(cudaMalloc(&d_fermat_pass_count, sizeof(*d_fermat_pass_count)));
-            checkCudaErrors(cudaMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
-            checkCudaErrors(cudaMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
-            checkCudaErrors(cudaMalloc(&d_trial_division_test_count, sizeof(*d_trial_division_test_count)));
-            checkCudaErrors(cudaMalloc(&d_trial_division_composite_count, sizeof(*d_trial_division_composite_count)));
-            checkCudaErrors(cudaMemset(d_trial_division_test_count, 0, sizeof(*d_trial_division_test_count)));
-            checkCudaErrors(cudaMemset(d_trial_division_composite_count, 0, sizeof(*d_trial_division_composite_count)));
+            checkCudaErrors(hipSetDevice(device));
+            checkCudaErrors(hipMalloc(&d_base_int, sizeof(*d_base_int)));
+            checkCudaErrors(hipMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
+            checkCudaErrors(hipMalloc(&d_results, sizeof(*d_results) * batch_size));
+            checkCudaErrors(hipMalloc(&d_offset_count, sizeof(*d_offset_count)));
+            checkCudaErrors(hipMalloc(&d_fermat_test_count, sizeof(*d_fermat_test_count)));
+            checkCudaErrors(hipMalloc(&d_fermat_pass_count, sizeof(*d_fermat_pass_count)));
+            checkCudaErrors(hipMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
+            checkCudaErrors(hipMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
+            checkCudaErrors(hipMalloc(&d_trial_division_test_count, sizeof(*d_trial_division_test_count)));
+            checkCudaErrors(hipMalloc(&d_trial_division_composite_count, sizeof(*d_trial_division_composite_count)));
+            checkCudaErrors(hipMemset(d_trial_division_test_count, 0, sizeof(*d_trial_division_test_count)));
+            checkCudaErrors(hipMemset(d_trial_division_composite_count, 0, sizeof(*d_trial_division_composite_count)));
 
         }
 
         void Fermat_prime_impl::fermat_free()
         {
-            checkCudaErrors(cudaSetDevice(m_device));
-            checkCudaErrors(cudaFree(d_base_int));
-            checkCudaErrors(cudaFree(d_offsets));
-            checkCudaErrors(cudaFree(d_results));
-            checkCudaErrors(cudaFree(d_offset_count));
-            checkCudaErrors(cudaFree(d_fermat_test_count));
-            checkCudaErrors(cudaFree(d_fermat_pass_count));
-            checkCudaErrors(cudaFree(d_trial_division_test_count));
-            checkCudaErrors(cudaFree(d_trial_division_composite_count));
+            checkCudaErrors(hipSetDevice(m_device));
+            checkCudaErrors(hipFree(d_base_int));
+            checkCudaErrors(hipFree(d_offsets));
+            checkCudaErrors(hipFree(d_results));
+            checkCudaErrors(hipFree(d_offset_count));
+            checkCudaErrors(hipFree(d_fermat_test_count));
+            checkCudaErrors(hipFree(d_fermat_pass_count));
+            checkCudaErrors(hipFree(d_trial_division_test_count));
+            checkCudaErrors(hipFree(d_trial_division_composite_count));
         }
 
         void Fermat_prime_impl::set_base_int(mpz_t base_big_int)
         {
-            checkCudaErrors(cudaSetDevice(m_device));
+            checkCudaErrors(hipSetDevice(m_device));
             Cump<1024> cuda_base_big_int;
             cuda_base_big_int.from_mpz(base_big_int);
-            checkCudaErrors(cudaMemcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), cudaMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), hipMemcpyHostToDevice));
             mpz_set(m_base_int, base_big_int);
         }
 
         void Fermat_prime_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
         {
-            checkCudaErrors(cudaMemcpy(d_offsets, offsets, sizeof(*offsets) * offset_count, cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_offset_count, &offset_count, sizeof(offset_count), cudaMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_offsets, offsets, sizeof(*offsets) * offset_count, hipMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_offset_count, &offset_count, sizeof(offset_count), hipMemcpyHostToDevice));
             m_offset_count = offset_count;
         }
 
         void Fermat_prime_impl::get_results(uint8_t results[])
         {
-            checkCudaErrors(cudaMemcpy(results, d_results, sizeof(uint8_t) * m_offset_count, cudaMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(results, d_results, sizeof(uint8_t) * m_offset_count, hipMemcpyDeviceToHost));
         }
 
         void Fermat_prime_impl::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes,
             uint64_t& trial_division_tests, uint64_t& trial_division_composites)
         {
-            checkCudaErrors(cudaMemcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(&trial_division_tests, d_trial_division_test_count, sizeof(*d_trial_division_test_count), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(&trial_division_composites, d_trial_division_composite_count, sizeof(*d_trial_division_composite_count), cudaMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), hipMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), hipMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&trial_division_tests, d_trial_division_test_count, sizeof(*d_trial_division_test_count), hipMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&trial_division_composites, d_trial_division_composite_count, sizeof(*d_trial_division_composite_count), hipMemcpyDeviceToHost));
         }
 
         void Fermat_prime_impl::reset_stats()
         {
-            checkCudaErrors(cudaMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
-            checkCudaErrors(cudaMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
-            checkCudaErrors(cudaMemset(d_trial_division_test_count, 0, sizeof(*d_trial_division_test_count)));
-            checkCudaErrors(cudaMemset(d_trial_division_composite_count, 0, sizeof(*d_trial_division_composite_count)));
+            checkCudaErrors(hipMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
+            checkCudaErrors(hipMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
+            checkCudaErrors(hipMemset(d_trial_division_test_count, 0, sizeof(*d_trial_division_test_count)));
+            checkCudaErrors(hipMemset(d_trial_division_composite_count, 0, sizeof(*d_trial_division_composite_count)));
         }
 
         void Fermat_prime_impl::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
@@ -206,12 +206,12 @@ namespace nexusminer {
             d_chains = chains;
             d_chain_count = chain_count;
             uint32_t chain_count_test;
-            checkCudaErrors(cudaMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
         }
 
         void Fermat_prime_impl::synchronize()
         {
-            checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(hipDeviceSynchronize());
         }
 
         __global__ void trial_division_chains(CudaChain* chains, uint32_t* chain_count, trial_divisors_uint32_t* trial_divisors,
@@ -263,33 +263,33 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             uint32_t chain_count;
-            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
 
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
-            trial_division_chains << <blocks, threads_per_block >> > (d_chains, d_chain_count, d_trial_divisors, 
+            trial_division_chains <<<blocks, threads_per_block >>> (d_chains, d_chain_count, d_trial_divisors, 
                 d_trial_divisor_count, d_trial_division_test_count, d_trial_division_composite_count);
 
-            checkCudaErrors(cudaPeekAtLastError());
-            checkCudaErrors(cudaDeviceSynchronize());
+            checkCudaErrors(hipPeekAtLastError());
+            checkCudaErrors(hipDeviceSynchronize());
         }
 
         void Fermat_prime_impl::trial_division_init(uint32_t trial_divisor_count, trial_divisors_uint32_t trial_divisors[],
             int device)
         {
-            checkCudaErrors(cudaSetDevice(device));
-            checkCudaErrors(cudaMalloc(&d_trial_divisor_count, sizeof(*d_trial_divisor_count)));
-            checkCudaErrors(cudaMalloc(&d_trial_divisors, trial_divisor_count * sizeof(*d_trial_divisors)));
+            checkCudaErrors(hipSetDevice(device));
+            checkCudaErrors(hipMalloc(&d_trial_divisor_count, sizeof(*d_trial_divisor_count)));
+            checkCudaErrors(hipMalloc(&d_trial_divisors, trial_divisor_count * sizeof(*d_trial_divisors)));
             
-            checkCudaErrors(cudaMemcpy(d_trial_divisors, trial_divisors, trial_divisor_count * sizeof(*d_trial_divisors), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_trial_divisor_count, &trial_divisor_count, sizeof(*d_trial_divisor_count), cudaMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_trial_divisors, trial_divisors, trial_divisor_count * sizeof(*d_trial_divisors), hipMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_trial_divisor_count, &trial_divisor_count, sizeof(*d_trial_divisor_count), hipMemcpyHostToDevice));
 
         }
 
         void Fermat_prime_impl::trial_division_free()
         {
-            checkCudaErrors(cudaSetDevice(m_device));
-            checkCudaErrors(cudaFree(d_trial_divisor_count));
-            checkCudaErrors(cudaFree(d_trial_divisors));
+            checkCudaErrors(hipSetDevice(m_device));
+            checkCudaErrors(hipFree(d_trial_divisor_count));
+            checkCudaErrors(hipFree(d_trial_divisors));
             
 
         }
@@ -297,21 +297,21 @@ namespace nexusminer {
         void Fermat_prime_impl::test_init(uint64_t batch_size, int device)
         {
             m_device = device;
-            checkCudaErrors(cudaSetDevice(device));
-            checkCudaErrors(cudaMalloc(&d_test_a, sizeof(*d_test_a) * batch_size));
-            checkCudaErrors(cudaMalloc(&d_test_b, sizeof(*d_test_b) * batch_size));
-            checkCudaErrors(cudaMalloc(&d_test_results, sizeof(*d_test_results) * batch_size));
-            checkCudaErrors(cudaMalloc(&d_test_vector_size, sizeof(*d_test_vector_size)));
+            checkCudaErrors(hipSetDevice(device));
+            checkCudaErrors(hipMalloc(&d_test_a, sizeof(*d_test_a) * batch_size));
+            checkCudaErrors(hipMalloc(&d_test_b, sizeof(*d_test_b) * batch_size));
+            checkCudaErrors(hipMalloc(&d_test_results, sizeof(*d_test_results) * batch_size));
+            checkCudaErrors(hipMalloc(&d_test_vector_size, sizeof(*d_test_vector_size)));
 
         }
 
         void Fermat_prime_impl::test_free()
         {
-            checkCudaErrors(cudaSetDevice(m_device));
-            checkCudaErrors(cudaFree(d_test_a));
-            checkCudaErrors(cudaFree(d_test_b));
-            checkCudaErrors(cudaFree(d_test_results));
-            checkCudaErrors(cudaFree(d_test_vector_size));
+            checkCudaErrors(hipSetDevice(m_device));
+            checkCudaErrors(hipFree(d_test_a));
+            checkCudaErrors(hipFree(d_test_b));
+            checkCudaErrors(hipFree(d_test_results));
+            checkCudaErrors(hipFree(d_test_vector_size));
 
         }
 
@@ -323,8 +323,8 @@ namespace nexusminer {
             {
                 vector_a[i].from_mpz(a[i]);
             }
-            checkCudaErrors(cudaMemcpy(d_test_a, vector_a, sizeof(*vector_a) * count, cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_test_vector_size, &count, sizeof(count), cudaMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_test_a, vector_a, sizeof(*vector_a) * count, hipMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_test_vector_size, &count, sizeof(count), hipMemcpyHostToDevice));
             delete[] vector_a;
         }
 
@@ -336,7 +336,7 @@ namespace nexusminer {
             {
                 vector_b[i].from_mpz(b[i]);
             }
-            checkCudaErrors(cudaMemcpy(d_test_b, vector_b, sizeof(*vector_b) * count, cudaMemcpyHostToDevice));
+            checkCudaErrors(hipMemcpy(d_test_b, vector_b, sizeof(*vector_b) * count, hipMemcpyHostToDevice));
             delete[] vector_b;
         }
 
@@ -345,7 +345,7 @@ namespace nexusminer {
         void Fermat_prime_impl::get_test_results(mpz_t* test_results)
         {
             Cump<1024>* results = new Cump<1024>[m_test_vector_a_size];
-            checkCudaErrors(cudaMemcpy(results, d_test_results, sizeof(*d_test_results) * m_test_vector_a_size, cudaMemcpyDeviceToHost));
+            checkCudaErrors(hipMemcpy(results, d_test_results, sizeof(*d_test_results) * m_test_vector_a_size, hipMemcpyDeviceToHost));
             for (auto i = 0; i < m_test_vector_a_size; i++)
             {
                 //mpz_init(test_results[i]);
@@ -394,9 +394,9 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            logic_test_kernel << <blocks, threads_per_block >> > (d_test_a, d_test_b, d_test_results, d_test_vector_size);
-            checkCudaErrors(cudaPeekAtLastError());
-            checkCudaErrors(cudaDeviceSynchronize());
+            logic_test_kernel <<<blocks, threads_per_block >>> (d_test_a, d_test_b, d_test_results, d_test_vector_size);
+            checkCudaErrors(hipPeekAtLastError());
+            checkCudaErrors(hipDeviceSynchronize());
         }
 
         

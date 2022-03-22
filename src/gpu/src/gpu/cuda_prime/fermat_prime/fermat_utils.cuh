@@ -3,8 +3,7 @@
 //math functions used with fermat testing
 
 #include <stdint.h>
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "hip/hip_runtime.h"
 
 namespace nexusminer {
 	namespace gpu {

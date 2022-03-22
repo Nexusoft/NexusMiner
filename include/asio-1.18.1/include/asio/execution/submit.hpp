@@ -389,10 +389,12 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR const asio_execution_submit_fn::impl&
+static //ASIO_CONSTEXPR
+ const asio_execution_submit_fn::impl&
   submit = asio_execution_submit_fn::static_instance<>::instance;
 
 } // namespace
+
 
 template <typename S, typename R>
 struct can_submit :

@@ -3,22 +3,21 @@ namespace nexusminer {
     namespace gpu {
         __device__ __forceinline__ uint32_t add_cc(uint32_t a, uint32_t b) {
             uint32_t r;
-
-            asm volatile ("add.cc.u32 %0, %1, %2;" : "=r"(r) : "r"(a), "r"(b));
+            asm volatile ("V_ADD_CO_U32 %0, vcc, %1, %2;" : "=v"(r) : "v"(a), "v"(b));
             return r;
         }
 
         __device__ __forceinline__ uint32_t addc_cc(uint32_t a, uint32_t b) {
             uint32_t r;
-
-            asm volatile ("addc.cc.u32 %0, %1, %2;" : "=r"(r) : "r"(a), "r"(b));
+            //asm volatile ("addc.cc.u32 %0, %1, %2;" : "=r"(r) : "r"(a), "r"(b));
+            asm volatile ("V_ADD_CO_CI_U32 %0, %1, %2;" : "=v"(r) : "v"(a), "v"(b));
             return r;
         }
 
         __device__ __forceinline__ uint32_t addc(uint32_t a, uint32_t b) {
             uint32_t r;
 
-            asm volatile ("addc.u32 %0, %1, %2;" : "=r"(r) : "r"(a), "r"(b));
+            asm volatile ("V_ADD_CO_CI_U32 %0, %1, %2;" : "=v"(r) : "v"(a), "v"(b));
             return r;
         }
 
@@ -99,12 +98,12 @@ namespace nexusminer {
             return r;
         }
 
-        __device__ __forceinline__ uint64_t mad_wide(uint32_t a, uint32_t b, uint64_t c) {
+        /* __device__ __forceinline__ uint64_t mad_wide(uint32_t a, uint32_t b, uint64_t c) {
             uint64_t r;
 
             asm volatile ("mad.wide.u32 %0, %1, %2, %3;" : "=l"(r) : "r"(a), "r"(b), "l"(c));
             return r;
-        }
+        } */
     }
 }
 

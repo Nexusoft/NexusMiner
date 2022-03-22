@@ -22,7 +22,7 @@ namespace nexusminer {
         }
 
         template<int BITS>
-        Cump<BITS>::Cump(int init) : m_limbs{}
+        __host__ __device__ Cump<BITS>::Cump(int init) : m_limbs{}
         {
             m_limbs[0] = init;
             if (init < 0)

@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 /***
 
 Copyright (c) 2018-2019, NVIDIA CORPORATION.  All rights reserved.
@@ -25,12 +26,12 @@ IN THE SOFTWARE.
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <gmp.h>
 #include "fermat_test_impl.cuh"
 #include "cgbn/cgbn.h"
 #include "cgbn/utility/support.h"
-#include "cuda_runtime.h"
+#include "hip/hip_runtime.h"
 #include "device_launch_parameters.h"
 #include "cuda_chain.cuh"
 //#include "nppdefs.h"
@@ -295,7 +296,7 @@ namespace nexusminer {
                 d_results, d_fermat_test_count, d_fermat_pass_count);
             
 
-            CUDA_CHECK(cudaDeviceSynchronize());
+            CUDA_CHECK(hipDeviceSynchronize());
             //CGBN_CHECK(d_report);
         }
 
@@ -307,13 +308,13 @@ namespace nexusminer {
             int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             uint32_t chain_count;
-            CUDA_CHECK(cudaMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(hipMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
 
             fermat_test_chains << <blocks, threads_per_block >> > (d_report, d_chains, d_chain_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
-            //CUDA_CHECK(cudaDeviceSynchronize());
+            //CUDA_CHECK(hipDeviceSynchronize());
             //CGBN_CHECK(d_report);
         }
 
@@ -323,13 +324,13 @@ namespace nexusminer {
             
             m_device = device;
 
-            CUDA_CHECK(cudaSetDevice(device));
-            CUDA_CHECK(cudaMalloc(&d_base_int, sizeof(*d_base_int)));
-            CUDA_CHECK(cudaMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
-            CUDA_CHECK(cudaMalloc(&d_results, sizeof(*d_results) * batch_size));
-            CUDA_CHECK(cudaMalloc(&d_offset_count, sizeof(*d_offset_count)));
-            CUDA_CHECK(cudaMalloc(&d_fermat_test_count, sizeof(*d_fermat_test_count)));
-            CUDA_CHECK(cudaMalloc(&d_fermat_pass_count, sizeof(*d_fermat_pass_count)));
+            CUDA_CHECK(hipSetDevice(device));
+            CUDA_CHECK(hipMalloc(&d_base_int, sizeof(*d_base_int)));
+            CUDA_CHECK(hipMalloc(&d_offsets, sizeof(*d_offsets) * batch_size));
+            CUDA_CHECK(hipMalloc(&d_results, sizeof(*d_results) * batch_size));
+            CUDA_CHECK(hipMalloc(&d_offset_count, sizeof(*d_offset_count)));
+            CUDA_CHECK(hipMalloc(&d_fermat_test_count, sizeof(*d_fermat_test_count)));
+            CUDA_CHECK(hipMalloc(&d_fermat_pass_count, sizeof(*d_fermat_pass_count)));
             reset_stats();
 
             // allocate memory for a cgbn_error_report for CGBN to report back errors. 
@@ -338,22 +339,22 @@ namespace nexusminer {
 
         void Cuda_fermat_test_impl::fermat_free()
         {
-            CUDA_CHECK(cudaSetDevice(m_device));
-            CUDA_CHECK(cudaFree(d_base_int));
-            CUDA_CHECK(cudaFree(d_offsets));
-            CUDA_CHECK(cudaFree(d_results));
-            CUDA_CHECK(cudaFree(d_offset_count));
-            CUDA_CHECK(cudaFree(d_fermat_test_count));
-            CUDA_CHECK(cudaFree(d_fermat_pass_count));
+            CUDA_CHECK(hipSetDevice(m_device));
+            CUDA_CHECK(hipFree(d_base_int));
+            CUDA_CHECK(hipFree(d_offsets));
+            CUDA_CHECK(hipFree(d_results));
+            CUDA_CHECK(hipFree(d_offset_count));
+            CUDA_CHECK(hipFree(d_fermat_test_count));
+            CUDA_CHECK(hipFree(d_fermat_pass_count));
             CUDA_CHECK(cgbn_error_report_free(d_report));
         }
 
         void Cuda_fermat_test_impl::set_base_int(mpz_t base_big_int)
         {
-            CUDA_CHECK(cudaSetDevice(m_device));
+            CUDA_CHECK(hipSetDevice(m_device));
             cgbn_mem_t<fermat_params_t::BITS> cgbn_base_int;
             from_mpz(base_big_int, cgbn_base_int._limbs, fermat_params_t::BITS / 32);
-            CUDA_CHECK(cudaMemcpy(d_base_int, &cgbn_base_int, sizeof(cgbn_base_int), cudaMemcpyHostToDevice));
+            CUDA_CHECK(hipMemcpy(d_base_int, &cgbn_base_int, sizeof(cgbn_base_int), hipMemcpyHostToDevice));
             mpz_set(m_base_int, base_big_int);
         }
 
@@ -361,27 +362,27 @@ namespace nexusminer {
         {
             cgbn_mem_t<64>* cgbn_offsets = new cgbn_mem_t<64>[offset_count];
             fermat_t::offsets_to_cgbn(offsets, offset_count, cgbn_offsets);
-            CUDA_CHECK(cudaMemcpy(d_offsets, cgbn_offsets, sizeof(cgbn_offsets) *  offset_count, cudaMemcpyHostToDevice));
-            CUDA_CHECK(cudaMemcpy(d_offset_count, &offset_count, sizeof(offset_count), cudaMemcpyHostToDevice));
+            CUDA_CHECK(hipMemcpy(d_offsets, cgbn_offsets, sizeof(cgbn_offsets) *  offset_count, hipMemcpyHostToDevice));
+            CUDA_CHECK(hipMemcpy(d_offset_count, &offset_count, sizeof(offset_count), hipMemcpyHostToDevice));
             m_offset_count = offset_count;
             delete[] cgbn_offsets;
         }
 
         void Cuda_fermat_test_impl::get_results(uint8_t results[])
         {
-            CUDA_CHECK(cudaMemcpy(results, d_results, sizeof(uint8_t) * m_offset_count, cudaMemcpyDeviceToHost));
+            CUDA_CHECK(hipMemcpy(results, d_results, sizeof(uint8_t) * m_offset_count, hipMemcpyDeviceToHost));
         }
 
         void Cuda_fermat_test_impl::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes)
         {
-            CUDA_CHECK(cudaMemcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), cudaMemcpyDeviceToHost));
-            CUDA_CHECK(cudaMemcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(hipMemcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), hipMemcpyDeviceToHost));
+            CUDA_CHECK(hipMemcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), hipMemcpyDeviceToHost));
         }
 
         void Cuda_fermat_test_impl::reset_stats()
         {
-            CUDA_CHECK(cudaMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
-            CUDA_CHECK(cudaMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
+            CUDA_CHECK(hipMemset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
+            CUDA_CHECK(hipMemset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
         }
 
         void Cuda_fermat_test_impl::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
@@ -389,12 +390,12 @@ namespace nexusminer {
             d_chains = chains;
             d_chain_count = chain_count;
             uint32_t chain_count_test;
-            CUDA_CHECK(cudaMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), cudaMemcpyDeviceToHost));
+            CUDA_CHECK(hipMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
         }
 
         void Cuda_fermat_test_impl::synchronize()
         {
-            CUDA_CHECK(cudaDeviceSynchronize());
+            CUDA_CHECK(hipDeviceSynchronize());
         }
 
     }

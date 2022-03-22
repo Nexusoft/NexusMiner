@@ -2,11 +2,11 @@
 #include "cpu/worker_hash.hpp"
 
 #include "fpga/worker_hash.hpp"
-#ifdef GPU_ENABLED
+#ifdef GPU_CUDA_ENABLED
 #include "gpu/worker_hash.hpp"
-#ifdef PRIME_ENABLED
-#include "gpu/worker_prime.hpp"
 #endif
+#if defined(PRIME_ENABLED) && defined(GPU_ENABLED)
+#include "gpu/worker_prime.hpp"
 #endif
 #ifdef PRIME_ENABLED
 #include "cpu/worker_prime.hpp"
@@ -143,12 +143,16 @@ void Worker_manager::create_workers()
                     m_logger->error("NexusMiner not built 'WITH_PRIME' -> no worker created!");
 #endif
                 }
+#if defined(GPU_CUDA_ENABLED) && !defined(PRIME_ENABLED)
                 else
                 {
                     m_workers.push_back(std::make_shared<gpu::Worker_hash>(m_io_context, worker_config));
                 }                
+#elif defined(GPU_AMD_ENABLED) && !defined(PRIME_ENABLED)
+                m_logger->error("NexusMiner 'WITH_GPU_AMD' but not 'WITH_PRIME'.  Hash mode on AMD is not supported. -> no worker created!");
+#endif
 #else
-                m_logger->error("NexusMiner not built 'WITH_GPU_CUDA' -> no worker created!");
+                m_logger->error("NexusMiner not built 'WITH_GPU_CUDA' or 'WITH_GPU_AMD' -> no worker created!");
 #endif
                 break;
             }

@@ -1,6 +1,6 @@
 #include "cuda_chain.cuh"
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "hip/hip_runtime.h"
+//#include "device_launch_parameters.h"
 #include <stdio.h>
 
 namespace nexusminer {
@@ -8,7 +8,7 @@ namespace nexusminer {
     {
        
         //add a new offset to the chain
-        __device__  void cuda_chain_push_back(CudaChain& chain, uint16_t offset)
+        __device__ void cuda_chain_push_back(CudaChain& chain, uint16_t offset)
         {
             if (chain.m_offset_count < chain.m_max_chain_length)
             {
@@ -19,7 +19,7 @@ namespace nexusminer {
             }
         }
        
-        __device__  void cuda_chain_open(CudaChain& chain, uint64_t base_offset)
+        __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset)
         {
             chain.m_base_offset = base_offset;
             chain.m_offsets[0] = 0; //the first offset is always zero
@@ -32,7 +32,7 @@ namespace nexusminer {
 
         //analyze the chain fermat test results.  
         //return the starting offset and length of the longest fermat chain that meets the mininmum gap requirement
-        __device__  void get_best_fermat_chain(const CudaChain& chain, uint64_t& base_offset, int& offset, int& best_length)
+        __device__ void get_best_fermat_chain(const CudaChain& chain, uint64_t& base_offset, int& offset, int& best_length)
         {
             base_offset = chain.m_base_offset;
             offset = 0;
@@ -80,7 +80,7 @@ namespace nexusminer {
         }
 
         //return true if there is more testing we can do. returns false if we should give up.
-        __device__  bool is_there_still_hope(CudaChain& chain)
+        __device__ bool is_there_still_hope(CudaChain& chain)
         {
             //there is nothing left to test
             if (chain.m_untested_count == 0)
@@ -121,7 +121,7 @@ namespace nexusminer {
         }
 
         //get the next untested fermat candidate.  prioritize candidates that bust the chain if they fail.  if there are no candidates return false.
-        __device__  bool get_next_fermat_candidate(CudaChain& chain, uint64_t& base_offset, int& offset)
+        __device__ bool get_next_fermat_candidate(CudaChain& chain, uint64_t& base_offset, int& offset)
         {
             // are there any extra links in the current chain?  i.e. if we are looking for 8-chains, and this chain has 9 candidates, there is one extra link.
             int extra_links = chain.m_prime_count + chain.m_untested_count - chain.m_min_chain_length;
@@ -170,7 +170,7 @@ namespace nexusminer {
 
 
         //set the fermat test status of an offset.  if the offset is not found return false.
-        __device__  bool update_fermat_status(CudaChain& chain, bool is_prime)
+        __device__ bool update_fermat_status(CudaChain& chain, bool is_prime)
         {
             chain.m_untested_count--;
             if (is_prime)

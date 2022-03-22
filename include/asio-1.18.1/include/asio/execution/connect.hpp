@@ -427,7 +427,8 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR const asio_execution_connect_fn::impl&
+static //ASIO_CONSTEXPR
+ const asio_execution_connect_fn::impl&
   connect = asio_execution_connect_fn::static_instance<>::instance;
 
 } // namespace

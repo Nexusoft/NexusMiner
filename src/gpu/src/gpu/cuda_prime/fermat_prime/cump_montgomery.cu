@@ -89,11 +89,17 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
+                //AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
+                uint64_t tmp_sum = AA.m_limbs[0] + yy[0];
+                uint8_t c = tmp_sum > 0xFFFFFFFF ? 1 : 0;
+                AA.m_limbs[0] = tmp_sum;
 #pragma unroll
                 for (int j = 1; j <= y_size - i - 1; j++)
                 {
-                    AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+                    //AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+                    tmp_sum = AA.m_limbs[i] + yy[i] + c;
+                    c = tmp_sum > 0xFFFFFFFF ? 1 : 0;
+                    AA.m_limbs[j] = tmp_sum;
                                     
                 }
                 

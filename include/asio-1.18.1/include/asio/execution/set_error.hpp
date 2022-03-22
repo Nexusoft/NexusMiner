@@ -208,7 +208,8 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR const asio_execution_set_error_fn::impl&
+static //ASIO_CONSTEXPR 
+const asio_execution_set_error_fn::impl&
   set_error = asio_execution_set_error_fn::static_instance<>::instance;
 
 } // namespace

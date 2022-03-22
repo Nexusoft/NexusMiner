@@ -2,7 +2,7 @@
 
 namespace nexusminer {
     namespace gpu {
-
+/* 
         //normalized multiprecision integer division.  Return both quotient and remainder.  Reference HAC chapter 14 algorithm 14.20.
         template<int BITS>
         __device__ void Cump<BITS>::divide(const Cump<BITS>& divisor, Cump<BITS>& quotient, Cump<BITS>& remainder) const
@@ -391,7 +391,7 @@ namespace nexusminer {
             }
             return;
         }
-
+ */
         //Calculate R mod m where m is the modulus (this), R is 2^BITS 
         //The upper word (but not the extra word) of m must be non-zero.  the object is m. 
         //m must be less than, but relatively close to 2^BITS for this to work efficiently.

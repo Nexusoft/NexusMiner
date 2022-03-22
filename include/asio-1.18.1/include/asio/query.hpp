@@ -244,7 +244,8 @@ const T static_instance<T>::instance = {};
 namespace asio {
 namespace {
 
-static ASIO_CONSTEXPR const asio_query_fn::impl&
+static //ASIO_CONSTEXPR
+ const asio_query_fn::impl&
   query = asio_query_fn::static_instance<>::instance;
 
 } // namespace

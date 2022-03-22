@@ -1,6 +1,7 @@
 #ifndef NEXUSMINER_GPU_CUDA_FIND_CHAIN_CUH
 #define NEXUSMINER_GPU_CUDA_FIND_CHAIN_CUH
 
+#include "hip/hip_runtime.h"
 #include "cuda_chain.cuh"
 #include <stdint.h>
 namespace nexusminer {

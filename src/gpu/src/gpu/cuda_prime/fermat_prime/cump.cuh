@@ -6,8 +6,8 @@
 
 #include <stdint.h>
 #include <gmp.h>
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "hip/hip_runtime.h"
+//#include "device_launch_parameters.h"
 #include "fermat_utils.cuh"
 
 namespace nexusminer {
@@ -66,9 +66,9 @@ namespace nexusminer {
 
 
 			__host__ __device__ Cump modinv(const Cump&) const;
-			__device__ void divide(const Cump& divisor, Cump& quotient, Cump& remainder) const;
+			//__device__ void divide(const Cump& divisor, Cump& quotient, Cump& remainder) const;
 			__device__ Cump R_mod_m() const;
-			__device__ void remainder(const Cump& divisor, Cump& remainder) const;
+			//__device__ void remainder(const Cump& divisor, Cump& remainder) const;
 
 			__host__ __device__ int compare(const Cump&) const;
 
@@ -91,8 +91,8 @@ namespace nexusminer {
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, uint32_t rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, uint32_t);
 		template<int BITS> __host__ __device__ Cump<BITS> operator * (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
-		template<int BITS> __device__ Cump<BITS> operator / (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
-		template<int BITS> __device__ Cump<BITS> operator % (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
+		//template<int BITS> __device__ Cump<BITS> operator / (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
+		//template<int BITS> __device__ Cump<BITS> operator % (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ bool operator > (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ bool operator > (const Cump<BITS>& lhs, int rhs);
 		template<int BITS> __host__ __device__ bool operator < (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
