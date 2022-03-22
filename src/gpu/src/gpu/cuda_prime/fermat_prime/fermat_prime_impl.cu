@@ -69,8 +69,8 @@ namespace nexusminer {
 
             int blocks = (m_offset_count + instances_per_block - 1) / instances_per_block;
 
-           kernel_fermat <<<blocks, threads_per_block >>> (d_offsets, d_offset_count, d_base_int,
-                d_results, d_fermat_test_count, d_fermat_pass_count);
+             hipLaunchKernelGGL(kernel_fermat, blocks, threads_per_block, 0, 0, d_offsets, d_offset_count, d_base_int,
+                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
             checkCudaErrors(hipPeekAtLastError());
             checkCudaErrors(hipDeviceSynchronize());
@@ -85,16 +85,17 @@ namespace nexusminer {
             const unsigned int thread_index = threadIdx.x;
             const int threads_per_instance = 1;
             const uint32_t index = block_id * num_threads / threads_per_instance + thread_index / threads_per_instance;
-
+            
+            
 
             if (index >= *chain_count)
                 return;
-
-            uint64_t offset64, base_offset;
-            int relative_offset;
+            
+            
+            uint64_t offset64 = 0, base_offset = 0;
+            int relative_offset = 0;
             get_next_fermat_candidate(chains[index], base_offset, relative_offset);
             offset64 = base_offset + relative_offset;
-           
             const bool is_prime = powm_2(*base_int, offset64);
             update_fermat_status(chains[index], is_prime);
             if (thread_index % threads_per_instance == 0)
@@ -107,7 +108,6 @@ namespace nexusminer {
                 atomicAdd(test_count, 1);
 
             }
-
         }
 
 
@@ -119,9 +119,10 @@ namespace nexusminer {
 
             uint32_t chain_count;
             checkCudaErrors(hipMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
-            
+            //printf("chain count %i\n", chain_count);
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
-            fermat_test_chains <<<blocks, threads_per_block >>> (d_chains, d_chain_count, d_base_int,
+            
+            hipLaunchKernelGGL(fermat_test_chains, blocks, threads_per_block, 0, 0, d_chains, d_chain_count, d_base_int,
                 d_results, d_fermat_test_count, d_fermat_pass_count);
 
             checkCudaErrors(hipPeekAtLastError());
@@ -205,8 +206,12 @@ namespace nexusminer {
         {
             d_chains = chains;
             d_chain_count = chain_count;
-            uint32_t chain_count_test;
-            checkCudaErrors(hipMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
+            //uint32_t chain_count_test;
+            //checkCudaErrors(hipMemcpy(&chain_count_test, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
+            //printf("chain count test %i\n", chain_count_test);
+            //CudaChain cc;
+            //checkCudaErrors(hipMemcpy(&cc, d_chains, sizeof(*d_chains), hipMemcpyDeviceToHost));
+            //printf("first chain offset count %i\n",cc.m_offset_count);
         }
 
         void Fermat_prime_impl::synchronize()
@@ -266,7 +271,7 @@ namespace nexusminer {
             checkCudaErrors(hipMemcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), hipMemcpyDeviceToHost));
 
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
-            trial_division_chains <<<blocks, threads_per_block >>> (d_chains, d_chain_count, d_trial_divisors, 
+            hipLaunchKernelGGL(trial_division_chains, blocks, threads_per_block, 0, 0, d_chains, d_chain_count, d_trial_divisors, 
                 d_trial_divisor_count, d_trial_division_test_count, d_trial_division_composite_count);
 
             checkCudaErrors(hipPeekAtLastError());
@@ -394,7 +399,7 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            logic_test_kernel <<<blocks, threads_per_block >>> (d_test_a, d_test_b, d_test_results, d_test_vector_size);
+            hipLaunchKernelGGL(logic_test_kernel, blocks, threads_per_block, 0, 0, d_test_a, d_test_b, d_test_results, d_test_vector_size);
             checkCudaErrors(hipPeekAtLastError());
             checkCudaErrors(hipDeviceSynchronize());
         }

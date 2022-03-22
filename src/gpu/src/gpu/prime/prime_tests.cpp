@@ -255,7 +255,7 @@ namespace gpu
 		uint64_t test_attempts, passes, trial_divisions, composites;
 		test_sieve.gpu_get_fermat_stats(test_attempts, passes, trial_divisions, composites);
 		m_logger->info("Trial division composites: {}/{} ({:.3f}%) in {:.4f} seconds. {:.2f}us/chain.",
-			composites, test_attempts, 100.0 * composites / test_attempts, trial_divsion_elapsed_s, 1.0e6*trial_divsion_elapsed_s/ test_attempts);
+		 	composites, test_attempts, 100.0 * composites / test_attempts, trial_divsion_elapsed_s, 1.0e6*trial_divsion_elapsed_s/ test_attempts);
 
 		m_logger->info("Fermat primes: {}/{} ({:.3f}%). Expected about {:.3f}%.",
 			passes, test_attempts, 100.0*passes/test_attempts, fermat_positive_rate_expected * 100.0);

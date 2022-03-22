@@ -2,7 +2,7 @@
 #define NEXUSMINER_GPU_PRIME_TESTS_HPP
 #include <spdlog/spdlog.h>
 #include <boost/multiprecision/cpp_int.hpp>
-#include "../cuda_prime/fermat_test.hpp"
+//#include "../cuda_prime/fermat_test.hpp"
 
 
 namespace nexusminer {

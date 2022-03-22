@@ -8,7 +8,7 @@
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve_utils.hpp"
 #include "chain.hpp"
-#include "../cuda_prime/fermat_test.hpp"
+//#include "../cuda_prime/fermat_test.hpp"
 #include "../cuda_prime/fermat_prime/fermat_prime.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include "gpu/prime_common.hpp"
@@ -94,9 +94,9 @@ namespace nexusminer {
 			//const uint32_t sieve_size_bytes = Cuda_sieve::m_kernel_sieve_size_bytes;  //size of the sieve in bytes
 			//const uint32_t sieve_size_words = Cuda_sieve::m_kernel_sieve_size_words;  //size of the sieve in words
 			//const uint32_t sieve_size = Cuda_sieve::m_kernel_sieve_size_words;  
-			const uint32_t m_sieve_range_per_word = Cuda_sieve::m_sieve_word_range;  
-			const uint32_t m_sieve_range_per_byte = Cuda_sieve::m_sieve_byte_range;
-			const uint32_t m_sieve_bytes_per_word = Cuda_sieve::m_sieve_word_byte_count;
+			static constexpr uint32_t m_sieve_range_per_word = Cuda_sieve::m_sieve_word_range;  
+			static constexpr uint32_t m_sieve_range_per_byte = Cuda_sieve::m_sieve_byte_range;
+			static constexpr uint32_t m_sieve_bytes_per_word = Cuda_sieve::m_sieve_word_byte_count;
 
 			std::vector<std::uint64_t> m_long_chain_starts;
 			uint64_t m_sieve_batch_start_offset;
@@ -106,13 +106,12 @@ namespace nexusminer {
 			uint32_t m_large_prime_limit;
 			uint32_t m_trial_division_prime_limit;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
-			const int m_fermat_test_batch_size = 200000;
-			const int m_fermat_test_batch_size_max = 1000000;
-			const int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
-			//const uint32_t m_sieve_batch_buffer_size = sieve_size * m_segment_batch_size;
-			uint64_t m_sieve_range;// = Cuda_sieve::m_sieve_range;
+			static constexpr int m_fermat_test_batch_size = 200000;
+			static constexpr int m_fermat_test_batch_size_max = 1000000;
+			static constexpr int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
+			uint64_t m_sieve_range;
 			static constexpr int m_min_chain_length = 8;
-			const uint32_t large_prime_count = 0;
+			static constexpr uint32_t large_prime_count = 0;
 
 			//stats
 			std::vector<std::uint32_t> m_chain_histogram;

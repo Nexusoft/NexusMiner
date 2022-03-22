@@ -20,7 +20,7 @@ namespace nexusminer {
 			static const int BITS_PER_WORD = 32;
 			//LIMBS is the number of machine words used to store the big int
 			//we allocate one extra word to handle overflow and normalization in division algorithm
-			static const int EXTRA_WORDS = 1;
+			static const int EXTRA_WORDS = 2;
 			static const int HIGH_WORD = (BITS + BITS_PER_WORD - 1) / BITS_PER_WORD - 1; //round up 
 			static const int LIMBS = HIGH_WORD + 1 + EXTRA_WORDS;  //extra word(s) for overflow
 			
@@ -32,14 +32,14 @@ namespace nexusminer {
 			__host__ __device__ Cump add(int) const;
 			__host__ __device__ Cump add(uint32_t) const;
 			__host__ __device__ Cump add(uint64_t) const;
-			__device__ Cump add_ptx(const Cump&) const;
+			//__device__ Cump add_ptx(const Cump&) const;
 			__host__ __device__ Cump sub(const Cump&) const;
 			__host__ __device__ Cump sub(int) const;
 			__host__ __device__ Cump sub(uint32_t) const;
 			__host__ __device__ void increment(const Cump&);
 			__host__ __device__ void increment(int);
 			__host__ __device__ void increment(uint32_t);
-			__device__ void increment_ptx(const Cump&);
+			//__device__ void increment_ptx(const Cump&);
 			__host__ __device__ void operator += (const Cump&);
 			__host__ __device__ void operator += (int);
 			__host__ __device__ void operator += (uint32_t);
@@ -57,7 +57,7 @@ namespace nexusminer {
 			__host__ __device__ Cump operator ~ () const;
 			__host__ __device__ Cump multiply(uint32_t) const;
 			__host__ __device__ Cump multiply(const Cump&) const;
-			__device__ Cump multiply_ptx(uint32_t x) const;
+			//__device__ Cump multiply_ptx(uint32_t x) const;
 
 
 			__host__ __device__ void operator *= (uint32_t);

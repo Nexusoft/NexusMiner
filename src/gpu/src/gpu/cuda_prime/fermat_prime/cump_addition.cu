@@ -109,7 +109,7 @@ namespace nexusminer {
         template<int BITS>
         __host__ __device__ void Cump<BITS>::operator+=(const Cump<BITS>& b)
         {
-            increment_ptx(b);
+            increment(b);
         }
 
         template<int BITS>
@@ -133,7 +133,7 @@ namespace nexusminer {
         template<int BITS>
         __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
         {
-            return lhs.add_ptx(rhs);
+            return lhs.add(rhs);
         }
 
         template<int BITS>
@@ -156,7 +156,7 @@ namespace nexusminer {
 
 
         //add two uint1024s directly in ptx (cuda assembly code)
-        template<int BITS>
+        /* template<int BITS>
         __device__ Cump<BITS> Cump<BITS>::add_ptx(const Cump<BITS>& x) const
         {
             Cump<BITS> result;
@@ -237,6 +237,6 @@ namespace nexusminer {
         {
             *this = add_ptx(x);
 
-        }
+        } */
     }
 }

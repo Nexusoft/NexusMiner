@@ -191,7 +191,6 @@ namespace nexusminer {
 
         void Sieve::gpu_fermat_test_init(uint16_t device)
         {
-            
             m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
             m_cuda_prime_test.trial_division_init(Cuda_sieve::m_trial_division_prime_count, m_trial_divisors.data(), device);
             gpu_fermat_test_set_base_int(m_sieve_start);

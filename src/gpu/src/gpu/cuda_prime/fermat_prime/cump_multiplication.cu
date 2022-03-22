@@ -80,7 +80,7 @@ namespace nexusminer {
 
         //multiply a 1024 bit uint by one uint32_t directly in ptx (cuda assembly code)
         //this works but compiles to similar code as the c++.  The performance is slightly worse compared to the c++.
-        template<int BITS>
+        /* template<int BITS>
         __device__ Cump<BITS> Cump<BITS>::multiply_ptx(uint32_t x) const
         {
             Cump<BITS> result;
@@ -177,7 +177,7 @@ namespace nexusminer {
             
             return result;
 
-        }
+        } */
 
         
     }

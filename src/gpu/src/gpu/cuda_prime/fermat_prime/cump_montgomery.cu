@@ -53,7 +53,8 @@ namespace nexusminer {
             //low half of the square
             Cump<BITS> AA, BB, y, result;
             const int y_size = x.HIGH_WORD + 2;
-            uint32_t yy[y_size + 1];
+            //uint32_t yy[y_size + 1];
+            uint32_t yy[32];  //TODO why does this fail to link for dynamic memory allocation?
             
 #pragma unroll
             for (int i = 0; i <= x.HIGH_WORD/2; i++)
@@ -149,11 +150,16 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
+                //AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]);
+                uint64_t tmp_sum = AA.m_limbs[0] + yy[0];
+                uint8_t c = tmp_sum > 0xFFFFFFFF ? 1 : 0;
 #pragma unroll
                 for (int j = 1; j <= y_size - i - (x.HIGH_WORD + 1) / 2; j++)
                 {
-                    AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+                    //AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+                    tmp_sum = AA.m_limbs[i] + yy[i] + c;
+                    c = tmp_sum > 0xFFFFFFFF ? 1 : 0;
+                    AA.m_limbs[j] = tmp_sum;
                 }
 
                 //The lowest two terms are now complete and can be moved to the reduction step.
@@ -233,7 +239,7 @@ namespace nexusminer {
             for (auto i = BITS - top_bits_window - 1; i >= 1; i--)
             {
                 //square
-                A = montgomery_square_2(A, m, m_primed);
+                A = montgomery_square(A, m, m_primed);
                 word = i / A.BITS_PER_WORD;
                 int bit = i % A.BITS_PER_WORD;
                 mask = 1 << bit;

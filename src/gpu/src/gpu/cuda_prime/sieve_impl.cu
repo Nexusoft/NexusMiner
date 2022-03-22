@@ -802,7 +802,7 @@ namespace nexusminer {
             hipDeviceGetAttribute(&shared_memory_size, hipDeviceAttributeSharedMemPerBlockOptin, device);
             //printf("Max shared mem size %i\n", shared_memory_size);
             #elif GPU_AMD_ENABLED
-            shared_memory_size = 64 * 1024;
+            shared_memory_size = 48 * 1024;
             #endif
 
             //get total gpu ram

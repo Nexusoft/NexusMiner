@@ -26,14 +26,14 @@ namespace nexusminer {
 			//Using a 64 bit words is slower and byte operations are not natively supported by builtin cuda functions (atomics, popcount, etc).
 			//One 32 bit sieve word represents a span of 30*4 = 120 integers.  
 			using sieve_word_t = uint32_t;
-			static const int m_sieve_word_byte_count = sizeof(sieve_word_t);
-			static const int m_sieve_byte_range = 30;
-			static const int m_sieve_word_range = m_sieve_byte_range * m_sieve_word_byte_count;
+			static constexpr int m_sieve_word_byte_count = sizeof(sieve_word_t);
+			static constexpr int m_sieve_byte_range = 30;
+			static constexpr int m_sieve_word_range = m_sieve_byte_range * m_sieve_word_byte_count;
 			//The wheel formed by primorial 2*3*5*7*11 = 2310 has two gaps of 14.  If we align the sieve start/stop to one of these gaps, 
 			// we guarantee that no chains can cross through the segment boundary.
-			static const int m_sieve_chain_search_boundary = 2310;
-			static const int m_sieve_alignment = m_sieve_chain_search_boundary * m_sieve_word_byte_count;  //ensure the segment ends on a word boundary
-			static const int m_sieve_alignment_offset = 120;  //offset from the wheel start to the first gap greater than 12.  Coincidentally its span 120 is a whole word.
+			static constexpr int m_sieve_chain_search_boundary = 2310;
+			static constexpr int m_sieve_alignment = m_sieve_chain_search_boundary * m_sieve_word_byte_count;  //ensure the segment ends on a word boundary
+			static constexpr int m_sieve_alignment_offset = 120;  //offset from the wheel start to the first gap greater than 12.  Coincidentally its span 120 is a whole word.
 			
 			struct Cuda_sieve_properties
 			{
@@ -51,19 +51,19 @@ namespace nexusminer {
 			};
 			Cuda_sieve_properties m_sieve_properties;
 			
-			static const int m_kernel_segments_per_block = 32;  //number of times to repeat the sieve within a kernel call
-			static const int m_num_blocks = 360;  //each block sieves part of the range
+			static constexpr int m_kernel_segments_per_block = 32;  //number of times to repeat the sieve within a kernel call
+			static constexpr int m_num_blocks = 360;  //each block sieves part of the range
 			
-			static const int m_threads_per_block = 1024;
+			static constexpr int m_threads_per_block = 1024;
 			
 			//the largest possible sieve based on max shared memory of 164K on A100 GPU
-			static const uint64_t m_sieve_max_range = 164ull * 1024 * m_sieve_byte_range * m_kernel_segments_per_block * m_num_blocks;
+			static constexpr uint64_t m_sieve_max_range = 164ull * 1024 * m_sieve_byte_range * m_kernel_segments_per_block * m_num_blocks;
 
-			static const int m_estimated_chains_per_million = 4;
-			static const uint32_t m_max_chains = 2 * Cuda_sieve::m_estimated_chains_per_million * Cuda_sieve::m_sieve_max_range / 1e6;
-			static const uint32_t m_max_long_chains = 32;
-			static const int m_min_chain_length = 9;
-			static const int m_start_prime = 7;
+			static constexpr int m_estimated_chains_per_million = 4;
+			static constexpr uint32_t m_max_chains = 2 * Cuda_sieve::m_estimated_chains_per_million * Cuda_sieve::m_sieve_max_range / 1e6;
+			static constexpr uint32_t m_max_long_chains = 32;
+			static constexpr int m_min_chain_length = 9;
+			static constexpr int m_start_prime = 7;
 			static constexpr int m_small_prime_count = 14; //61 is the 15th prime starting at 7.  61 is first prime that hits each sieve word no more than 1 time.
 			//If you change the small_prime_count, make sure you also change the hardcoded list of primes in the small prime sieve in sieve_impl.cu
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
@@ -75,7 +75,7 @@ namespace nexusminer {
 			//static constexpr int m_large_prime_2_count = 32 * 140000;
 			static constexpr int m_trial_division_prime_count = 32 * 100000;
 
-			static const int chain_histogram_max = 10;  
+			static constexpr int chain_histogram_max = 10;  
 			//static const uint64_t m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
 			//static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
 			
