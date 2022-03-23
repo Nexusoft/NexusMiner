@@ -10,6 +10,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 configure_file(src/version.h.in version.h)
 
+set(CPM_DOWNLOAD_VERSION 0.35.0) 
+set(CPM_DOWNLOAD_LOCATION "${CMAKE_BINARY_DIR}/cmake/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+
+if(NOT (EXISTS ${CPM_DOWNLOAD_LOCATION}))
+    message(STATUS "Downloading CPM.cmake")
+    file(DOWNLOAD https://github.com/TheLartians/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake ${CPM_DOWNLOAD_LOCATION})
+endif()
+
+include(${CPM_DOWNLOAD_LOCATION})
+
+find_package(Threads REQUIRED)
+
+#spdlog
+CPMAddPackage(NAME spdlog GITHUB_REPOSITORY gabime/spdlog VERSION 1.9.2)
+
+#nlohmann json
+CPMAddPackage(NAME nlohmann_json GITHUB_REPOSITORY nlohmann/json  VERSION 3.10.5)
+
 include_directories(${CMAKE_SOURCE_DIR}/include)
 link_directories(${CMAKE_SOURCE_DIR}/libs)
 
@@ -24,8 +42,6 @@ endif()
 if(WIN32)
     add_definitions(-D_WIN32_WINT=0x0601 -DNOMINMAX -D_CRT_SECURE_NO_WARNINGS)
 endif()
-
-find_package(Threads REQUIRED)
 
 # OpenSSL
 if(STATIC_OPENSSL)

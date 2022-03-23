@@ -1,6 +1,6 @@
 #include "config/validator.hpp"
 #include "config/types.hpp"
-#include "json/json.hpp"
+#include <nlohmann/json.hpp>
 
 #include <fstream>
 #include <sstream>

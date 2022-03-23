@@ -8,3 +8,5 @@ target_include_directories(config
         $<INSTALL_INTERFACE:inc>    
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
+
+target_link_libraries(config spdlog nlohmann_json::nlohmann_json)

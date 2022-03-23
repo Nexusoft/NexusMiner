@@ -11,4 +11,4 @@ target_include_directories(protocol
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
 
-target_link_libraries(protocol PRIVATE network LLP stats config)
+target_link_libraries(protocol PRIVATE network LLP stats config spdlog nlohmann_json::nlohmann_json)

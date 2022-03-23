@@ -5,7 +5,7 @@
 #include "stats/stats_collector.hpp"
 #include "stats/types.hpp"
 #include <spdlog/spdlog.h>
-#include <json/json.hpp>
+#include <nlohmann/json.hpp>
 
 namespace nexusminer
 {

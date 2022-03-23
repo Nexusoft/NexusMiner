@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include "json/json.hpp"
+#include <nlohmann/json.hpp>
 #include "config/worker_config.hpp"
 #include "config/stats_printer_config.hpp"
 #include "config/pool.hpp"
