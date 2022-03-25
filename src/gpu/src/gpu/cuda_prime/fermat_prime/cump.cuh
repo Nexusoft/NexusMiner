@@ -17,33 +17,33 @@ namespace nexusminer {
 		{
 			static_assert(BITS > 0, "The big int must have at least one bit.");
 		public:
-			static const int BITS_PER_WORD = 32;
+			static constexpr int BITS_PER_WORD = 32;
 			//LIMBS is the number of machine words used to store the big int
 			//we allocate one extra word to handle overflow and normalization in division algorithm
-			static const int EXTRA_WORDS = 2;
-			static const int HIGH_WORD = (BITS + BITS_PER_WORD - 1) / BITS_PER_WORD - 1; //round up 
-			static const int LIMBS = HIGH_WORD + 1 + EXTRA_WORDS;  //extra word(s) for overflow
+			static constexpr int EXTRA_WORDS = 1;
+			static constexpr int HIGH_WORD = (BITS + BITS_PER_WORD - 1) / BITS_PER_WORD - 1; //round up 
+			static constexpr int LIMBS = HIGH_WORD + 1 + EXTRA_WORDS;  //extra word(s) for overflow
 			
 			
 			__host__ __device__ Cump(uint32_t);
 			__host__ __device__ Cump(int);
 			__host__ __device__ Cump();
-			__host__ __device__ Cump add(const Cump&) const;
-			__host__ __device__ Cump add(int) const;
-			__host__ __device__ Cump add(uint32_t) const;
-			__host__ __device__ Cump add(uint64_t) const;
+			__device__ Cump add(const Cump&) const;
+			__device__ Cump add(int) const;
+			__device__ Cump add(uint32_t) const;
+			__device__ Cump add(uint64_t) const;
 			//__device__ Cump add_ptx(const Cump&) const;
 			__host__ __device__ Cump sub(const Cump&) const;
 			__host__ __device__ Cump sub(int) const;
 			__host__ __device__ Cump sub(uint32_t) const;
-			__host__ __device__ void increment(const Cump&);
-			__host__ __device__ void increment(int);
-			__host__ __device__ void increment(uint32_t);
+			__device__ void increment(const Cump&);
+			__device__ void increment(int);
+			__device__ void increment(uint32_t);
 			//__device__ void increment_ptx(const Cump&);
-			__host__ __device__ void operator += (const Cump&);
-			__host__ __device__ void operator += (int);
-			__host__ __device__ void operator += (uint32_t);
-			__host__ __device__ void operator += (uint64_t);
+			__device__ void operator += (const Cump&);
+			__device__ void operator += (int);
+			__device__ void operator += (uint32_t);
+			__device__ void operator += (uint64_t);
 			__host__ __device__ void decrement(const Cump&);
 			__host__ __device__ void decrement(int);
 			__host__ __device__ void decrement(uint32_t);
@@ -82,10 +82,10 @@ namespace nexusminer {
 		};
 
 		
-		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
-		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs);
-		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint32_t rhs);
-		template<int BITS> __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint64_t rhs);
+		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
+		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs);
+		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint32_t rhs);
+		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint64_t rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, int rhs);
 		template<int BITS> __host__ __device__ Cump<BITS> operator - (const Cump<BITS>& lhs, uint32_t rhs);
@@ -107,16 +107,13 @@ namespace nexusminer {
 		template<int BITS> __host__ __device__ bool operator != (const Cump<BITS>& lhs, int rhs);
 
 		template<int BITS> __device__ Cump<BITS> montgomery_multiply(const Cump<BITS>& x, const Cump<BITS>& y, const Cump<BITS>& m, uint32_t m_primed);
-		template<int BITS> __device__ Cump<BITS> montgomery_square(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
-		template<int BITS> __device__ Cump<BITS> montgomery_square_2(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
-		template<int BITS> __device__ Cump<BITS> montgomery_reduce(const Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
-		template<int BITS> __device__ void montgomery_reduce(Cump<BITS>& A, uint32_t x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ void montgomery_square(Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ void montgomery_square_2(Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ void montgomery_square_3(Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
+		template<int BITS> __device__ void montgomery_reduce(Cump<BITS>& x, const Cump<BITS>& m, uint32_t m_primed);
+		//template<int BITS> __device__ void montgomery_reduce(Cump<BITS>& A, uint32_t x, const Cump<BITS>& m, uint32_t m_primed);
 		template<int BITS> __device__ bool powm_2(const Cump<BITS>& m, uint64_t offset);
 		template<int BITS> __device__ Cump<BITS> double_and_reduce(const Cump<BITS>& x, const Cump<BITS>& m, int shift);
-
-
-
-		
 
 	}
 }

@@ -3,27 +3,31 @@
 namespace nexusminer {
     namespace gpu {
 
-        template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(const Cump<BITS>& b) const
-        {
-            Cump result;
-            bool propagate = false;
-            bool generate = false;
-            uint32_t carry = 0;
-            uint32_t x = 0;
-            for (auto i = 0; i < LIMBS; i++)
-            {
-                x = m_limbs[i] + b.m_limbs[i];
-                result.m_limbs[i] = x + carry;
-                propagate = x == 0xFFFFFFFF;
-                generate = x < m_limbs[i];
-                carry = generate || (propagate && carry) ? 1 : 0;
-            }
-            return result;
+        __device__ __forceinline__ unsigned char add_carry(unsigned char carry_in, uint32_t a, uint32_t b, uint32_t* sum)
+        {         
+            uint64_t x = static_cast<uint64_t>(a) + static_cast<uint64_t>(b) + carry_in;
+            unsigned char carry_out = x > 0xFFFFFFFF ? 1 : 0;
+            *sum = static_cast<uint32_t>(x);
+            return carry_out;
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(int b) const
+        __device__ Cump<BITS> Cump<BITS>::add(const Cump<BITS>& b) const
+        {
+            Cump result;
+            unsigned char carry = 0;
+            #pragma unroll
+            for (int i = 0; i < LIMBS; i++)
+            {
+                carry = add_carry(carry, m_limbs[i], b.m_limbs[i], &result.m_limbs[i]);
+            }
+
+            return result;
+            
+        }
+
+        template<int BITS>
+        __device__ Cump<BITS> Cump<BITS>::add(int b) const
         {
             if (b < 0)
             {
@@ -34,7 +38,7 @@ namespace nexusminer {
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(uint32_t b) const
+        __device__ Cump<BITS> Cump<BITS>::add(uint32_t b) const
         {
             Cump result;
             result.m_limbs[0] = m_limbs[0] + b;
@@ -48,7 +52,7 @@ namespace nexusminer {
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> Cump<BITS>::add(uint64_t b) const
+        __device__ Cump<BITS> Cump<BITS>::add(uint64_t b) const
         {
             Cump result;
             uint64_t x = (static_cast<uint64_t>(m_limbs[1]) << 32) + m_limbs[0];
@@ -64,26 +68,19 @@ namespace nexusminer {
             return result;
         }
 
-        //same as add, but results are stored in the current object
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::increment(const Cump<BITS>& b)
+        __device__ void Cump<BITS>::increment(const Cump<BITS>& b)
         {
-            bool propagate = false;
-            bool generate = false;
-            uint32_t carry = 0;
-            uint32_t x = 0;
-            for (auto i = 0; i < LIMBS; i++)
+            unsigned char carry = 0;
+            #pragma unroll
+            for (int i = 0; i < LIMBS; i++)
             {
-                x = m_limbs[i] + b.m_limbs[i];
-                propagate = x == 0xFFFFFFFF;
-                generate = x < m_limbs[i];
-                m_limbs[i] = x + carry;
-                carry = generate || (propagate && carry) ? 1 : 0;
+                carry = add_carry(carry, m_limbs[i], b.m_limbs[i], &m_limbs[i]);
             }
         }
 
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::increment(int b)
+        __device__ void Cump<BITS>::increment(int b)
         {
             if (b < 0)
                 decrement(static_cast<uint32_t>(-b));
@@ -93,7 +90,7 @@ namespace nexusminer {
         }
 
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::increment(uint32_t b)
+        __device__ void Cump<BITS>::increment(uint32_t b)
         {
             uint32_t temp = m_limbs[0];
             m_limbs[0] += b;
@@ -107,49 +104,49 @@ namespace nexusminer {
         }
 
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(const Cump<BITS>& b)
+        __device__ void Cump<BITS>::operator+=(const Cump<BITS>& b)
         {
             increment(b);
         }
 
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(int b)
+        __device__ void Cump<BITS>::operator+=(int b)
         {
             increment(b);
         }
 
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(uint32_t b)
+        __device__ void Cump<BITS>::operator+=(uint32_t b)
         {
             increment(b);
         }
 
         template<int BITS>
-        __host__ __device__ void Cump<BITS>::operator+=(uint64_t b)
+        __device__ void Cump<BITS>::operator+=(uint64_t b)
         {
             *this = add(b);
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
+        __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs)
         {
             return lhs.add(rhs);
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs)
+        __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs)
         {
             return lhs.add(rhs);
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> operator+(const Cump<BITS>& lhs, uint32_t rhs)
+        __device__ Cump<BITS> operator+(const Cump<BITS>& lhs, uint32_t rhs)
         {
             return lhs.add(rhs);
         }
 
         template<int BITS>
-        __host__ __device__ Cump<BITS> operator+(const Cump<BITS>& lhs, uint64_t rhs)
+        __device__ Cump<BITS> operator+(const Cump<BITS>& lhs, uint64_t rhs)
         {
             return lhs.add(rhs);
         }

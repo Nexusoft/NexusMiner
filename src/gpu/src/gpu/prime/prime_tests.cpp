@@ -245,7 +245,7 @@ namespace gpu
 		//trial divsision test
 		test_sieve.gpu_reset_fermat_stats();
 		start = std::chrono::steady_clock::now();
-		test_sieve.gpu_run_trial_division_chain_test();
+		//test_sieve.gpu_run_trial_division_chain_test();
 		end = std::chrono::steady_clock::now();
 		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		double trial_divsion_elapsed_s = elapsed.count() / 1000.0;
@@ -254,8 +254,8 @@ namespace gpu
 		test_sieve.gpu_fermat_synchronize();
 		uint64_t test_attempts, passes, trial_divisions, composites;
 		test_sieve.gpu_get_fermat_stats(test_attempts, passes, trial_divisions, composites);
-		m_logger->info("Trial division composites: {}/{} ({:.3f}%) in {:.4f} seconds. {:.2f}us/chain.",
-		 	composites, test_attempts, 100.0 * composites / test_attempts, trial_divsion_elapsed_s, 1.0e6*trial_divsion_elapsed_s/ test_attempts);
+		// m_logger->info("Trial division composites: {}/{} ({:.3f}%) in {:.4f} seconds. {:.2f}us/chain.",
+		//  	composites, test_attempts, 100.0 * composites / test_attempts, trial_divsion_elapsed_s, 1.0e6*trial_divsion_elapsed_s/ test_attempts);
 
 		m_logger->info("Fermat primes: {}/{} ({:.3f}%). Expected about {:.3f}%.",
 			passes, test_attempts, 100.0*passes/test_attempts, fermat_positive_rate_expected * 100.0);

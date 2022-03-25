@@ -103,9 +103,8 @@ set(MAIN_SOURCE_FILES src/main.cpp
                 src/miner.cpp 
                 src/worker_manager.cpp 
                 src/timer_manager.cpp)
-#set_source_files_properties(${MAIN_SOURCE_FILES} PROPERTIES HIP_SOURCE_PROPERTY_FORMAT 0)
-#set_target_properties(hip::device PROPERTIES INTERFACE_COMPILE_OPTIONS "-fPIC")
-#set_target_properties(hip::device PROPERTIES INTERFACE_LINK_LIBRARIES "hip::host")
+
+set(GPU_TARGETS "gfx1030" CACHE STRING "AMD GPU targets")
 add_executable(NexusMiner ${MAIN_SOURCE_FILES})
 if (WITH_GPU_AMD AND WITH_PRIME)
     set(GPU_FILES 

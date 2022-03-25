@@ -1,6 +1,14 @@
 #ifndef NEXUSMINER_GPU_CUDA_SIEVE_HPP
 #define NEXUSMINER_GPU_CUDA_SIEVE_HPP
 
+//hardware dependent performance tweaks
+#if defined(GPU_CUDA_ENABLED)
+#define GPU_LARGE_PRIME_COUNT 50000
+#else
+//AMD gpu has slower fermat testing which can be offset somewhat with more sieving
+#define GPU_LARGE_PRIME_COUNT 150000
+#endif
+
 #include "cuda_chain.cuh"
 #include <stdint.h>
 #include <memory>
@@ -69,11 +77,9 @@ namespace nexusminer {
 //primes 7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103
 //       1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22, 23,24
 			static constexpr int m_medium_small_prime_count = 32 * 18;
-			static constexpr int m_medium_prime_count = 32 * 2500;
-			//static constexpr int m_medium_large_prime_count = 32 * 4500;
-			static constexpr int m_large_prime_count = 32 * 50000;
-			//static constexpr int m_large_prime_2_count = 32 * 140000;
-			static constexpr int m_trial_division_prime_count = 32 * 100000;
+			static constexpr int m_medium_prime_count = 32 * 2500;			
+			static constexpr int m_large_prime_count = 32 * GPU_LARGE_PRIME_COUNT;
+			static constexpr int m_trial_division_prime_count = 0;
 
 			static constexpr int chain_histogram_max = 10;  
 			//static const uint64_t m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data

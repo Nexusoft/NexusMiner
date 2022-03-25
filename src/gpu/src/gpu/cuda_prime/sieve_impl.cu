@@ -672,10 +672,13 @@ namespace nexusminer {
         //medium sieve
         void Cuda_sieve_impl::run_sieve(uint64_t sieve_start_offset)
         {
+            
             int blocks = Cuda_sieve::m_num_blocks;// * Cuda_sieve::m_kernel_segments_per_block;
             int threads = 1024;
             m_sieve_start_offset = sieve_start_offset;
             
+            if (Cuda_sieve::m_medium_prime_count == 0)
+                return;
             //hipFuncSetAttribute(medium_sieve, hipFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
 
             hipLaunchKernelGGL(medium_sieve, blocks, threads, m_sieve_properties.m_shared_mem_size_bytes, 0, sieve_start_offset, d_sieving_primes, m_sieving_prime_count,

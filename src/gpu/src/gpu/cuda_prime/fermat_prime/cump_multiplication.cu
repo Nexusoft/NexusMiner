@@ -3,6 +3,15 @@
 namespace nexusminer {
     namespace gpu {
 
+        //multiply with carry in for use in big int * single word.
+        __device__ __forceinline__ uint32_t mul_carry(uint32_t a, uint32_t b, uint32_t carry_in, uint32_t* upper_product)
+        {
+            uint64_t uv = static_cast<uint64_t>(a) * static_cast<uint64_t>(b) + carry_in;
+            uint32_t low_word = static_cast<uint32_t>(uv);
+            *upper_product = uv >> 32;
+            return low_word;
+        }
+
         //low half of mutliplication
         //HAC 14.12 modified for fixed width
         template<int BITS>

@@ -236,11 +236,12 @@ namespace nexusminer {
         void Sieve::sieve_batch(uint64_t low)
         {
             
-            reset_sieve_batch(low);
-            uint32_t sieve_batch_buffer_size = m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
+            //reset_sieve_batch(low);
+            //uint32_t sieve_batch_buffer_size = m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
 
-            m_cuda_sieve.run_sieve(m_sieve_run_count * sieve_batch_buffer_size * m_sieve_range_per_word);
-            m_sieve_run_count++;
+            //m_cuda_sieve.run_sieve(m_sieve_run_count * sieve_batch_buffer_size * m_sieve_range_per_word);
+            //m_sieve_run_count++;
+            m_cuda_sieve.run_sieve(low);
            
         }
 
