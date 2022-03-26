@@ -1,5 +1,6 @@
+#include "gpu_helper.hpp"
 #include "cuda_chain.cuh"
-#include "hip/hip_runtime.h"
+
 //#include "device_launch_parameters.h"
 #include <stdio.h>
 

@@ -4,10 +4,9 @@
 //cuda unsigned big integer class
 //The size of the integer in bits is selectable via template
 
+#include "../gpu_helper.hpp"
 #include <stdint.h>
 #include <gmp.h>
-#include "hip/hip_runtime.h"
-//#include "device_launch_parameters.h"
 #include "fermat_utils.cuh"
 
 namespace nexusminer {

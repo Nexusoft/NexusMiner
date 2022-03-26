@@ -1,9 +1,8 @@
 #ifndef NEXUSMINER_GPU_FERMAT_UTILS_CUH
 #define NEXUSMINER_GPU_FERMAT_UTILS_CUH
 //math functions used with fermat testing
-
+#include "../gpu_helper.hpp"
 #include <stdint.h>
-#include "hip/hip_runtime.h"
 
 namespace nexusminer {
 	namespace gpu {

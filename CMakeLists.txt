@@ -104,9 +104,9 @@ set(MAIN_SOURCE_FILES src/main.cpp
                 src/worker_manager.cpp 
                 src/timer_manager.cpp)
 
-set(GPU_TARGETS "gfx1030" CACHE STRING "AMD GPU targets")
 add_executable(NexusMiner ${MAIN_SOURCE_FILES})
 if (WITH_GPU_AMD AND WITH_PRIME)
+    # set(GPU_TARGETS "gfx1030" CACHE STRING "AMD GPU targets")  #this limits gpu hardware targets and can shorten compile time
     set(GPU_FILES 
         src/gpu/src/gpu/cuda_prime/cuda_chain.cu  
         src/gpu/src/gpu/cuda_prime/sieve.cu
