@@ -1,26 +1,12 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "gpu_helper.hpp"
 #include "sieve_impl.cuh"
 #include "sieve.hpp"
 #include "find_chain.cuh"
 #include "sieve_small_prime_constants.cuh"
 #include "sieve_lookup_tables.cuh"
-
-#include <cuda.h>
 #include <stdio.h>
 #include <math.h>
 #include <inttypes.h>
-
-
-#define checkCudaErrors(call)                                \
-  do {                                                        \
-    cudaError_t err = call;                                   \
-    if (err != cudaSuccess) {                                 \
-      printf("CUDA error at %s %d: %s\n", __FILE__, __LINE__, \
-             cudaGetErrorString(err));                        \
-      exit(EXIT_FAILURE);                                     \
-    }                                                         \
-  } while (0)
 
 namespace nexusminer {
     namespace gpu {
@@ -629,19 +615,25 @@ namespace nexusminer {
 
             int split_numerator = split_denominator - 1;
             //warning this can use a lot of vram. it does not check for overflow of buckets between blocks. 
-            sort_large_primes << <blocks, threads >> > (sieve_start_offset, d_large_primes, Cuda_sieve::m_large_prime_count/ split_denominator,
+            sort_large_primes <<<blocks, threads>>> (sieve_start_offset, d_large_primes, Cuda_sieve::m_large_prime_count/ split_denominator,
                 d_large_prime_starting_multiples, d_large_prime_buckets, d_bucket_indices, m_sieve_properties);
+            //hipLaunchKernelGGL(sort_large_primes, blocks, threads, 0, 0, sieve_start_offset, d_large_primes, Cuda_sieve::m_large_prime_count/ split_denominator,
+            //    d_large_prime_starting_multiples, d_large_prime_buckets, d_bucket_indices, m_sieve_properties );
+
 
             //one kernel block per sieve segment
             blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
             threads = 1024;
-            cudaFuncSetAttribute(sieveLargePrimes, cudaFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
-            sieveLargePrimes << <blocks, threads, m_sieve_properties.m_shared_mem_size_bytes >> > (d_large_prime_buckets,
+            checkGPUErrors(NEXUSMINER_GPU_FuncSetAttribute((void*)sieveLargePrimes, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes));
+            //hipFuncSetAttribute(sieveLargePrimes, hipFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
+            //hipLaunchKernelGGL(sieveLargePrimes, blocks, threads, m_sieve_properties.m_shared_mem_size_bytes, 0, d_large_prime_buckets,
+            //    d_bucket_indices, d_sieve, m_sieve_properties);
+            sieveLargePrimes <<<blocks, threads, m_sieve_properties.m_shared_mem_size_bytes>>> (d_large_prime_buckets,
                 d_bucket_indices, d_sieve, m_sieve_properties);
 
             blocks = Cuda_sieve::m_num_blocks / 2;
 
-            sort_large_primes << <blocks, threads >> > (sieve_start_offset, d_large_primes+ Cuda_sieve::m_large_prime_count / split_denominator,
+            sort_large_primes <<<blocks, threads >>> (sieve_start_offset, d_large_primes+ Cuda_sieve::m_large_prime_count / split_denominator,
                 split_numerator *Cuda_sieve::m_large_prime_count/ split_denominator,
                 d_large_prime_starting_multiples + Cuda_sieve::m_large_prime_count / split_denominator, d_large_prime_buckets, d_bucket_indices,
                 m_sieve_properties);
@@ -649,7 +641,7 @@ namespace nexusminer {
             //one kernel block per sieve segment
             blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
             threads = 1024;
-            sieveLargePrimes << <blocks, threads, m_sieve_properties.m_shared_mem_size_bytes >> > (d_large_prime_buckets, 
+            sieveLargePrimes <<<blocks, threads, m_sieve_properties.m_shared_mem_size_bytes >>> (d_large_prime_buckets, 
                 d_bucket_indices, d_sieve, m_sieve_properties);
 
         }
@@ -660,7 +652,7 @@ namespace nexusminer {
             const int loops_per_block = 32;
             const int blocks = (m_sieve_properties.m_sieve_total_size/loops_per_block + threads - 1)/threads;
             
-            sieveSmallPrimes << <blocks, threads >> > (d_sieve, sieve_start_offset, d_small_prime_offsets, d_small_prime_masks,
+            sieveSmallPrimes <<<blocks, threads>>> (d_sieve, sieve_start_offset, d_small_prime_offsets, d_small_prime_masks,
                 d_small_primes, m_sieve_properties);
 
         }
@@ -668,13 +660,17 @@ namespace nexusminer {
         //medium sieve
         void Cuda_sieve_impl::run_sieve(uint64_t sieve_start_offset)
         {
+            
             int blocks = Cuda_sieve::m_num_blocks;// * Cuda_sieve::m_kernel_segments_per_block;
             int threads = 1024;
             m_sieve_start_offset = sieve_start_offset;
             
-            cudaFuncSetAttribute(medium_sieve, cudaFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
+            if (Cuda_sieve::m_medium_prime_count == 0)
+                return;
+            checkGPUErrors(NEXUSMINER_GPU_FuncSetAttribute((void*)medium_sieve, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes));
+            //hipFuncSetAttribute(medium_sieve, hipFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
 
-            medium_sieve << <blocks, threads, m_sieve_properties.m_shared_mem_size_bytes >> > (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
+            medium_sieve <<<blocks, threads, m_sieve_properties.m_shared_mem_size_bytes>>> (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
                 d_starting_multiples, d_sieve, d_multiples, m_sieve_properties);
 
         }
@@ -682,15 +678,15 @@ namespace nexusminer {
         void Cuda_sieve_impl::run_medium_small_prime_sieve(uint64_t sieve_start_offset)
         {
 
-           cudaFuncSetAttribute(medium_small_sieve, cudaFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
-           medium_small_sieve << <Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block, m_sieve_properties.m_shared_mem_size_bytes >> >
-               (sieve_start_offset, d_medium_small_primes, d_medium_small_prime_starting_multiples, d_sieve, m_sieve_properties);
+            checkGPUErrors(NEXUSMINER_GPU_FuncSetAttribute((void*)medium_small_sieve, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes));
+            medium_small_sieve <<<Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block, m_sieve_properties.m_shared_mem_size_bytes>>>
+                (sieve_start_offset, d_medium_small_primes, d_medium_small_prime_starting_multiples, d_sieve, m_sieve_properties);
 
         }
 
         void Cuda_sieve_impl::get_sieve(Cuda_sieve::sieve_word_t sieve[])
         {
-            checkCudaErrors(cudaMemcpy(sieve, d_sieve, m_sieve_properties.m_sieve_total_size * sizeof(*d_sieve), cudaMemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(sieve, d_sieve, m_sieve_properties.m_sieve_total_size * sizeof(*d_sieve), NEXUSMINER_GPU_MemcpyDeviceToHost));
 
         }
 
@@ -698,9 +694,10 @@ namespace nexusminer {
         {
             const int threads = 256;
             const int blocks = 1; // (Cuda_sieve::m_sieve_total_size + threads - 1) / threads;
-            count_prime_candidates << <blocks, threads >> > (d_sieve, d_prime_candidate_count, m_sieve_properties);
-            checkCudaErrors(cudaDeviceSynchronize());
-            checkCudaErrors(cudaMemcpy(&prime_candidate_count, d_prime_candidate_count, sizeof(*d_prime_candidate_count), cudaMemcpyDeviceToHost));
+
+            count_prime_candidates <<<blocks, threads>>> (d_sieve, d_prime_candidate_count, m_sieve_properties);
+            checkGPUErrors(NEXUSMINER_GPU_DeviceSynchronize());
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&prime_candidate_count, d_prime_candidate_count, sizeof(*d_prime_candidate_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
 
         }
 
@@ -718,19 +715,20 @@ namespace nexusminer {
             const unsigned int search_range = Cuda_sieve::m_sieve_chain_search_boundary * Cuda_sieve::m_sieve_word_byte_count;
             const unsigned int search_regions_per_segment = (m_sieve_properties.m_segment_range + search_range - 1) / search_range;
             const unsigned int threads = round_up((search_regions_per_segment + search_regions_per_thread - 1) / search_regions_per_thread,32);
-            find_chain_kernel2 << <blocks, threads >> > (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count, m_sieve_properties);
+            find_chain_kernel2 <<<blocks, threads>>> 
+                (d_sieve, d_chains, d_last_chain_index, m_sieve_start_offset, d_chain_stat_count, m_sieve_properties);
             
         }
 
         void Cuda_sieve_impl::get_chains(CudaChain chains[], uint32_t& chain_count)
         {
-            checkCudaErrors(cudaMemcpy(&chain_count, d_last_chain_index, sizeof(*d_last_chain_index), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(chains, d_chains, chain_count * sizeof(*d_chains), cudaMemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_last_chain_index, sizeof(*d_last_chain_index), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(chains, d_chains, chain_count * sizeof(*d_chains), NEXUSMINER_GPU_MemcpyDeviceToHost));
         }
 
         void Cuda_sieve_impl::get_chain_count(uint32_t& chain_count)
         {
-            checkCudaErrors(cudaMemcpy(&chain_count, d_last_chain_index, sizeof(*d_last_chain_index), cudaMemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_last_chain_index, sizeof(*d_last_chain_index), NEXUSMINER_GPU_MemcpyDeviceToHost));
         }
 
         //get a pointer to the chain array.  fermat test uses the chain array as input. 
@@ -748,40 +746,40 @@ namespace nexusminer {
             get_chain_count(chain_count);
             int blocks = (chain_count + threads - 1) / threads;
             //copy surviving chains to a temporary location. 
-            filter_busted_chains << <blocks, threads >> > (d_chains, d_last_chain_index, d_good_chains, d_good_chain_index,
+            filter_busted_chains <<<blocks, threads>>> (d_chains, d_last_chain_index, d_good_chains, d_good_chain_index,
                 d_long_chains, d_last_long_chain_index, d_chain_histogram);
             uint32_t good_chain_count;
             //get the count of good chains from device memory
-            checkCudaErrors(cudaMemcpy(&good_chain_count, d_good_chain_index, sizeof(*d_good_chain_index), cudaMemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&good_chain_count, d_good_chain_index, sizeof(*d_good_chain_index), NEXUSMINER_GPU_MemcpyDeviceToHost));
             //copy the temporary good chain list back to the chain list
-            checkCudaErrors(cudaMemcpyAsync(d_chains, d_good_chains, good_chain_count*sizeof(*d_chains), cudaMemcpyDeviceToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_MemcpyAsync(d_chains, d_good_chains, good_chain_count*sizeof(*d_chains), NEXUSMINER_GPU_MemcpyDeviceToDevice));
             //update the chain count
-            checkCudaErrors(cudaMemcpy(d_last_chain_index, d_good_chain_index, sizeof(*d_last_chain_index), cudaMemcpyDeviceToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_last_chain_index, d_good_chain_index, sizeof(*d_last_chain_index), NEXUSMINER_GPU_MemcpyDeviceToDevice));
 
         }
 
         void Cuda_sieve_impl::get_long_chains(CudaChain chains[], uint32_t& chain_count)
         {
-            checkCudaErrors(cudaMemcpy(&chain_count, d_last_long_chain_index, sizeof(*d_last_long_chain_index), cudaMemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_last_long_chain_index, sizeof(*d_last_long_chain_index), NEXUSMINER_GPU_MemcpyDeviceToHost));
             if (chain_count > 0)
             {
-                checkCudaErrors(cudaMemcpy(chains, d_long_chains, chain_count * sizeof(*d_long_chains), cudaMemcpyDeviceToHost));
+                checkGPUErrors(NEXUSMINER_GPU_Memcpy(chains, d_long_chains, chain_count * sizeof(*d_long_chains), NEXUSMINER_GPU_MemcpyDeviceToHost));
                 //clear the long chain list
-                checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+                checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
             }
         }
 
         //read the histogram
         void Cuda_sieve_impl::get_stats(uint32_t chain_histogram[], uint64_t& chain_count)
         {
-            checkCudaErrors(cudaMemcpy(chain_histogram, d_chain_histogram, (Cuda_sieve::chain_histogram_max+1) * sizeof(*d_chain_histogram), cudaMemcpyDeviceToHost));
-            checkCudaErrors(cudaMemcpy(&chain_count, d_chain_stat_count, sizeof(*d_chain_stat_count), cudaMemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(chain_histogram, d_chain_histogram, (Cuda_sieve::chain_histogram_max+1) * sizeof(*d_chain_histogram), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_chain_stat_count, sizeof(*d_chain_stat_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
 
         }
 
         void Cuda_sieve_impl::synchronize()
         {
-            checkCudaErrors(cudaDeviceSynchronize());
+            checkGPUErrors(NEXUSMINER_GPU_DeviceSynchronize());
         }
 
 
@@ -792,21 +790,27 @@ namespace nexusminer {
         {
             //get max shared memory available to each thread block
             int shared_memory_size;
+            #ifdef GPU_CUDA_ENABLED
             cudaDeviceGetAttribute(&shared_memory_size, cudaDevAttrMaxSharedMemoryPerBlockOptin, device);
+            #elif GPU_AMD_ENABLED
+            //This returns an error.  why?
+            //checkGPUErrors(hipDeviceGetAttribute(&shared_memory_size, hipDeviceAttributeSharedMemPerBlockOptin, device));
+            shared_memory_size = 64 * 1024;
+            #endif
             //printf("Max shared mem size %i\n", shared_memory_size);
 
             //get total gpu ram
             size_t free_mem, total_mem;
-            cudaSetDevice(device);
-            cudaMemGetInfo(&free_mem, &total_mem);
+            checkGPUErrors(NEXUSMINER_GPU_SetDevice(device));
+            checkGPUErrors(NEXUSMINER_GPU_MemGetInfo(&free_mem, &total_mem));
             //printf("Total gpu memory %zu\n", total_mem);
             if (total_mem < 8.0e9)
-                sieve_properties.m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
+                sieve_properties.m_bucket_ram_budget = 4.4e9;  //bytes avaialble for storing bucket data
             else
                 sieve_properties.m_bucket_ram_budget = 6.0e9;
 
             sieve_properties.m_large_prime_bucket_size = sieve_properties.m_bucket_ram_budget / (Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block) / 4;
-            //shared_memory_size = 48 * 1024;
+            
             sieve_properties.m_shared_mem_size_kbytes = shared_memory_size / 1024;
             sieve_properties.m_shared_mem_size_bytes = sieve_properties.m_shared_mem_size_kbytes * 1024;
             //The span of the primorial 30030 is represented by 30030/30 = 1001 bytes which conveniently is just below 1KB
@@ -831,48 +835,48 @@ namespace nexusminer {
           
             m_sieving_prime_count = prime_count;
             m_device = device;
-            checkCudaErrors(cudaSetDevice(device));
+            checkGPUErrors(NEXUSMINER_GPU_SetDevice(device));
 
             //allocate memory on the gpu
-            checkCudaErrors(cudaMalloc(&d_sieving_primes, prime_count * sizeof(*d_sieving_primes)));
-            checkCudaErrors(cudaMalloc(&d_starting_multiples, prime_count * sizeof(*d_starting_multiples)));
-            //checkCudaErrors(cudaMalloc(&d_medium_primes, prime_count * sizeof(*d_medium_primes)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_sieving_primes, prime_count * sizeof(*d_sieving_primes)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_starting_multiples, prime_count * sizeof(*d_starting_multiples)));
+            //checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_medium_primes, prime_count * sizeof(*d_medium_primes)));
 
-            checkCudaErrors(cudaMalloc(&d_small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets)));
-            checkCudaErrors(cudaMalloc(&d_medium_small_primes, Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_primes)));
-            checkCudaErrors(cudaMalloc(&d_medium_small_prime_starting_multiples, 
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_medium_small_primes, Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_primes)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_medium_small_prime_starting_multiples, 
                 Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_prime_starting_multiples)));
-            checkCudaErrors(cudaMalloc(&d_small_prime_masks, small_prime_mask_count * sizeof(*d_small_prime_masks)));
-            checkCudaErrors(cudaMalloc(&d_small_primes, Cuda_sieve::m_small_prime_count * sizeof(*d_small_primes)));
-            checkCudaErrors(cudaMalloc(&d_large_primes, Cuda_sieve::m_large_prime_count * sizeof(*d_large_primes)));
-            checkCudaErrors(cudaMalloc(&d_large_prime_starting_multiples, Cuda_sieve::m_large_prime_count * sizeof(*d_large_prime_starting_multiples)));
-            checkCudaErrors(cudaMalloc(&d_large_prime_buckets, Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_small_prime_masks, small_prime_mask_count * sizeof(*d_small_prime_masks)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_small_primes, Cuda_sieve::m_small_prime_count * sizeof(*d_small_primes)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_large_primes, Cuda_sieve::m_large_prime_count * sizeof(*d_large_primes)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_large_prime_starting_multiples, Cuda_sieve::m_large_prime_count * sizeof(*d_large_prime_starting_multiples)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_large_prime_buckets, Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block
                 * m_sieve_properties.m_large_prime_bucket_size * sizeof(*d_large_prime_buckets)));
-            checkCudaErrors(cudaMalloc(&d_bucket_indices, Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block * sizeof(*d_bucket_indices)));
-            checkCudaErrors(cudaMalloc(&d_sieve, m_sieve_properties.m_sieve_total_size * sizeof(*d_sieve)));
-            checkCudaErrors(cudaMalloc(&d_multiples, prime_count * Cuda_sieve::m_num_blocks * sizeof(*d_multiples)));
-            checkCudaErrors(cudaMalloc(&d_chains, Cuda_sieve::m_max_chains * sizeof(*d_chains)));
-            checkCudaErrors(cudaMalloc(&d_long_chains, Cuda_sieve::m_max_long_chains * sizeof(*d_long_chains)));
-            checkCudaErrors(cudaMalloc(&d_last_chain_index, sizeof(*d_last_chain_index)));
-            checkCudaErrors(cudaMalloc(&d_last_long_chain_index, sizeof(*d_last_long_chain_index)));
-            checkCudaErrors(cudaMalloc(&d_prime_candidate_count, sizeof(*d_prime_candidate_count)));
-            checkCudaErrors(cudaMalloc(&d_good_chain_index, sizeof(*d_good_chain_index)));
-            checkCudaErrors(cudaMalloc(&d_good_chains, Cuda_sieve::m_max_chains/2 * sizeof(*d_good_chains)));
-            checkCudaErrors(cudaMalloc(&d_chain_histogram, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
-            checkCudaErrors(cudaMalloc(&d_chain_stat_count, sizeof(*d_chain_stat_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_bucket_indices, Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block * sizeof(*d_bucket_indices)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_sieve, m_sieve_properties.m_sieve_total_size * sizeof(*d_sieve)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_multiples, prime_count * Cuda_sieve::m_num_blocks * sizeof(*d_multiples)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_chains, Cuda_sieve::m_max_chains * sizeof(*d_chains)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_long_chains, Cuda_sieve::m_max_long_chains * sizeof(*d_long_chains)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_last_chain_index, sizeof(*d_last_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_last_long_chain_index, sizeof(*d_last_long_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_prime_candidate_count, sizeof(*d_prime_candidate_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_good_chain_index, sizeof(*d_good_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_good_chains, Cuda_sieve::m_max_chains/2 * sizeof(*d_good_chains)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_chain_histogram, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_chain_stat_count, sizeof(*d_chain_stat_count)));
 
             //copy data to the gpu
-            checkCudaErrors(cudaMemcpy(d_small_primes, small_primes, Cuda_sieve::m_small_prime_count * sizeof(*d_small_primes), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_small_prime_masks, small_prime_masks, small_prime_mask_count * sizeof(*d_small_prime_masks), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_sieving_primes, primes, prime_count * sizeof(*d_sieving_primes), cudaMemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_small_primes, small_primes, Cuda_sieve::m_small_prime_count * sizeof(*d_small_primes), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_small_prime_masks, small_prime_masks, small_prime_mask_count * sizeof(*d_small_prime_masks), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_sieving_primes, primes, prime_count * sizeof(*d_sieving_primes), NEXUSMINER_GPU_MemcpyHostToDevice));
 
-            checkCudaErrors(cudaMemcpy(d_large_primes, large_primes, Cuda_sieve::m_large_prime_count * sizeof(*d_large_primes), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_medium_small_primes, medium_small_primes,
-                Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_primes), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
-            checkCudaErrors(cudaMemset(d_prime_candidate_count, 0, sizeof(*d_prime_candidate_count)));
-            checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
-            checkCudaErrors(cudaMemset(d_chain_stat_count, 0, sizeof(*d_chain_stat_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_large_primes, large_primes, Cuda_sieve::m_large_prime_count * sizeof(*d_large_primes), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_medium_small_primes, medium_small_primes,
+                Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_primes), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_prime_candidate_count, 0, sizeof(*d_prime_candidate_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_chain_stat_count, 0, sizeof(*d_chain_stat_count)));
             reset_stats();
 
         }
@@ -881,48 +885,48 @@ namespace nexusminer {
         void Cuda_sieve_impl::init_sieve(uint32_t starting_multiples[], uint16_t small_prime_offsets[], uint32_t large_prime_multiples[],
             uint32_t medium_small_prime_multiples[])
         {
-            checkCudaErrors(cudaSetDevice(m_device));
-            checkCudaErrors(cudaMemcpy(d_starting_multiples, starting_multiples, m_sieving_prime_count * sizeof(*d_starting_multiples), cudaMemcpyHostToDevice));
-            //checkCudaErrors(cudaMemcpy(d_medium_primes, starting_multiples, m_sieving_prime_count * sizeof(*d_medium_primes), cudaMemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_starting_multiples, starting_multiples, m_sieving_prime_count * sizeof(*d_starting_multiples), NEXUSMINER_GPU_MemcpyHostToDevice));
+            //checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_medium_primes, starting_multiples, m_sieving_prime_count * sizeof(*d_medium_primes), NEXUSMINER_GPU_MemcpyHostToDevice));
 
-            checkCudaErrors(cudaMemcpy(d_large_prime_starting_multiples, large_prime_multiples, Cuda_sieve::m_large_prime_count * sizeof(*d_large_prime_starting_multiples), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemcpy(d_small_prime_offsets, small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets), cudaMemcpyHostToDevice));
-            checkCudaErrors(cudaMemset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
-            checkCudaErrors(cudaMemset(d_prime_candidate_count, 0, sizeof(*d_prime_candidate_count)));
-            checkCudaErrors(cudaMemset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
-            checkCudaErrors(cudaMemcpy(d_medium_small_prime_starting_multiples, medium_small_prime_multiples,
-                Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_prime_starting_multiples), cudaMemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_large_prime_starting_multiples, large_prime_multiples, Cuda_sieve::m_large_prime_count * sizeof(*d_large_prime_starting_multiples), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_small_prime_offsets, small_prime_offsets, Cuda_sieve::m_small_prime_count * sizeof(*d_small_prime_offsets), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_chain_index, 0, sizeof(*d_last_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_prime_candidate_count, 0, sizeof(*d_prime_candidate_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_long_chain_index, 0, sizeof(*d_last_long_chain_index)));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_medium_small_prime_starting_multiples, medium_small_prime_multiples,
+                Cuda_sieve::m_medium_small_prime_count * sizeof(*d_medium_small_prime_starting_multiples), NEXUSMINER_GPU_MemcpyHostToDevice));
         }
 
         void Cuda_sieve_impl::reset_stats()
         {
-            checkCudaErrors(cudaMemset(d_chain_histogram, 0, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
-            checkCudaErrors(cudaMemset(d_chain_stat_count, 0, sizeof(*d_chain_stat_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_chain_histogram, 0, (Cuda_sieve::chain_histogram_max + 1) * sizeof(*d_chain_histogram)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_chain_stat_count, 0, sizeof(*d_chain_stat_count)));
 
         }
 
         void Cuda_sieve_impl::free_sieve()
         {
-            checkCudaErrors(cudaSetDevice(m_device));
-            checkCudaErrors(cudaFree(d_sieving_primes));
-            checkCudaErrors(cudaFree(d_large_primes));
-            checkCudaErrors(cudaFree(d_starting_multiples));
-            //checkCudaErrors(cudaFree(d_medium_primes));
-            checkCudaErrors(cudaFree(d_multiples));
-            checkCudaErrors(cudaFree(d_sieve));
-            checkCudaErrors(cudaFree(d_chains));
-            checkCudaErrors(cudaFree(d_last_chain_index));
-            checkCudaErrors(cudaFree(d_long_chains));
-            checkCudaErrors(cudaFree(d_last_long_chain_index));
-            checkCudaErrors(cudaFree(d_good_chains));
-            checkCudaErrors(cudaFree(d_good_chain_index));
-            checkCudaErrors(cudaFree(d_chain_histogram));
-            checkCudaErrors(cudaFree(d_large_prime_buckets));
-            checkCudaErrors(cudaFree(d_bucket_indices));
-            checkCudaErrors(cudaFree(d_medium_small_primes));
-            checkCudaErrors(cudaFree(d_medium_small_prime_starting_multiples));
-            checkCudaErrors(cudaFree(d_small_primes));
-            checkCudaErrors(cudaFree(d_small_prime_masks));
+            checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_sieving_primes));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_large_primes));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_starting_multiples));
+            //checkGPUErrors(NEXUSMINER_GPU_Free(d_medium_primes));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_multiples));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_sieve));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_chains));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_last_chain_index));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_long_chains));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_last_long_chain_index));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_good_chains));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_good_chain_index));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_chain_histogram));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_large_prime_buckets));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_bucket_indices));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_medium_small_primes));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_medium_small_prime_starting_multiples));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_small_primes));
+            checkGPUErrors(NEXUSMINER_GPU_Free(d_small_prime_masks));
 
 
 

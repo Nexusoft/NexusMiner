@@ -1,6 +1,6 @@
 #ifndef NEXUSMINER_GPU_CUDA_SIEVE_LOOKUP_TABLES
 #define NEXUSMINER_GPU_CUDA_SIEVE_LOOKUP_TABLES
-
+#include "gpu_helper.hpp"
 //lookup tables and constants used by the sieves
 namespace nexusminer {
 	namespace gpu {

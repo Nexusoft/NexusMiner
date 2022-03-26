@@ -245,7 +245,8 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR const asio_execution_schedule_fn::impl&
+static //ASIO_CONSTEXPR
+ const asio_execution_schedule_fn::impl&
   schedule = asio_execution_schedule_fn::static_instance<>::instance;
 
 } // namespace

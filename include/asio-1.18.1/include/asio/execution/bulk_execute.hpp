@@ -337,8 +337,8 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR
-  const asio_execution_bulk_execute_fn::impl& bulk_execute =
+static //ASIO_CONSTEXPR
+  const asio_execution_bulk_execute_fn::impl& bulk_execute = 
     asio_execution_bulk_execute_fn::static_instance<>::instance;
 
 } // namespace

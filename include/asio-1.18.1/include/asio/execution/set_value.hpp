@@ -389,7 +389,8 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR const asio_execution_set_value_fn::impl&
+static //ASIO_CONSTEXPR 
+const asio_execution_set_value_fn::impl&
   set_value = asio_execution_set_value_fn::static_instance<>::instance;
 
 } // namespace

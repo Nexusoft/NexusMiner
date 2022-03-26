@@ -60,10 +60,15 @@ namespace nexusminer {
                 m_large_prime_limit = m_large_sieving_primes.back();
             else
                 m_large_prime_limit = m_sieving_prime_limit;
+
+            generate_trial_divisors();
+
             auto end = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
             std::stringstream ss;
-            ss << "Done. " << m_sieving_primes.size() + m_large_sieving_primes.size() << " primes generated in " << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds.";
+            uint32_t total_prime_count = Cuda_sieve::m_small_prime_count + Cuda_sieve::m_medium_small_prime_count +
+                Cuda_sieve::m_medium_prime_count + Cuda_sieve::m_large_prime_count + Cuda_sieve::m_trial_division_prime_count;
+            ss << "Done. " << m_trial_division_prime_limit << " primes generated in " << std::fixed << std::setprecision(3) << elapsed.count() / 1000.0 << " seconds.";
             m_logger->info(ss.str());
 
         }
@@ -133,6 +138,13 @@ namespace nexusminer {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, p);
                 m_large_multiples.push_back(m);
             }
+
+            //calculate starting multiples for trial division primes
+            for (auto& s : m_trial_divisors)
+            {
+                uint32_t m = get_offset_to_next_multiple(m_sieve_start, s.divisor);
+                s.starting_multiple = m;
+            }
         }
 
         void Sieve::gpu_sieve_load(uint16_t device=0)
@@ -179,8 +191,8 @@ namespace nexusminer {
 
         void Sieve::gpu_fermat_test_init(uint16_t device)
         {
-            
             m_cuda_prime_test.fermat_init(m_fermat_test_batch_size_max, device);
+            m_cuda_prime_test.trial_division_init(Cuda_sieve::m_trial_division_prime_count, m_trial_divisors.data(), device);
             gpu_fermat_test_set_base_int(m_sieve_start);
             //pass a device pointer to the list of chains to the fermat test
             //do this after initializing the gpu sieve so the pointer is valid
@@ -201,6 +213,8 @@ namespace nexusminer {
         void Sieve::gpu_fermat_free()
         {
             m_cuda_prime_test.fermat_free();
+            m_cuda_prime_test.trial_division_free();
+
         }
 
         void Sieve::gpu_sieve_small_primes(uint64_t sieve_start_offset)
@@ -222,11 +236,12 @@ namespace nexusminer {
         void Sieve::sieve_batch(uint64_t low)
         {
             
-            reset_sieve_batch(low);
-            uint32_t sieve_batch_buffer_size = m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
+            //reset_sieve_batch(low);
+            //uint32_t sieve_batch_buffer_size = m_cuda_sieve.m_sieve_properties.m_kernel_sieve_size_words * m_segment_batch_size;
 
-            m_cuda_sieve.run_sieve(m_sieve_run_count * sieve_batch_buffer_size * m_sieve_range_per_word);
-            m_sieve_run_count++;
+            //m_cuda_sieve.run_sieve(m_sieve_run_count * sieve_batch_buffer_size * m_sieve_range_per_word);
+            //m_sieve_run_count++;
+            m_cuda_sieve.run_sieve(low);
            
         }
 
@@ -442,9 +457,14 @@ namespace nexusminer {
             m_cuda_prime_test.fermat_chain_run();
         }
 
-        void Sieve::gpu_get_fermat_stats(uint64_t& tests, uint64_t& passes)
+        void Sieve::gpu_run_trial_division_chain_test()
         {
-            m_cuda_prime_test.get_stats(tests, passes);
+            m_cuda_prime_test.trial_division_chain_run();
+        }
+
+        void Sieve::gpu_get_fermat_stats(uint64_t& tests, uint64_t& passes, uint64_t& trial_division_tests, uint64_t& trial_division_composites)
+        {
+            m_cuda_prime_test.get_stats(tests, passes, trial_division_tests, trial_division_composites);
         }
 
         void Sieve::gpu_reset_fermat_stats()
@@ -628,35 +648,35 @@ namespace nexusminer {
             return m_sieve;
         }
 
-        //experimental - filter chain using trial division with large primes prior to fermat test. 
-        bool Sieve::chain_trial_division(Chain& chain)
-        {
-            uint64_t base_offset = chain.m_base_offset;
-            int chain_offset;
-            for (auto j = 0; j < m_large_sieving_primes.size(); j++)
-            {
-                uint32_t remainder = (base_offset + m_large_multiples[j]) % m_large_sieving_primes[j];
-                uint64_t q = (base_offset + m_large_multiples[j]) * m_large_prime_mod_constants[j];
-                //uint32_t remainder2 = (base_offset + m_large_multiples[j]) - q * m_large_sieving_primes[j];
-                //remainder2 = remainder2 == m_large_sieving_primes[j] ? 0 : remainder2;
-                //if (remainder != remainder2)
-                //    std::cout << "mod mismatch expected " << remainder << " got " << q << " R " << remainder2 << std::endl;
-                remainder = remainder > 0 ? m_large_sieving_primes[j] - remainder : 0;
-                for (auto i = 0; i < chain.length(); i++)
-                {
-                    chain.get_next_fermat_candidate(base_offset, chain_offset);
-                    if (chain_offset == remainder)
-                    {
-                        chain.update_fermat_status(false);
-                        if (!chain.is_there_still_hope())
-                            return false;
-                        break;
-                    }
-                }
-                
-            }
-            return true;
-        }
+        ////experimental - filter chain using trial division with large primes prior to fermat test. 
+        //bool Sieve::chain_trial_division(Chain& chain)
+        //{
+        //    uint64_t base_offset = chain.m_base_offset;
+        //    int chain_offset;
+        //    for (auto j = 0; j < m_large_sieving_primes.size(); j++)
+        //    {
+        //        uint32_t remainder = (base_offset + m_large_multiples[j]) % m_large_sieving_primes[j];
+        //        uint64_t q = (base_offset + m_large_multiples[j]) * m_large_prime_mod_constants[j];
+        //        //uint32_t remainder2 = (base_offset + m_large_multiples[j]) - q * m_large_sieving_primes[j];
+        //        //remainder2 = remainder2 == m_large_sieving_primes[j] ? 0 : remainder2;
+        //        //if (remainder != remainder2)
+        //        //    std::cout << "mod mismatch expected " << remainder << " got " << q << " R " << remainder2 << std::endl;
+        //        remainder = remainder > 0 ? m_large_sieving_primes[j] - remainder : 0;
+        //        for (auto i = 0; i < chain.length(); i++)
+        //        {
+        //            chain.get_next_fermat_candidate(base_offset, chain_offset);
+        //            if (chain_offset == remainder)
+        //            {
+        //                chain.update_fermat_status(false);
+        //                if (!chain.is_there_still_hope())
+        //                    return false;
+        //                break;
+        //            }
+        //        }
+        //        
+        //    }
+        //    return true;
+        //}
 
         void Sieve::gpu_get_stats()
         {
@@ -678,18 +698,37 @@ namespace nexusminer {
             return m_cuda_sieve.m_sieve_properties;
         }
 
-        void Sieve::do_chain_trial_division_check()
+        void Sieve::generate_trial_divisors()
         {
-            for (auto& chain : m_chain)
+            
+            std::vector<uint32_t> trial_division_primes;
+            primesieve::generate_n_primes(Cuda_sieve::m_trial_division_prime_count, m_large_prime_limit + 1ull, &trial_division_primes);
+            //the largest trial_division prime
+            if (trial_division_primes.size() > 0)
+                m_trial_division_prime_limit = trial_division_primes.back();
+            else
+                m_trial_division_prime_limit = m_large_prime_limit;
+
+            for (auto p : trial_division_primes)
             {
-                if (!chain_trial_division(chain))
-                {
-                    m_trial_division_chains_busted++;
-                    //m_logger->info("chain busted by trial division.");
-                }
+                trial_divisors_uint32_t d = { p, 0 };
+                m_trial_divisors.push_back(d);
             }
-            clean_chains();
+
         }
+
+        //void Sieve::do_chain_trial_division_check()
+        //{
+        //    for (auto& chain : m_chain)
+        //    {
+        //        if (!chain_trial_division(chain))
+        //        {
+        //            m_trial_division_chains_busted++;
+        //            //m_logger->info("chain busted by trial division.");
+        //        }
+        //    }
+        //    clean_chains();
+        //}
 
         //search for winners.  delete finished or hopeless chains.
         //run this after batch primality testing.

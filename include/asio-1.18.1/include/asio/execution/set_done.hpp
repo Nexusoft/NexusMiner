@@ -208,7 +208,8 @@ namespace asio {
 namespace execution {
 namespace {
 
-static ASIO_CONSTEXPR const asio_execution_set_done_fn::impl&
+static //ASIO_CONSTEXPR
+ const asio_execution_set_done_fn::impl&
   set_done = asio_execution_set_done_fn::static_instance<>::instance;
 
 } // namespace

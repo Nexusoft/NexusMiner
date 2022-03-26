@@ -31,10 +31,12 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	
 	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
 	PrimeTests prime_test(worker_config_gpu.m_device);
+	//prime_test.math_test();
 	prime_test.sieve_performance_test();
 	prime_test.fermat_performance_test();
 	m_segmented_sieve->generate_sieving_primes();
 	m_segmented_sieve->generate_small_prime_tables();
+	m_segmented_sieve->generate_trial_divisors();
 
 }
 
@@ -131,7 +133,9 @@ void Worker_prime::run()
 	uint64_t range_searched_this_cycle = 0;
 	uint64_t fermat_tests_this_cycle_start;
 	uint64_t fermat_passes_this_cycle_start;
-	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start);
+	uint64_t trial_division_tests, trial_division_composites;
+	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start,
+		trial_division_tests, trial_division_composites);
 
 	//Setting debug to true can impact performance.  we will set it to true if the log level is set to debug or more verbose.
 	//setting debug to true is required to measure individual kernel run time
@@ -212,8 +216,8 @@ void Worker_prime::run()
 		
 		if (debug && interval_elapsed.count() > 10000)
 		{
-			uint64_t fermat_test_count, fermat_prime_count, fermat_tests_this_cycle;
-			m_segmented_sieve->gpu_get_fermat_stats(fermat_test_count, fermat_prime_count);
+			uint64_t fermat_test_count, fermat_prime_count, fermat_tests_this_cycle, trial_divisions, trial_division_composites;
+			m_segmented_sieve->gpu_get_fermat_stats(fermat_test_count, fermat_prime_count, trial_divisions, trial_division_composites);
 			fermat_tests_this_cycle = fermat_test_count - fermat_tests_this_cycle_start;
 			auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 			elapsed_ms = elapsed.count();

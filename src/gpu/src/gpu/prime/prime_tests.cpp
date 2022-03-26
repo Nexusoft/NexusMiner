@@ -3,9 +3,12 @@
 #include <bitset>
 #include <boost/random.hpp>
 #include <boost/multiprecision/gmp.hpp>
+#include <boost/integer/mod_inverse.hpp>
 #include "sieve.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include <cmath>
+#include "../cuda_prime/fermat_prime/fermat_prime.hpp"
+#include <random>
 
 
 namespace nexusminer
@@ -54,7 +57,25 @@ namespace gpu
 		std::vector<uint8_t> primality_test_results;
 		primality_test_results.resize(primality_test_batch_size);
 		//bool primality_test_results[primality_test_batch_size];
-		Cuda_fermat_test cuda_fermat_test;
+
+		//cump
+		Fermat_prime cuda_fermat_test_cump;
+		cuda_fermat_test_cump.fermat_init(primality_test_batch_size, m_device);
+		cuda_fermat_test_cump.set_base_int(base_as_mpz_t);
+		cuda_fermat_test_cump.set_offsets(offsets.data(), primality_test_batch_size);
+		auto start = std::chrono::steady_clock::now();
+		cuda_fermat_test_cump.fermat_run();
+		auto end = std::chrono::steady_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		cuda_fermat_test_cump.get_results(primality_test_results.data());
+		uint64_t cuda_primality_test_count, cuda_primality_pass_count, trial_division_count, composite_count;
+		cuda_fermat_test_cump.get_stats(cuda_primality_test_count, cuda_primality_pass_count, trial_division_count, composite_count);
+		cuda_fermat_test_cump.fermat_free();
+
+
+
+		//cgbn library
+		/*Cuda_fermat_test cuda_fermat_test;
 		cuda_fermat_test.fermat_init(primality_test_batch_size, m_device);
 		cuda_fermat_test.set_base_int(base_as_mpz_t);
 		cuda_fermat_test.set_offsets(offsets.data(), primality_test_batch_size);
@@ -65,7 +86,8 @@ namespace gpu
 		cuda_fermat_test.get_results(primality_test_results.data());
 		uint64_t cuda_primality_test_count, cuda_primality_pass_count;
 		cuda_fermat_test.get_stats(cuda_primality_test_count, cuda_primality_pass_count);
-		cuda_fermat_test.fermat_free();
+		cuda_fermat_test.fermat_free();*/
+
 		mpz_clear(base_as_mpz_t);
 
 		
@@ -220,11 +242,21 @@ namespace gpu
 		//range_per_eight_chain = 1 / expected_chain_density;
 		//m_logger->info("Approximate range to find one 8-chain: {:.1E} ", range_per_eight_chain);
 		//process chains
+		//trial divsision test
 		test_sieve.gpu_reset_fermat_stats();
+		start = std::chrono::steady_clock::now();
+		//test_sieve.gpu_run_trial_division_chain_test();
+		end = std::chrono::steady_clock::now();
+		elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		double trial_divsion_elapsed_s = elapsed.count() / 1000.0;
+		test_sieve.gpu_fermat_synchronize();
 		test_sieve.gpu_run_fermat_chain_test();
 		test_sieve.gpu_fermat_synchronize();
-		uint64_t test_attempts, passes;
-		test_sieve.gpu_get_fermat_stats(test_attempts, passes);
+		uint64_t test_attempts, passes, trial_divisions, composites;
+		test_sieve.gpu_get_fermat_stats(test_attempts, passes, trial_divisions, composites);
+		// m_logger->info("Trial division composites: {}/{} ({:.3f}%) in {:.4f} seconds. {:.2f}us/chain.",
+		//  	composites, test_attempts, 100.0 * composites / test_attempts, trial_divsion_elapsed_s, 1.0e6*trial_divsion_elapsed_s/ test_attempts);
+
 		m_logger->info("Fermat primes: {}/{} ({:.3f}%). Expected about {:.3f}%.",
 			passes, test_attempts, 100.0*passes/test_attempts, fermat_positive_rate_expected * 100.0);
 		//test_sieve.clear_chains();
@@ -274,6 +306,263 @@ namespace gpu
 	{
 		m_fermat_prime_count = 0;
 		m_fermat_test_count = 0;
+	}
+
+	void PrimeTests::math_test()
+	{
+		using namespace boost::multiprecision;
+		using namespace boost::random;
+		const uint64_t batch_size = 100;
+		m_logger->info("Starting big_int math performance test with batch size {}.", batch_size);
+		bool cpu_verify = true;
+		typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
+		generator1024_type gen1024;
+		gen1024.seed(time(0));
+		
+		mpz_t* a = new mpz_t[batch_size];
+		mpz_t* b = new mpz_t[batch_size];
+		mpz_t* c = new mpz_t[batch_size];
+		mpz_t* results = new mpz_t[batch_size];
+
+		boost::multiprecision::uint1024_t a1, b1;
+
+		for (auto i = 0; i < batch_size; i++)
+		{
+			//generate a few contrived test cases
+			switch (i){
+			case 1:
+				a1 = 0x15d79a8e0;
+				b1 = 0x1e05d54f9;
+				break;
+			case 0:
+				a1.assign("0xeed0ea40daaec1031b6c8172b9c3714846a8784736de503369e58e9c25499cb5a034c76ec59511778affe2150ae1e07623d5418a6c2132303a22fe599add9e12ad6b5434b5fd21a84befce066758dc418832b01fce21d6be1b4519e3f3d5b9bff3effd9ba963847ffb95c8c88ea3b854bfa576e6d63badc99cbc114adb27122");
+				b1.assign("0xfe0584cba13b76ba4d468a779f158f2f6d2a4ba21e19383cff0ab2918db49f4a52ac1550fcdc3a600efedf7c47883a8f61425118dc7679b50291fafe0115315406c855e074ed3c78bbaf1d3ad74ea046a682900a01e10b810b795381c0c971222d88b8b27ad13de26129110c97be2aaf5807a90c7151ee383c01808f94faf5df");
+				break;
+			case 2:
+				a1.assign("0xe2792767ec01880f6178d32f5aad3a9b4c2316acf5eb694913b86b71f4497078b1dc808296c8b1e0eac87f7a4c104097d42b93000a1bd8c340ea59fcc9f6a402df7a1eeb65b814228df2ffe887935baf0bcbcadf2cd7791fd8766bdc261e27dd8a1f3dafc24fbe5e673b1cb7eb771759c6e0c5605835c27236af25c6e1ba3231");
+				b1.assign("0x46fde95a7bd8da283b895d6bb9a66cfd4e22d7686e6e1863856ff5c29aee6ebcabb073547d7bf");
+				break;
+			case 3:
+				a1 = 1;
+				b1 = 0;
+				break;
+			case 4:
+				a1 = 0;
+				b1 = -1;
+				break;
+			case 5:
+				a1 = -1;
+				b1 = 0;
+				break;
+			case 6:
+				a1 = 0;
+				b1 = 0;
+				break;
+			case 7:
+				a1 = 1;
+				b1 = 1;
+				break;
+			case 8:
+				a1 = -1;
+				b1 = -1;
+				break;
+			case 9:
+				a1 = 721948327;
+				b1 = 84461;
+				break;
+			case 10:
+				a1 = -1;
+				b1 = 2;
+				break;
+			case 11:
+				a1 = -1;
+				b1 = 1;
+				break;
+			case 12:
+				a1 = -1;
+				b1 = 4;
+				break;
+			case 13:
+				a1 = -1;
+				b1 = 5;
+				break;
+			case 14:
+				a1 = boost::multiprecision::uint1024_t(1) << (31*32);
+				b1 = 1;
+				break;
+			case 15:
+				a1 = -1;
+				b1 = boost::multiprecision::uint1024_t(1) << 32;
+				break;
+			case 16:
+				a1 = boost::multiprecision::uint1024_t(1) << (31*32);
+				b1 = boost::multiprecision::uint1024_t(1) << (30*32);
+				break;
+			case 17:
+				a1 = boost::multiprecision::uint1024_t (-1) >> 37;
+				b1 = boost::multiprecision::uint1024_t (-1) >> 666;
+				break;
+			case 18:
+				a1 = boost::multiprecision::uint1024_t(-1) >> 666;
+				b1 = boost::multiprecision::uint1024_t(-1) >> 37;
+				break;
+			default:
+				//the rest are random numbers
+				a1 = gen1024();
+				b1 = gen1024();
+				//random shift
+				std::random_device dev;
+				std::mt19937 rng(dev());
+				std::uniform_int_distribution<std::mt19937::result_type> dist(0, 15);
+				int shift = dist(rng);
+				b1 = b1 >> shift;
+				//a1 = a1 >> (1023 - 32);
+				//b1 = b1 >> (1023 - 32);
+
+			}
+			
+			//make b1 odd
+			b1 += (b1 % 2 == 0) ? 1 : 0;
+			mpz_init2(a[i],1024);
+			mpz_set(a[i], static_cast<mpz_int>(a1).backend().data());
+			mpz_init2(b[i], 1024);
+			mpz_set(b[i], static_cast<mpz_int>(b1).backend().data());
+			//initialize output containers
+			mpz_init2(c[i], 1024);
+			mpz_init2(results[i], 1024);
+		}
+		
+		m_logger->info("Test data generation complete.");
+		
+		Fermat_prime big_int;
+		big_int.test_init(batch_size, 0);
+		m_logger->info("Loading test vectors to GPU RAM.");
+		big_int.set_input_a(a, batch_size);
+		big_int.set_input_b(b, batch_size);
+		m_logger->info("Running aritmetic/logic operation under test.");
+		auto start = std::chrono::steady_clock::now();
+		big_int.logic_test();
+		//big_int.subtract();
+		auto end = std::chrono::steady_clock::now();
+		auto add_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+		m_logger->info("Copying results to CPU RAM.");
+		big_int.get_test_results(results);
+		big_int.test_free();
+		uint64_t passes = 0;
+		uint64_t attempts = 0;
+		if (cpu_verify)
+		{
+			m_logger->info("Verifying Results.");
+
+			for (auto i = 0; i < batch_size; i++)
+			{
+				boost::multiprecision::uint1024_t a_1024(static_cast<mpz_int>(a[i]));
+				boost::multiprecision::uint1024_t b_1024(static_cast<mpz_int>(b[i]));
+				boost::multiprecision::uint1024_t c_1024 = 0, d_1024 = 0;
+				boost::multiprecision::uint1024_t results_1024(static_cast<mpz_int>(results[i]));
+				
+
+				//this must match the math/logic function under test used in the gpu
+				if (boost::multiprecision::msb(b_1024) >= 992)
+				{
+					//mpz_int c = static_cast<mpz_int>(a[i]) * static_cast<mpz_int>(a[i]);
+					//c = c >> 1024;
+					
+					//c_1024 = a_1024 + b_1024;
+					//c_1024.assign(1);
+					mpz_int bm = static_cast<mpz_int>(b[i]);
+					mpz_int two = 2;
+					mpz_int c = boost::multiprecision::powm(two,bm - 1, bm);
+					c_1024 = static_cast<boost::multiprecision::uint1024_t>(c);
+
+					
+					//mpz_int d = 1;
+					//d = d << 1024;
+					//mpz_int m = static_cast<mpz_int>(b[i]);
+					//int leading_zeros = 1023 - boost::multiprecision::msb(m);
+					//mpz_int m_primed = m << leading_zeros;
+					//mpz_int r = d; 
+					//int counta = 0, countb = 0;
+					//while (r > m)
+					//{
+					//	counta++;
+					//	//std::cout << "outer" << std::endl;
+					//	//std::cout << "r " << std::setfill('0') << std::hex << r << std::endl;
+					//	//std::cout << "m " << std::setfill('0') << std::hex << m << std::endl;
+					//	//std::cout << "m_primed " << std::setfill('0') << std::hex << m_primed << std::endl;
+					//	while (r > m_primed)
+					//	{
+					//		r -= m_primed;
+					//		//std::cout << "inner" << std::endl;
+					//		//std::cout << "r " << std::setfill('0') << std::hex << r << std::endl;
+					//		//std::cout << "m " << std::setfill('0') << std::hex << m << std::endl;
+					//		//std::cout << "m_primed " << std::setfill('0') << std::hex << m_primed << std::endl;
+					//		countb++;
+					//	}
+					//	leading_zeros = boost::multiprecision::msb(m_primed) - boost::multiprecision::msb(r);
+					//	m_primed = m_primed >> 1;// std::max(leading_zeros, 1);
+					//}
+					//std::cout << "a " << counta << " b " << countb << std::endl;
+					//d_1024 = static_cast<boost::multiprecision::uint1024_t>(r);
+					//results_1024 = d_1024;
+					//if (i == 0)
+					//	std::cout << "c[0]:" << c_1024 << std::endl;
+
+					if (c_1024 != results_1024)
+					{
+
+						m_logger->debug("GPU/CPU math test mismatch at offset {}", i);
+						std::stringstream result_ss, a_ss, b_ss, c_ss;
+						result_ss << std::setfill('0') << std::hex << results_1024;
+						c_ss << std::setfill('0') << std::hex << c_1024;
+						a_ss << std::setfill('0') << std::hex << a_1024;
+						b_ss << std::setfill('0') << std::hex << b_1024;
+						m_logger->debug("Input a {}", a_ss.str());
+						m_logger->debug("Input b {}", b_ss.str());
+						m_logger->debug("Got {}", result_ss.str());
+						m_logger->debug("Expected {}", c_ss.str());
+						
+
+					}
+					else
+					{
+						passes++;
+					}
+					attempts++;
+				}
+				
+			}
+		}
+
+		for (auto i = 0; i < batch_size; i++)
+		{
+			mpz_clear(a[i]);
+			mpz_clear(b[i]);
+			mpz_clear(c[i]);
+			mpz_clear(results[i]);
+		}
+
+		delete[] a;
+		delete[] b;
+		delete[] c;
+		delete[] results;
+
+		std::stringstream ss;
+		if (cpu_verify)
+		{
+			ss << "Test result: " << passes << "/" << attempts << " results match.";
+			m_logger->info(ss.str());
+		}
+		else
+		{
+			attempts = batch_size;
+		}
+		
+		ss = {};
+		ss << "Run time: " << add_elapsed.count() << " ms. " << std::fixed << std::setprecision(1) << (double)attempts / (add_elapsed.count()) << " thousand operations/second. (" << (attempts > 0 ? 1.0e3 * add_elapsed.count() / attempts : -999) << "us)";
+		m_logger->info(ss.str());
+		
+		
 	}
 
 }
