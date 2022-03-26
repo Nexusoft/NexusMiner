@@ -53,7 +53,7 @@ namespace nexusminer {
             
             //low half of the square
             Cump<BITS> AA, BB, y, result;
-            constexpr int y_size = Cump<BITS>::HIGH_WORD + 2;//x.HIGH_WORD + 2;
+            constexpr int y_size = Cump<BITS>::HIGH_WORD + 2;
             uint32_t yy[y_size + 1];
             
 #pragma unroll
@@ -146,17 +146,23 @@ namespace nexusminer {
                 yy[2] += ((yy[1] < sq_upper) ? 1 : 0);
 
                 //Accumulate
-                //AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]); //inline asm gives the wrong answer here.  why?
+#if defined(GPU_CUDA_ENABLED)
+                AA.m_limbs[0] = add_cc(AA.m_limbs[0], yy[0]); //inline asm gives the wrong answer here with amd.  why?
+#else
                 uint64_t tmp = (uint64_t)AA.m_limbs[0] + yy[0];
                 uint8_t cc = tmp > 0xFFFFFFFF?1:0;
                 AA.m_limbs[0] = tmp;
+#endif
 #pragma unroll
                 for (int j = 1; j <= y_size - i - (Cump<BITS>::HIGH_WORD + 1) / 2; j++)
                 {
-                    //AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+#if defined(GPU_CUDA_ENABLED)
+                    AA.m_limbs[j] = addc_cc(AA.m_limbs[j], yy[j]);
+#else               
                     tmp = (uint64_t)AA.m_limbs[j] + yy[j] + cc;
                     cc = tmp > 0xFFFFFFFF?1:0;
                     AA.m_limbs[j] = tmp;
+#endif
                 }
 
                 //The lowest two terms are now complete and can be moved to the reduction step.

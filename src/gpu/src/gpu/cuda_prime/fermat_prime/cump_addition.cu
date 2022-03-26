@@ -106,7 +106,11 @@ namespace nexusminer {
         template<int BITS>
         __device__ void Cump<BITS>::operator+=(const Cump<BITS>& b)
         {
+#if defined(GPU_CUDA_ENABLED)
+            increment_ptx(b);
+#else
             increment(b);
+#endif
         }
 
         template<int BITS>
@@ -136,7 +140,11 @@ namespace nexusminer {
         template<int BITS>
         __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs)
         {
+#if defined(GPU_CUDA_ENABLED)
+            return lhs.add_ptx(rhs);
+#else
             return lhs.add(rhs);
+#endif
         }
 
         template<int BITS>
@@ -153,11 +161,11 @@ namespace nexusminer {
 
 
         //add two uint1024s directly in ptx (cuda assembly code)
-        /* template<int BITS>
+        template<int BITS>
         __device__ Cump<BITS> Cump<BITS>::add_ptx(const Cump<BITS>& x) const
         {
             Cump<BITS> result;
-            
+            uint32_t dummy = 0;
             asm("{\n\t"
                 "add.cc.u32       %0, %34, %68;    \n\t" //a[0] + x[0] with carry out
                 "addc.cc.u32      %1, %35, %69;    \n\t" //a[1] + x[1] with carry in and carry out
@@ -203,7 +211,7 @@ namespace nexusminer {
                 "=r"(result.m_limbs[20]), "=r"(result.m_limbs[21]), "=r"(result.m_limbs[22]), "=r"(result.m_limbs[23]),
                 "=r"(result.m_limbs[24]), "=r"(result.m_limbs[25]), "=r"(result.m_limbs[26]), "=r"(result.m_limbs[27]),
                 "=r"(result.m_limbs[28]), "=r"(result.m_limbs[29]), "=r"(result.m_limbs[30]), "=r"(result.m_limbs[31]),
-                "=r"(result.m_limbs[32]), "=r"(result.m_limbs[33])
+                "=r"(result.m_limbs[32]), "=r"(dummy)
                 : "r"(m_limbs[0]), "r"(m_limbs[1]), "r"(m_limbs[2]), "r"(m_limbs[3]),
                 "r"(m_limbs[4]), "r"(m_limbs[5]), "r"(m_limbs[6]), "r"(m_limbs[7]),
                 "r"(m_limbs[8]), "r"(m_limbs[9]), "r"(m_limbs[10]), "r"(m_limbs[11]),
@@ -212,7 +220,7 @@ namespace nexusminer {
                 "r"(m_limbs[20]), "r"(m_limbs[21]), "r"(m_limbs[22]), "r"(m_limbs[23]),
                 "r"(m_limbs[24]), "r"(m_limbs[25]), "r"(m_limbs[26]), "r"(m_limbs[27]),
                 "r"(m_limbs[28]), "r"(m_limbs[29]), "r"(m_limbs[30]), "r"(m_limbs[31]),
-                "r"(m_limbs[32]), "r"(m_limbs[33]),
+                "r"(m_limbs[32]), "r"(dummy),
                 "r"(x.m_limbs[0]), "r"(x.m_limbs[1]), "r"(x.m_limbs[2]), "r"(x.m_limbs[3]),
                 "r"(x.m_limbs[4]), "r"(x.m_limbs[5]), "r"(x.m_limbs[6]), "r"(x.m_limbs[7]),
                 "r"(x.m_limbs[8]), "r"(x.m_limbs[9]), "r"(x.m_limbs[10]), "r"(x.m_limbs[11]),
@@ -221,7 +229,7 @@ namespace nexusminer {
                 "r"(x.m_limbs[20]), "r"(x.m_limbs[21]), "r"(x.m_limbs[22]), "r"(x.m_limbs[23]),
                 "r"(x.m_limbs[24]), "r"(x.m_limbs[25]), "r"(x.m_limbs[26]), "r"(x.m_limbs[27]),
                 "r"(x.m_limbs[28]), "r"(x.m_limbs[29]), "r"(x.m_limbs[30]), "r"(x.m_limbs[31]),
-                "r"(x.m_limbs[32]), "r"(x.m_limbs[33])
+                "r"(x.m_limbs[32]), "r"(dummy)
             );
             
             return result;
@@ -234,6 +242,6 @@ namespace nexusminer {
         {
             *this = add_ptx(x);
 
-        } */
+        }
     }
 }

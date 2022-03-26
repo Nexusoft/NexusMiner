@@ -31,14 +31,16 @@ namespace nexusminer {
 			__device__ Cump add(int) const;
 			__device__ Cump add(uint32_t) const;
 			__device__ Cump add(uint64_t) const;
-			//__device__ Cump add_ptx(const Cump&) const;
+#if defined(GPU_CUDA_ENABLED)
+			__device__ Cump add_ptx(const Cump&) const;
+			__device__ void increment_ptx(const Cump&);
+#endif
 			__host__ __device__ Cump sub(const Cump&) const;
 			__host__ __device__ Cump sub(int) const;
 			__host__ __device__ Cump sub(uint32_t) const;
 			__device__ void increment(const Cump&);
 			__device__ void increment(int);
 			__device__ void increment(uint32_t);
-			//__device__ void increment_ptx(const Cump&);
 			__device__ void operator += (const Cump&);
 			__device__ void operator += (int);
 			__device__ void operator += (uint32_t);
