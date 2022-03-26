@@ -160,6 +160,7 @@ namespace nexusminer {
         }
 
 
+#if defined(GPU_CUDA_ENABLED)
         //add two uint1024s directly in ptx (cuda assembly code)
         template<int BITS>
         __device__ Cump<BITS> Cump<BITS>::add_ptx(const Cump<BITS>& x) const
@@ -243,5 +244,6 @@ namespace nexusminer {
             *this = add_ptx(x);
 
         }
+#endif
     }
 }
