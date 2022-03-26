@@ -624,7 +624,7 @@ namespace nexusminer {
             //one kernel block per sieve segment
             blocks = Cuda_sieve::m_num_blocks * Cuda_sieve::m_kernel_segments_per_block;
             threads = 1024;
-            NEXUSMINER_GPU_FuncSetAttribute(sieveLargePrimes, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
+            checkGPUErrors(NEXUSMINER_GPU_FuncSetAttribute((void*)sieveLargePrimes, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes));
             //hipFuncSetAttribute(sieveLargePrimes, hipFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
             //hipLaunchKernelGGL(sieveLargePrimes, blocks, threads, m_sieve_properties.m_shared_mem_size_bytes, 0, d_large_prime_buckets,
             //    d_bucket_indices, d_sieve, m_sieve_properties);
@@ -667,7 +667,7 @@ namespace nexusminer {
             
             if (Cuda_sieve::m_medium_prime_count == 0)
                 return;
-            NEXUSMINER_GPU_FuncSetAttribute(medium_sieve, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
+            checkGPUErrors(NEXUSMINER_GPU_FuncSetAttribute((void*)medium_sieve, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes));
             //hipFuncSetAttribute(medium_sieve, hipFuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
 
             medium_sieve <<<blocks, threads, m_sieve_properties.m_shared_mem_size_bytes>>> (sieve_start_offset, d_sieving_primes, m_sieving_prime_count,
@@ -678,7 +678,7 @@ namespace nexusminer {
         void Cuda_sieve_impl::run_medium_small_prime_sieve(uint64_t sieve_start_offset)
         {
 
-            NEXUSMINER_GPU_FuncSetAttribute(medium_small_sieve, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes);
+            checkGPUErrors(NEXUSMINER_GPU_FuncSetAttribute((void*)medium_small_sieve, NEXUSMINER_GPU_FuncAttributeMaxDynamicSharedMemorySize, m_sieve_properties.m_shared_mem_size_bytes));
             medium_small_sieve <<<Cuda_sieve::m_num_blocks, Cuda_sieve::m_threads_per_block, m_sieve_properties.m_shared_mem_size_bytes>>>
                 (sieve_start_offset, d_medium_small_primes, d_medium_small_prime_starting_multiples, d_sieve, m_sieve_properties);
 
@@ -792,11 +792,12 @@ namespace nexusminer {
             int shared_memory_size;
             #ifdef GPU_CUDA_ENABLED
             cudaDeviceGetAttribute(&shared_memory_size, cudaDevAttrMaxSharedMemoryPerBlockOptin, device);
-            //printf("Max shared mem size %i\n", shared_memory_size);
             #elif GPU_AMD_ENABLED
-            //hipDeviceGetAttribute(&shared_memory_size, hipDeviceAttributeSharedMemPerBlockOptin, device);
-            shared_memory_size = 48 * 1024;
+            //This returns an error.  why?
+            //checkGPUErrors(hipDeviceGetAttribute(&shared_memory_size, hipDeviceAttributeSharedMemPerBlockOptin, device));
+            shared_memory_size = 64 * 1024;
             #endif
+            //printf("Max shared mem size %i\n", shared_memory_size);
 
             //get total gpu ram
             size_t free_mem, total_mem;

@@ -44,7 +44,7 @@
 #define checkGPUErrors(call)                                \
   do {                                                        \
     hipError_t err = call;                                   \
-    if (err != cudaSuccess) {                                 \
+    if (err != hipSuccess) {                                 \
       printf("HIP GPU error at %s %d: %s\n", __FILE__, __LINE__, \
              hipGetErrorString(err));                        \
       exit(EXIT_FAILURE);                                     \
