@@ -148,7 +148,7 @@ void Worker_prime::run()
 				{
 					if (m_found_nonce_callback)
 					{
-						m_io_context->post([self = shared_from_this()]()
+						::asio::post([self = shared_from_this()]()
 						{
 							self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
 						});
