@@ -138,13 +138,13 @@ namespace nexusminer
 	{
 		::asio::ip::tcp::resolver resolver(*m_io_context);
 		::asio::error_code ec;
-		auto it = resolver.resolve(dns_name, std::string{std::to_string(port)}, ec);
+		auto endpoint = resolver.resolve(dns_name, std::string{std::to_string(port)}, ec);
 		if(ec) 
 		{
 			return network::Endpoint{};
 		}
 
-		return network::Endpoint{it->endpoint()};
+		return network::Endpoint{ endpoint };
 	}
 
 	network::Endpoint Miner::get_local_ip()
@@ -156,14 +156,16 @@ namespace nexusminer
 		{
 			try 
 			{
+				asio::error_code error;
 				asio::ip::udp::resolver resolver(*m_io_context);
-				asio::ip::udp::resolver::query query(asio::ip::udp::v4(), "google.com", "");
-				asio::ip::udp::resolver::iterator endpoints = resolver.resolve(query);
-				asio::ip::udp::endpoint ep = *endpoints;
-				asio::ip::udp::socket socket(*m_io_context);
-				socket.connect(ep);
-				asio::ip::address addr = socket.local_endpoint().address();
-				return network::Endpoint{ network::Transport_protocol::tcp, addr.to_string(), 0 };
+				auto results = resolver.resolve("google.com", "80", error);
+				for (auto const& endpoint : results)
+				{
+					asio::ip::udp::socket socket(*m_io_context);
+					socket.connect(endpoint);
+					asio::ip::address addr = socket.local_endpoint().address();
+					return network::Endpoint{ network::Transport_protocol::tcp, addr.to_string(), 0 };
+				}
 			}
 			catch (std::exception& e) 
 			{
