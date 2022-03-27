@@ -8,4 +8,4 @@ target_include_directories(fpga
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
 )
 
-target_link_libraries(fpga hash worker LLP stats config)
+target_link_libraries(fpga hash worker LLP stats config spdlog::spdlog)

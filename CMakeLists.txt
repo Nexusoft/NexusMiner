@@ -23,7 +23,7 @@ include(${CPM_DOWNLOAD_LOCATION})
 find_package(Threads REQUIRED)
 
 #spdlog
-CPMAddPackage(NAME spdlog GITHUB_REPOSITORY gabime/spdlog VERSION 1.9.2)
+CPMAddPackage(NAME spdlog GITHUB_REPOSITORY gabime/spdlog VERSION 1.9.2 OPTIONS "SPDLOG_BUILD_SHARED OFF")
 
 #nlohmann json
 CPMAddPackage(NAME nlohmann_json GITHUB_REPOSITORY nlohmann/json  VERSION 3.10.5)
@@ -194,7 +194,7 @@ endif()
               
 
 target_include_directories(NexusMiner PUBLIC "${PROJECT_BINARY_DIR}")
-target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker TAO asio)
+target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker TAO asio spdlog::spdlog)
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()

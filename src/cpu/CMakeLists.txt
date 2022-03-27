@@ -14,7 +14,7 @@ target_include_directories(cpu
 )
 
 # TODO reduce dependencies
-target_link_libraries(cpu hash worker LLP LLC stats config spdlog)
+target_link_libraries(cpu hash worker LLP LLC stats config spdlog::spdlog)
 if(WITH_PRIME)
     target_link_libraries(cpu libprimesieve-static)
     if(WIN32)

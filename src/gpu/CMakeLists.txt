@@ -33,7 +33,7 @@ if (WITH_GPU_CUDA)
         $<INSTALL_INTERFACE:inc>    
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>)
 
-    target_link_libraries(gpu LLC worker LLP stats config TAO)
+    target_link_libraries(gpu LLC worker LLP stats config TAO spdlog::spdlog)
 
 
     if(WITH_PRIME)
