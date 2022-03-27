@@ -9,3 +9,5 @@ target_include_directories(network
         $<INSTALL_INTERFACE:inc>
     PRIVATE src
 )
+
+target_link_libraries(network asio)
