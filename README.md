@@ -91,3 +91,6 @@ Prime mining with Radeon RX6000 series GPUs is supported on Linux systems.  The 
     * `sudo apt-get install libgmp-dev`
 * boost (required for WITH_PRIME):
     * `sudo apt-get install libboost-all-dev`
+## Support
+* [Nexus Miners](https://t.me/NexusMiners) on telegram.
+
