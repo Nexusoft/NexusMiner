@@ -9,7 +9,7 @@ Have an Nvidia GPU and a windows machine?  Start mining in 3 steps.
 3. Run NexusMiner.exe
 
 ## FPGA Mining
-FPGAs are the most efficient hardware for mining the Nexus Hash channel.  Blackminer users see these instructions.  Other users see the list of supported [FPGA boards](https://github.com/Nexusoft/NexusMiner/blob/master/docs/fpga_support.md). 
+FPGAs are the most efficient hardware for mining the Nexus Hash channel.  Blackminer users see [these instructions](docs/blackminer_instructions.md).  Other users see the list of supported [FPGA boards](docs/fpga_support.md). 
 
 ## GPU Mining
 GPUs are the most efficient hardware for mining the Nexus Prime channel.  Supported GPUs are Nvidia GTX/RTX 10x0, 20x0, and 30x0 series, and Radeon RX6000 series.  Nvidia RTX 20x0 and 30x0 GPUs have the best performance.  Hash channel mining with Nvidia GPUs is also supported. 
