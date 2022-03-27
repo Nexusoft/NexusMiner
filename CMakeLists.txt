@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.21)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 set(CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/libs")
@@ -31,7 +31,8 @@ CPMAddPackage(NAME nlohmann_json GITHUB_REPOSITORY nlohmann/json  VERSION 3.10.5
 include_directories(${CMAKE_SOURCE_DIR}/include)
 link_directories(${CMAKE_SOURCE_DIR}/libs)
 
-option(WITH_GPU_CUDA "Build with gpu workers, CUDA needed" OFF)
+option(WITH_GPU_AMD "Build with AMD gpu workers, Requires HIP and clang" OFF)
+option(WITH_GPU_CUDA "Build with Nvidia gpu workers, CUDA needed" OFF)
 option(WITH_PRIME "Build with PRIME mining support, BOOST and GMP or MPIR needed" OFF)
 option(STATIC_OPENSSL "Build with static OpenSSL" ON)
 
@@ -107,11 +108,21 @@ if(WITH_GPU_CUDA)
         enable_language(CUDA)
         find_package(CUDAToolkit)
         include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
+        add_definitions(-DGPU_CUDA_ENABLED)
         add_definitions(-DGPU_ENABLED)
     else()
         message(STATUS "No CUDA compiler found")
     endif()
 endif()
+
+if(WITH_GPU_AMD)
+    # Search for rocm in common locations
+    list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
+    find_package(hip)
+    add_definitions(-DGPU_AMD_ENABLED)
+    add_definitions(-DGPU_ENABLED)    
+endif()
+
 
 #PRIME
 if(WITH_PRIME)
@@ -145,21 +156,49 @@ add_subdirectory(src/fpga)
 add_subdirectory(src/TAO)
 
 
-if(WITH_GPU_CUDA)
+if(WITH_GPU_CUDA OR WITH_GPU_AMD)
     add_subdirectory(src/gpu)
 endif()
 
-add_executable(NexusMiner 
-                src/main.cpp 
+set(MAIN_SOURCE_FILES src/main.cpp
                 src/miner.cpp 
                 src/worker_manager.cpp 
                 src/timer_manager.cpp)
+
+add_executable(NexusMiner ${MAIN_SOURCE_FILES})
+if (WITH_GPU_AMD AND WITH_PRIME)
+    # set(GPU_TARGETS "gfx1030" CACHE STRING "AMD GPU targets")  #this limits gpu hardware targets and can shorten compile time
+    set(GPU_FILES 
+        src/gpu/src/gpu/cuda_prime/cuda_chain.cu  
+        src/gpu/src/gpu/cuda_prime/sieve.cu
+        src/gpu/src/gpu/cuda_prime/sieve_impl.cu
+        src/gpu/src/gpu/cuda_prime/find_chain.cu
+        src/gpu/src/gpu/cuda_prime/fermat_prime/fermat_prime.cu
+        src/gpu/src/gpu/cuda_prime/fermat_prime/fermat_prime_impl.cu
+        src/gpu/src/gpu/cuda_prime/fermat_prime/fermat_utils.cu)
+
+    set(HOST_FILES 
+        src/gpu/src/gpu/worker_prime.cpp
+        src/gpu/src/gpu/prime/prime.cpp
+        src/gpu/src/gpu/prime/prime_tests.cpp
+        src/gpu/src/gpu/prime/chain.cpp
+        src/gpu/src/gpu/prime/sieve.cpp
+        src/gpu/src/gpu/prime/small_sieve_tools.cpp)
+    set_source_files_properties(${GPU_FILES} PROPERTIES COMPILE_FLAGS "-fgpu-rdc" )
+    set_source_files_properties(${GPU_FILES} PROPERTIES LANGUAGE CXX)
+
+    target_sources(NexusMiner PRIVATE ${GPU_FILES} ${HOST_FILES})
+    include_directories(${CMAKE_SOURCE_DIR}/src/gpu/inc)
+    target_link_libraries(NexusMiner hip::device "--hip-link -fgpu-rdc")
+endif() 
+              
 
 target_include_directories(NexusMiner PUBLIC "${PROJECT_BINARY_DIR}")
 target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga LLP worker TAO asio)
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()
+
 
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)

@@ -38,7 +38,7 @@ private:
     // Rotate left : 0b1001 -- > 0b0011
     inline uint64_t rol(uint64_t val, int r_bits)
     {
-        return (val << r_bits) | (val >> (64 - r_bits));
+        return (r_bits == 0) ? val : (val << r_bits) | (val >> (64 - r_bits));
     }
 
     k_state keccak_round(const k_state& state_in, int round);

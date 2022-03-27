@@ -1,11 +1,10 @@
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
+#include "gpu_helper.hpp"
 #include "sieve_impl.cuh"
 #include "sieve.hpp"
 #include "find_chain.cuh"
 #include "sieve_lookup_tables.cuh"
+#include "cuda_chain.cuh"
 
-#include <cuda.h>
 #include <stdio.h>
 #include <math.h>
 #include <inttypes.h>
@@ -18,6 +17,7 @@ namespace nexusminer {
         __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset);
         __device__  bool is_there_still_hope(CudaChain& chain);
         __device__  void get_best_fermat_chain(const CudaChain& chain, uint64_t& base_offset, int& offset, int& best_length);
+
 
         //get the nth bit from the sieve.
         __device__ __forceinline__ bool get_bit(uint64_t bit_position, Cuda_sieve::sieve_word_t* sieve)
