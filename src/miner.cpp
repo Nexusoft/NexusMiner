@@ -144,7 +144,7 @@ namespace nexusminer
 			return network::Endpoint{};
 		}
 
-		return network::Endpoint{ endpoint };
+		return network::Endpoint{ *endpoint.begin()};
 	}
 
 	network::Endpoint Miner::get_local_ip()
@@ -166,6 +166,9 @@ namespace nexusminer
 					asio::ip::address addr = socket.local_endpoint().address();
 					return network::Endpoint{ network::Transport_protocol::tcp, addr.to_string(), 0 };
 				}
+
+				m_logger->error("Failed to resolve address google.com. Fallback to 127.0.0.1.");
+				return network::Endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
 			}
 			catch (std::exception& e) 
 			{
