@@ -16,7 +16,7 @@ GPUs are the most efficient hardware for mining the Nexus Prime channel.  Suppor
 
 ## Pools
 * [primepool.nexus.io](https://primepool.nexus.io)
-* [hashpool.nexus.io](https://hashpool.nexus.io)  
+* [hashpool.nexus.io](http://hashpool.nexus.io)  
 Connect to either pool on port 50000
 
 ## Prime Pool
