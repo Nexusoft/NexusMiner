@@ -20,7 +20,6 @@
 #include "stats/stats_collector.hpp"
 #include "protocol/solo.hpp"
 #include "protocol/pool.hpp"
-#include "protocol/pool_legacy.hpp"
 #include <variant>
 
 namespace nexusminer
@@ -37,14 +36,7 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
     auto const& pool_config = m_config.get_pool_config();
     if(pool_config.m_use_pool)
     {
-        if (pool_config.m_use_deprecated)
-        {
-            m_miner_protocol = std::make_shared<protocol::Pool_legacy>(m_logger, m_config.get_pool_config(), m_stats_collector);
-        }
-        else
-        {
-            m_miner_protocol = std::make_shared<protocol::Pool>(m_logger, m_config.get_mining_mode(), m_config.get_pool_config(), m_stats_collector);
-        }
+        m_miner_protocol = std::make_shared<protocol::Pool>(m_logger, m_config.get_mining_mode(), m_config.get_pool_config(), m_stats_collector);
     }
     else
     {
