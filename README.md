@@ -15,15 +15,10 @@ FPGAs are the most efficient hardware for mining the Nexus Hash channel.  Blackm
 GPUs are the most efficient hardware for mining the Nexus Prime channel.  Supported GPUs are Nvidia GTX/RTX 10x0, 20x0, and 30x0 series, and Radeon RX6000 series.  Nvidia RTX 20x0 and 30x0 GPUs have the best performance.  Hash channel mining with Nvidia GPUs is also supported. 
 
 ## Pools
-* [primepool.nexus.io](https://primepool.nexus.io)
-* [hashpool.nexus.io](http://hashpool.nexus.io)  
-Connect to either pool on port 50000
+* [primepool.nexus.io](https://primepool.nexus.io) - port 50000
+* [hashpool.nexus.io](http://hashpool.nexus.io)  - port 50000 (for blackminer fpgas) port 50001 for NexusMiners
 
-## Prime Pool
-To use the prime pool, set the following address and port in miner.conf:
-```
-    "wallet_ip" : "primepool.nexus.io",
-    "port" : 50000,
+
 ```
 
  ## miner.conf Configuration File
