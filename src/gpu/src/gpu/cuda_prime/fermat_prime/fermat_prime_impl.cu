@@ -158,6 +158,15 @@ namespace nexusminer {
             mpz_set(m_base_int, base_big_int);
         }
 
+        void Fermat_prime_impl::set_base_int(ump::uint1024_t base_big_int)
+        {
+            checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
+            Cump<1024> cuda_base_big_int;
+            cuda_base_big_int.from_ump(base_big_int);
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), NEXUSMINER_GPU_MemcpyHostToDevice));
+            m_base_int_ump = base_big_int;
+        }
+
         void Fermat_prime_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
         {
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_offsets, offsets, sizeof(*offsets) * offset_count, NEXUSMINER_GPU_MemcpyHostToDevice));

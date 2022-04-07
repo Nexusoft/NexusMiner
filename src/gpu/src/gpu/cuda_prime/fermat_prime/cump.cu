@@ -560,13 +560,30 @@ namespace nexusminer {
 
         }
 
+        template<int BITS>
+        __host__ void Cump<BITS>::to_ump(ump::Ump<BITS>& r)
+        {
+            r = 0;
+            constexpr int ump_to_cump_word_size_ratio = ump::BITS_PER_WORD / BITS_PER_WORD;
+            //assume ump word size is greater than or equal to cump word size
+            for (int i = 0; i < LIMBS; i++)
+            {
+                for (int j = 0; j < ump_to_cump_word_size_ratio; j++)
+                    r.m_limbs[i] |= static_cast<ump::limb_t>(m_limbs[ump_to_cump_word_size_ratio * i + j]) << (j * BITS_PER_WORD);
+            }
+        }
 
-        
-
-        //forward declaration of known template instantiations allows us to compile this code separate from the header
-        //and avoid link errors
-        //template class Cump<1024>;
-        //template class Cump<2048>;
+        template<int BITS>
+        __host__ void Cump<BITS>::from_ump(const ump::Ump<BITS>& s)
+        {
+            constexpr int ump_to_cump_word_size_ratio = ump::BITS_PER_WORD / BITS_PER_WORD;
+            //assume ump word size is greater than or equal to cump word size
+            for (int i = 0; i < ump::Ump<BITS>::LIMBS; i++)
+            {
+                for (int j=0; j < ump_to_cump_word_size_ratio; j++)
+                    m_limbs[ump_to_cump_word_size_ratio * i + j] = s.m_limbs[i] >> (j * BITS_PER_WORD);
+            }
+        }
 
     }
 }

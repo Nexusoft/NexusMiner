@@ -8,10 +8,10 @@
 #include <boost/multiprecision/gmp.hpp>
 #include "sieve_utils.hpp"
 #include "chain.hpp"
-//#include "../cuda_prime/fermat_test.hpp"
 #include "../cuda_prime/fermat_prime/fermat_prime.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include "gpu/prime_common.hpp"
+#include "ump.hpp"
 
 namespace nexusminer {
 	namespace gpu
@@ -24,15 +24,15 @@ namespace nexusminer {
 			Sieve();
 			void generate_sieving_primes();
 			void generate_small_prime_tables();
-			void set_sieve_start(boost::multiprecision::uint1024_t);
-			boost::multiprecision::uint1024_t get_sieve_start();
+			void set_sieve_start(ump::uint1024_t);
+			ump::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
 			void gpu_sieve_load(uint16_t device);
 			void gpu_sieve_init();
 			void gpu_fermat_test_init(uint16_t device);
 			void gpu_sieve_free();
 			void gpu_fermat_free();
-			void gpu_fermat_test_set_base_int(boost::multiprecision::uint1024_t base_big_int);
+			void gpu_fermat_test_set_base_int(ump::uint1024_t base_big_int);
 			uint64_t gpu_get_prime_candidate_count();
 			void gpu_get_sieve();
 			void gpu_sieve_small_primes(uint64_t sieve_start_offset);
@@ -60,7 +60,7 @@ namespace nexusminer {
 			uint32_t get_chain_count();
 			uint64_t count_fermat_primes(int sample_size, uint16_t device);
 			uint64_t count_fermat_primes_cpu(int sample_size);
-			bool primality_test(boost::multiprecision::uint1024_t p);
+			bool primality_test(ump::uint1024_t p);
 			void test_chains();
 			void primality_batch_test(uint16_t device);
 			void primality_batch_test_cpu();
@@ -157,7 +157,7 @@ namespace nexusminer {
 			std::vector<CudaChain>m_cuda_chains;
 			//std::vector<double>m_large_prime_mod_constants;
 
-			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
+			ump::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
 			

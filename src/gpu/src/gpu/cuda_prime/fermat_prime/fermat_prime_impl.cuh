@@ -6,6 +6,7 @@
 #include "../cuda_chain.cuh"
 #include <stdint.h>
 #include <gmp.h>
+#include "ump.hpp"
 
 namespace nexusminer {
 	namespace gpu {
@@ -21,6 +22,7 @@ namespace nexusminer {
             void fermat_init(uint64_t batch_size, int device);
             void fermat_free();
             void set_base_int(mpz_t base_big_int);
+            void set_base_int(ump::uint1024_t base_big_int);
             void set_offsets(uint64_t offsets[], uint64_t offset_count);
             void get_results(uint8_t results[]);
             void get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes, uint64_t& trial_division_tests,
@@ -76,6 +78,7 @@ namespace nexusminer {
             //host memory
             int m_device = 0;
             mpz_t m_base_int;
+            ump::uint1024_t m_base_int_ump;
             uint64_t m_offset_count;
             uint64_t m_test_vector_a_size;
             uint64_t m_test_vector_b_size;

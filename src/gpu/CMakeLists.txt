@@ -35,9 +35,9 @@ if (WITH_GPU_CUDA)
 
     target_link_libraries(gpu LLC worker LLP stats config TAO spdlog::spdlog)
 
-
     if(WITH_PRIME)
         target_link_libraries(gpu libprimesieve-static)
+        target_link_libraries(gpu fermat_test)
         if(WIN32)
             target_link_libraries(gpu mpir)
         else()

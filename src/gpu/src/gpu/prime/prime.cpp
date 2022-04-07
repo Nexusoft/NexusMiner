@@ -281,17 +281,16 @@ bool Prime::PrimeCheck(LLC::CBigNum test, int checks)
 	a = Base or 2... 2 + checks, n is the Prime Test. Used after Miller-Rabin and Divisor tests to verify primality. **/
 LLC::CBigNum Prime::FermatTest(LLC::CBigNum n, LLC::CBigNum a)
 {
-	uint1k base("0x" + a.GetHex());
+	//uint1k base("0x" + a.GetHex());
 	uint1k result;
 	uint1k p("0x" + n.GetHex());
-	result = boost::multiprecision::powm(base, p - 1, p);
+	result = ump::powm_2(p, 0);
 	//convert to hex and return as llc::cbignum
 	LLC::CBigNum r;
-	std::stringstream ss;
-	ss << std::hex << result;
-	std::string r_str = ss.str();
-	LLC::CBigNum prime_to_test;
-	r.SetHex(r_str);
+	//std::stringstream ss;
+	//ss << std::hex << result;
+	//std::string r_str = ss.str();
+	r.SetHex(result.to_str());
 	return (r);
 	
 }

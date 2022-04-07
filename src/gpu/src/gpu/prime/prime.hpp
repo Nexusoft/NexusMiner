@@ -10,12 +10,13 @@
 #include <spdlog/spdlog.h>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "LLC/types/bignum.h"
+#include "ump.hpp"
 
 
 namespace nexusminer{
 namespace gpu
 {
-using uint1k = boost::multiprecision::uint1024_t;
+using uint1k = ump::uint1024_t;
 class Prime
 {
 public:

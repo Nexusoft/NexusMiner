@@ -267,11 +267,11 @@ bool Worker_prime::difficulty_check(uint1k p)
 
 LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
 {
-	std::stringstream ss;
-	ss << std::hex << p;
-	std::string p_hex_str = ss.str();
+	//std::stringstream ss;
+	//ss << std::hex << p;
+	//std::string p_hex_str = ss.str();
 	LLC::CBigNum p_CBignum;
-	p_CBignum.SetHex(p_hex_str);
+	p_CBignum.SetHex(p.to_str());
 	return p_CBignum;
 }
 

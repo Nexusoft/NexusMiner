@@ -257,7 +257,6 @@ namespace nexusminer {
                 A += m * u;
                 A >>= 32;
             }
-            
             if (A >= m)
             {
                 A -= m;

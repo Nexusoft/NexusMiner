@@ -8,6 +8,11 @@ project(NexusMiner VERSION 1.6 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set default build to release
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose Release or Debug" FORCE)
+endif()
+
 configure_file(src/version.h.in version.h)
 
 set(CPM_DOWNLOAD_VERSION 0.35.0) 
@@ -21,6 +26,8 @@ endif()
 include(${CPM_DOWNLOAD_LOCATION})
 
 find_package(Threads REQUIRED)
+
+SET(BUILD_SHARED_LIBS OFF)
 
 #spdlog
 CPMAddPackage(NAME spdlog GITHUB_REPOSITORY gabime/spdlog VERSION 1.9.2 OPTIONS "SPDLOG_BUILD_SHARED OFF")
@@ -128,6 +135,7 @@ endif()
 if(WITH_PRIME)
     find_package(Boost)
     include_directories(${Boost_INCLUDE_DIRS}) 
+    CPMAddPackage(NAME fermat_test GITHUB_REPOSITORY ahatstat/fermat_test GIT_TAG main OPTIONS "BUILD_TESTS Off")
     include(FetchContent)
     FetchContent_Declare(primesieve GIT_REPOSITORY https://github.com/kimwalisch/primesieve.git GIT_TAG master)
     FetchContent_MakeAvailable(primesieve)
@@ -198,7 +206,6 @@ target_link_libraries(NexusMiner chrono network config stats protocol cpu fpga L
 if(WITH_GPU_CUDA)
     target_link_libraries(NexusMiner gpu)
 endif()
-
 
 target_link_libraries(NexusMiner ${OPENSSL_LIBRARIES})
 target_link_libraries(NexusMiner Threads::Threads)

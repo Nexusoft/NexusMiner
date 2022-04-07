@@ -8,6 +8,9 @@
 #include <stdint.h>
 #include <gmp.h>
 #include "fermat_utils.cuh"
+#include <string>
+#include "ump.hpp"
+
 
 namespace nexusminer {
 	namespace gpu {
@@ -64,8 +67,6 @@ namespace nexusminer {
 			__host__ __device__ void operator *= (uint32_t);
 			__host__ __device__ void operator *= (const Cump&);
 
-
-
 			__host__ __device__ Cump modinv(const Cump&) const;
 			//__device__ void divide(const Cump& divisor, Cump& quotient, Cump& remainder) const;
 			__device__ Cump R_mod_m() const;
@@ -76,13 +77,14 @@ namespace nexusminer {
 			__host__ __device__ void to_cstr(char* s) const;
 			__host__ void to_mpz(mpz_t r);
 			__host__ void from_mpz(mpz_t s);
+			__host__ void to_ump(ump::Ump<BITS>& r);
+			__host__ void from_ump(const ump::Ump<BITS>& s);
 
 			//the least significant word is stored in array element 0
 			uint32_t m_limbs[LIMBS];  
 			
 		};
 
-		
 		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, const Cump<BITS>& rhs);
 		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, int rhs);
 		template<int BITS> __device__ Cump<BITS> operator + (const Cump<BITS>& lhs, uint32_t rhs);

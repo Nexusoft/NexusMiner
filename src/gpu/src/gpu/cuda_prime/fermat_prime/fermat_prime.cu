@@ -35,6 +35,11 @@ namespace nexusminer {
             m_impl->set_base_int(base_big_int);
         }
 
+        void Fermat_prime::set_base_int(ump::uint1024_t base_big_int)
+        {
+            m_impl->set_base_int(base_big_int);
+        }
+
         void Fermat_prime::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
         {
             m_impl->set_chain_ptr(chains, chain_count);
