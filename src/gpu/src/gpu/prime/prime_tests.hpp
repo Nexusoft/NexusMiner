@@ -1,7 +1,6 @@
 #ifndef NEXUSMINER_GPU_PRIME_TESTS_HPP
 #define NEXUSMINER_GPU_PRIME_TESTS_HPP
 #include <spdlog/spdlog.h>
-//#include <boost/multiprecision/cpp_int.hpp>
 #include "ump.hpp"
 
 namespace nexusminer {

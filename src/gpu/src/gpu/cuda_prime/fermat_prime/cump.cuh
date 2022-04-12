@@ -6,11 +6,9 @@
 
 #include "../gpu_helper.hpp"
 #include <stdint.h>
-#include <gmp.h>
 #include "fermat_utils.cuh"
 #include <string>
 #include "ump.hpp"
-
 
 namespace nexusminer {
 	namespace gpu {
@@ -75,8 +73,8 @@ namespace nexusminer {
 			__host__ __device__ int compare(const Cump&) const;
 
 			__host__ __device__ void to_cstr(char* s) const;
-			__host__ void to_mpz(mpz_t r);
-			__host__ void from_mpz(mpz_t s);
+			//__host__ void to_mpz(mpz_t r);
+			//__host__ void from_mpz(mpz_t s);
 			__host__ void to_ump(ump::Ump<BITS>& r);
 			__host__ void from_ump(const ump::Ump<BITS>& s);
 

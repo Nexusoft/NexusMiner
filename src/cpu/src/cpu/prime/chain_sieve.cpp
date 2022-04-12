@@ -5,12 +5,10 @@
 #include <chrono>
 #include <bitset>
 #include <sstream>
-#include <boost/integer/mod_inverse.hpp>
 
 namespace nexusminer {
     namespace cpu
     {
-        using namespace boost::multiprecision;
         Chain::Chain()
         {
         }
@@ -200,7 +198,7 @@ namespace nexusminer {
             m_logger->info(ss.str());
         }
 
-        void Sieve::set_sieve_start(boost::multiprecision::uint1024_t sieve_start)
+        void Sieve::set_sieve_start(ump::uint1024_t sieve_start)
         {
             //set the sieve start to a multiple of 30
             if (sieve_start % 30 > 0)
@@ -210,7 +208,7 @@ namespace nexusminer {
             m_sieve_start = sieve_start;
         }
 
-        boost::multiprecision::uint1024_t Sieve::get_sieve_start()
+        ump::uint1024_t Sieve::get_sieve_start()
         {
             return m_sieve_start;
         }
@@ -227,7 +225,7 @@ namespace nexusminer {
                 uint32_t m = get_offset_to_next_multiple(m_sieve_start, s);
                 m_multiples.push_back(m);
                 //where is the starting multiple relative to the wheel
-                int wheel_index = (boost::integer::mod_inverse((int)s, 30) * m) % 30;
+                int wheel_index = (prime_mod30_inverse[s % 30] * m) % 30;
                 m_wheel_indices.push_back(sieve30_index[wheel_index]);
             }
             auto end = std::chrono::steady_clock::now();
@@ -352,7 +350,7 @@ namespace nexusminer {
                     int previous_sieve_offset = 0;
                     for (uint8_t b = sieve[n]; b > 0; b &= b - 1)
                     {
-                        int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//c++20 alternative to lsb(b) is std::countr_zero(b);
+                        int index_of_lowest_set_bit = ump::count_trailing_zeros(b);//std::countr_zero(b);
                         sieve_offset = sieve30_offsets[index_of_lowest_set_bit];
                         uint64_t prime_candidate_offset = low + n * 30 + sieve_offset;
                         if (m_chain_in_process)
@@ -427,7 +425,7 @@ namespace nexusminer {
                 {
                     if (m_chain[i].get_next_fermat_candidate(base_offset, offset))
                     {
-                        boost::multiprecision::uint1024_t candidate = m_sieve_start + base_offset + offset;
+                        ump::uint1024_t candidate = m_sieve_start + base_offset + offset;
                         bool is_prime = primality_test(candidate);
                         m_chain[i].update_fermat_status(is_prime);
                         if (is_prime)
@@ -470,7 +468,7 @@ namespace nexusminer {
                 uint64_t base_offset;
                 int offset;
                 bool success = chain.get_next_fermat_candidate(base_offset, offset);
-                boost::multiprecision::uint1024_t candidate = m_sieve_start + base_offset + offset;
+                ump::uint1024_t candidate = m_sieve_start + base_offset + offset;
                 bool is_prime = primality_test(candidate);
                 /*uint1024_t T("0x0000005ff320ec9f9599b9cb0156c793f61060c8a8c49185df9d25603e37259c2f0213d6d96745bbbbe7ea1e4e9da371aeeb5d20c204c22a038b10957b53c67d9eb3a00acfaeb6ccd4c231a8088d5a5745e19f70387a7d91463d9b318a1f0503819a32f5fa32cf3579c7d6a3546cbdceaa364cfa2e989defeb4f5fe29de687cc");
                 uint64_t nNonce = 4933493377870005061;
@@ -535,24 +533,19 @@ namespace nexusminer {
             {
                 for (uint8_t b = m_sieve[n]; b > 0; b &= b - 1)
                 {
-                    int index_of_lowest_set_bit = boost::multiprecision::lsb(b);//std::countr_zero(b);
+                    int index_of_lowest_set_bit = ump::count_trailing_zeros(b);//std::countr_zero(b);
                     uint64_t prime_candidate_offset = low + n * 30 + sieve30_offsets[index_of_lowest_set_bit];
-                    uint1024_t p = m_sieve_start + prime_candidate_offset;
+                    ump::uint1024_t p = m_sieve_start + prime_candidate_offset;
                     count += primality_test(p) ? 1 : 0;
                 }
             }
             return count;
         }
 
-        bool Sieve::primality_test(boost::multiprecision::uint1024_t p)
+        bool Sieve::primality_test(ump::uint1024_t p)
         {
-            //gmp powm is about 7 times faster than boost backend
-            mpz_int base = 2;
-            mpz_int result;
-            mpz_int p1 = static_cast<mpz_int>(p);
-            result = boost::multiprecision::powm(base, p1 - 1, p1);
             m_fermat_test_count++;
-            bool isPrime = (result == 1);
+            bool isPrime = p.is_prime();
             if (isPrime)
             {
                 ++m_fermat_prime_count;

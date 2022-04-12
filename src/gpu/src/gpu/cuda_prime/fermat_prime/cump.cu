@@ -533,33 +533,6 @@ namespace nexusminer {
             return lhs.compare(rhs) != 0;
         }
 
-        
-
-        //convert the cuda big unsigned int to a gmp multiprecision integer
-        template<int BITS>
-        __host__ void Cump<BITS>::to_mpz(mpz_t r)
-        {
-            mpz_import(r, LIMBS, -1, sizeof(uint32_t), 0, 0, m_limbs);
-        }
-
-        //convert a gmp multiprecision integer to a cuda unsigned int 
-        template<int BITS>
-        __host__ void Cump<BITS>::from_mpz(mpz_t s) {
-            size_t words = 0;
-
-            if (mpz_sizeinbase(s, 2) > LIMBS * 32) {
-                fprintf(stderr, "from_mpz error. Data does not fit.\n");
-            }
-            else
-            {
-                mpz_export(m_limbs, &words, -1, sizeof(uint32_t), 0, 0, s);
-            }
-
-            while (words < LIMBS)
-                m_limbs[words++] = 0;
-
-        }
-
         template<int BITS>
         __host__ void Cump<BITS>::to_ump(ump::Ump<BITS>& r)
         {
@@ -580,9 +553,14 @@ namespace nexusminer {
             //assume ump word size is greater than or equal to cump word size
             for (int i = 0; i < ump::Ump<BITS>::LIMBS; i++)
             {
-                for (int j=0; j < ump_to_cump_word_size_ratio; j++)
-                    m_limbs[ump_to_cump_word_size_ratio * i + j] = s.m_limbs[i] >> (j * BITS_PER_WORD);
+                for (int j = 0; j < ump_to_cump_word_size_ratio; j++)
+                {
+                    int index = ump_to_cump_word_size_ratio * i + j;
+                    if (index < LIMBS)
+                        m_limbs[index] = s.m_limbs[i] >> (j * BITS_PER_WORD);
+                }
             }
+            
         }
 
     }

@@ -7,7 +7,6 @@
 #include <asio.hpp>
 #include <primesieve.hpp>
 #include <sstream> 
-#include <boost/random.hpp>
 
 namespace nexusminer
 {
@@ -199,7 +198,7 @@ void Worker_prime::run()
 double Worker_prime::getDifficulty(uint1k p)
 {
 	std::vector<unsigned int> offsets_to_test;
-	LLC::CBigNum prime_to_test = boost_uint1024_t_to_CBignum(p);
+	LLC::CBigNum prime_to_test = ump_uint1024_t_to_CBignum(p);
 	double difficulty = m_prime_helper->GetPrimeDifficulty(prime_to_test, 1, offsets_to_test);
 	return difficulty;
 }
@@ -216,11 +215,11 @@ bool Worker_prime::difficulty_check(uint1k p)
 
 
 
-LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
+LLC::CBigNum Worker_prime::ump_uint1024_t_to_CBignum(uint1k p)
 {
-	std::stringstream ss;
-	ss << std::hex << p;
-	std::string p_hex_str = ss.str();
+	//std::stringstream ss;
+	//ss << std::hex << p;
+	std::string p_hex_str = p.to_str();
 	LLC::CBigNum p_CBignum;
 	p_CBignum.SetHex(p_hex_str);
 	return p_CBignum;
@@ -246,20 +245,15 @@ void Worker_prime::update_statistics(stats::Collector& stats_collector)
 void Worker_prime::fermat_performance_test()
 //test the throughput of fermat primality test
 {
-	using namespace boost::multiprecision;
-	using namespace boost::random;
-
-	typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
-	generator1024_type gen1024;
-	gen1024.seed(time(0));
+	
 	// Generate some random 1024-bit unsigned values:
-	std::vector<boost::multiprecision::uint1024_t> big_uints;
+	std::vector<ump::uint1024_t> big_uints;
 	int sample_size = 2000;
 	for (unsigned i = 0; i < sample_size; ++i)
 	{
-		boost::multiprecision::uint1024_t pp = gen1024();
-		//make it odd
-		pp += 1?(pp % 2) == 0:0;
+		ump::uint1024_t pp;
+		pp.random();
+		pp.make_odd();
 		big_uints.push_back(pp);
 	}
 

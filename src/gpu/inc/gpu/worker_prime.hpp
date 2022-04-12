@@ -8,7 +8,6 @@
 #include "worker.hpp"
 #include "hash/nexus_skein.hpp"
 #include "hash/nexus_keccak.hpp"
-#include <boost/multiprecision/cpp_int.hpp>
 #include <spdlog/spdlog.h>
 #include "LLC/types/bignum.h"
 #include "ump.hpp"
@@ -64,7 +63,7 @@ private:
 
     std::uint64_t m_nonce = 0;
     uint1k m_base_hash;
-    static LLC::CBigNum boost_uint1024_t_to_CBignum(uint1k);
+    static LLC::CBigNum ump_uint1024_t_to_CBignum(uint1k);
 
     //stats
     uint64_t m_range_searched = 0;

@@ -1,8 +1,4 @@
 #include "prime.hpp"
-#include <boost/integer/mod_inverse.hpp>
-
-//#include <openssl/bn.h>
-
 
 namespace nexusminer {
 namespace gpu
@@ -95,65 +91,7 @@ Prime::Prime()
 {
 }
 
-void Prime::InitializePrimes()
-{
-	m_logger->info("Generating primes...");
-	// generate prime table
 
-	primes = make_primes(prime_limit);
-
-	printf("\n%d primes generated\n", primes[0]);
-
-	//mpz_init(zPrimorial);
-	zPrimorial = 1;
-	//mpz_set_ui(zPrimorial, 1);
-
-	for (int i = 1; i < nPrimorialEndPrime; i++)
-	{
-		//mpz_mul_ui(zPrimorial, zPrimorial, primes[i]);
-		zPrimorial *= primes[i];
-	}
-
-	m_logger->debug("Primorial: " + zPrimorial.str());
-	//printf("\n"); mpz_out_str(stdout, 10, zPrimorial); printf("\n");
-
-	m_logger->debug("Last Primorial Prime = {}", primes[nPrimorialEndPrime - 1]);
-	m_logger->debug("First Sieving Prime = {}", primes[nPrimorialEndPrime]);
-
-
-	//int nSize = mpz_sizeinbase(zPrimorial, 2);
-	int nSize = boost::multiprecision::msb(zPrimorial) + 1;
-	m_logger->debug("Primorial Size = {}-bit", nSize);
-
-	inverses = (unsigned int*)malloc((nPrimeLimit + 1) * sizeof(unsigned int));
-	memset(inverses, 0, (nPrimeLimit + 1) * sizeof(unsigned int));
-
-	//mpz_t zPrime, zInverse, zResult;
-
-	//mpz_init(zPrime);
-	//mpz_init(zInverse);
-	//mpz_init(zResult);
-	boost::multiprecision::cpp_int zPrime, zInverse, zResult;
-	
-
-	for (unsigned int i = nPrimorialEndPrime; i <= nPrimeLimit; i++)
-	{
-		//mpz_set_ui(zPrime, primes[i]);
-		zPrime = primes[i];
-		//int	inv = mpz_invert(zResult, zPrimorial, zPrime);
-		zResult = boost::integer::mod_inverse(zPrimorial, zPrime);
-
-		if (zResult == 0)
-		{
-			m_logger->critical("No Inverse at position {}", i);
-			exit(1);
-		}
-		else
-		{
-			inverses[i] = zResult.convert_to<unsigned int>();
-		}
-	}
-}
 
 /** Convert Double to unsigned int Representative. Used for encoding / decoding prime difficulty from nBits. **/
 unsigned int Prime::SetBits(double nDiff)
@@ -223,7 +161,22 @@ unsigned int Prime::GetPrimeBits(LLC::CBigNum prime, int checks, std::vector<uns
 unsigned int Prime::GetFractionalDifficulty(LLC::CBigNum composite)
 {
 	/** Break the remainder of Fermat test to calculate fractional difficulty [Thanks Sunny] **/
-	return ((composite - FermatTest(composite, 2) << 24) / composite).getuint32();
+	unsigned int a = ((composite - FermatTest(composite, 2) << 24) / composite).getuint32();
+	//this shift would overflow a normal fixed width number.  we rely on ump's extra word to accomodate the overflow. 
+	LLC::CBigNum dd = composite - FermatTest(composite, 2) << 24;
+	LLC::CBigNum ee = dd / composite;
+	ump::uint1024_t b{ composite.ToString()};
+	ump::uint1024_t c{ "0x" + FermatTest(composite, 2).GetHex()};
+	ump::uint1024_t d = b - c << 24;
+	ump::uint1024_t e = d / b;
+	ump::uint1024_t e1{ "0x" + ee.GetHex() };
+	ump::uint1024_t d1{ "0x" + dd.GetHex() };
+	//if (d != d1)
+	//	std::cout << "prime fractional difficulty mismatch." << std::endl;
+	unsigned int a1 = static_cast<uint32_t>(e);
+	if (a != a1)
+		std::cout << "prime fractional difficulty mismatch." << std::endl;
+	return a1;
 }
 
 /** bit_array_sieve of Eratosthenes for Divisor Tests. Used for Searching Primes. **/
@@ -294,7 +247,6 @@ LLC::CBigNum Prime::FermatTest(LLC::CBigNum n, LLC::CBigNum a)
 	return (r);
 	
 }
-
 
 
 }

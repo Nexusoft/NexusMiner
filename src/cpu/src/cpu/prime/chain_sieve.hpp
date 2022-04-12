@@ -4,9 +4,8 @@
 #include <vector>
 #include <atomic>
 #include <spdlog/spdlog.h>
-#include <boost/multiprecision/cpp_int.hpp>
-#include <boost/multiprecision/gmp.hpp>
 #include "sieve_utils.hpp"
+#include "ump.hpp"
 
 namespace nexusminer {
 	namespace cpu
@@ -68,8 +67,8 @@ namespace nexusminer {
 		public:
 			Sieve();
 			void generate_sieving_primes();
-			void set_sieve_start(boost::multiprecision::uint1024_t);
-			boost::multiprecision::uint1024_t get_sieve_start();
+			void set_sieve_start(ump::uint1024_t);
+			ump::uint1024_t get_sieve_start();
 			void calculate_starting_multiples();
 			void sieve_segment();
 			void sieve_batch(uint64_t low);
@@ -82,7 +81,7 @@ namespace nexusminer {
 			void reset_stats();
 			void find_chains(uint64_t low, bool batch_sieve_mode);
 			uint64_t count_fermat_primes(uint64_t sieve_size, uint64_t low);
-			bool primality_test(boost::multiprecision::uint1024_t p);
+			bool primality_test(ump::uint1024_t p);
 			void test_chains();
 			void primality_batch_test();
 			void primality_batch_test_cpu();
@@ -116,6 +115,8 @@ namespace nexusminer {
 			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
 			static constexpr int sieve30_gaps[]{ 6,4,2,4,2,4,6,2 };
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
+			static constexpr int prime_mod30_inverse[]  //lookup table - prime % 30 to prime inverse % 30
+			{ 1,1,13,13,13,13,13, 13, 11, 11, 11, 11, 7, 7, 23, 23, 23, 23, 19, 19, 17, 17, 17, 17, 29, 29, 29, 29, 29, 29 };
 			static constexpr int L1_CACHE_SIZE = 32768;
 			static constexpr int L2_CACHE_SIZE = 262144;
 			//upper limit of the sieving range
@@ -172,7 +173,7 @@ namespace nexusminer {
 			std::vector<int> m_wheel_indices;
 			std::vector<Chain> m_chain;
 			std::vector<uint8_t> m_sieve_results;  //accumulated results of sieving
-			boost::multiprecision::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
+			ump::uint1024_t m_sieve_start;  //starting integer for the sieve.  This must be a multiple of 30.
 			bool m_chain_in_process = false;
 			Chain m_current_chain;
 			static constexpr int m_fermat_test_batch_size = 100;

@@ -1,9 +1,5 @@
 #include "prime_tests.hpp"
-#include <gmp.h>
 #include <bitset>
-#include <boost/random.hpp>
-#include <boost/multiprecision/gmp.hpp>
-//#include <boost/integer/mod_inverse.hpp>
 #include "sieve.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include <cmath>
@@ -14,8 +10,6 @@ namespace nexusminer
 {
 namespace gpu
 {
-	
-
 	PrimeTests::PrimeTests(int device)
 		: m_logger{ spdlog::get("logger") }
 		, m_device{device}
@@ -26,19 +20,12 @@ namespace gpu
 	{
 
 		m_logger->info("Starting fermat primality test performance test.");
-		bool cpu_verify = true;
-		//typedef independent_bits_engine<mt19937, 1024, boost::multiprecision::uint1024_t> generator1024_type;
-		//generator1024_type gen1024;
-		//gen1024.seed(time(0));
-		// Generate a random 1024-bit unsigned value:
-		//boost::multiprecision::uint1024_t pp = gen1024();
+		bool cpu_verify = false;
 		ump::uint1024_t T200("0x53bf18ac03f0adfb36fc4864b42013375ebdc0bb311f06636771e605ad731ca1383c7d9056522ed9bda4f608ef71498bc9c7dade6c56bf1534494e0ef371e79f09433e4c9e64624695a42d7920bd5022f449156d2f93f3be3a429159794ac9e49f69c706793ef249a284f9173a82379e62dffac42c0f53f155f65a784f31f42c");
 		ump::uint1024_t pp = T200;
-		//make it odd
-		//pp += 1 ? (pp % 2) == 0 : 0;
 		pp.make_odd();
 
-		static constexpr uint32_t primality_test_batch_size = 1e3;
+		static constexpr uint32_t primality_test_batch_size = 1e5;
 		uint64_t offset_start = 0xFFFFFFFFFFFFFE;
 		int expected_prime_count = 269;
 		//uint64_t offsets[primality_test_batch_size];
@@ -48,13 +35,8 @@ namespace gpu
 		{
 			offsets.push_back(i * 2);
 		}
-		//boost::multiprecision::mpz_int base_as_mpz_int = static_cast<mpz_int>(pp);
-		//mpz_t base_as_mpz_t;
-		//mpz_init(base_as_mpz_t);
-		//mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
 		std::vector<uint8_t> primality_test_results;
 		primality_test_results.resize(primality_test_batch_size);
-		//bool primality_test_results[primality_test_batch_size];
 
 		//cump
 		Fermat_prime cuda_fermat_test_cump;
@@ -70,8 +52,6 @@ namespace gpu
 		uint64_t cuda_primality_test_count, cuda_primality_pass_count, trial_division_count, composite_count;
 		cuda_fermat_test_cump.get_stats(cuda_primality_test_count, cuda_primality_pass_count, trial_division_count, composite_count);
 		cuda_fermat_test_cump.fermat_free();
-
-		//mpz_clear(base_as_mpz_t);
 
 		int primes_found = 0;
 		for (auto i = 0; i < primality_test_batch_size; i++)
@@ -198,8 +178,6 @@ namespace gpu
 		//uint32_t busted_chain_count = chain_count_before - chain_count_after;
 		test_sieve.gpu_fermat_test_init(m_device);
 		//uint64_t prime_candidate_count = test_sieve.count_prime_candidates();
-		
-		//double bits = static_cast<double>(boost::multiprecision::log2(static_cast<boost::multiprecision::mpf_float>(test_sieve.get_sieve_start())));
 		int leading_zeros = ump::count_leading_zeros(test_sieve.get_sieve_start());
 		double bits = 1024 - leading_zeros;
 		double fermat_positive_rate_expected = test_sieve.probability_is_prime_after_sieve(bits);

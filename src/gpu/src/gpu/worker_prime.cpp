@@ -8,7 +8,6 @@
 #include <asio.hpp>
 #include <primesieve.hpp>
 #include <sstream> 
-#include <boost/random.hpp>
 
 namespace nexusminer
 {
@@ -249,7 +248,7 @@ void Worker_prime::run()
 double Worker_prime::getDifficulty(uint1k p)
 {
 	std::vector<unsigned int> offsets_to_test;
-	LLC::CBigNum prime_to_test = boost_uint1024_t_to_CBignum(p);
+	LLC::CBigNum prime_to_test = ump_uint1024_t_to_CBignum(p);
 	double difficulty = m_prime_helper->GetPrimeDifficulty(prime_to_test, 1, offsets_to_test);
 	return difficulty;
 }
@@ -265,11 +264,9 @@ bool Worker_prime::difficulty_check(uint1k p)
 }
 
 
-LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
+LLC::CBigNum Worker_prime::ump_uint1024_t_to_CBignum(uint1k p)
 {
-	//std::stringstream ss;
-	//ss << std::hex << p;
-	//std::string p_hex_str = ss.str();
+
 	LLC::CBigNum p_CBignum;
 	p_CBignum.SetHex(p.to_str());
 	return p_CBignum;

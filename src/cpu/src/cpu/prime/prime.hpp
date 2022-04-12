@@ -6,16 +6,14 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <gmp.h>
 #include <spdlog/spdlog.h>
-#include <boost/multiprecision/cpp_int.hpp>
 #include "LLC/types/bignum.h"
-
+#include "ump.hpp"
 
 namespace nexusminer{
 namespace cpu
 {
-using uint1k = boost::multiprecision::uint1024_t;
+using uint1k = ump::uint1024_t;
 class Prime
 {
 public:
@@ -29,10 +27,8 @@ public:
 	unsigned int GetFractionalDifficulty(LLC::CBigNum composite);
 	std::vector<unsigned int> Eratosthenes(int nSieveSize);
 	bool DivisorCheck(LLC::CBigNum test);
-	unsigned long PrimeSieve(LLC::CBigNum BaseHash, unsigned int nDifficulty, unsigned int nHeight);
 	bool PrimeCheck(LLC::CBigNum test, int checks);
 	LLC::CBigNum FermatTest(LLC::CBigNum n, LLC::CBigNum a);
-	//bool Miller_Rabin(LLC::CBigNum n, std::uint32_t checks);
 
 private:
 
@@ -41,7 +37,6 @@ private:
 	unsigned int* inverses;
 
 	unsigned int nBitArray_Size;
-	boost::multiprecision::cpp_int zPrimorial;
 
 	unsigned int prime_limit;
 	unsigned int nPrimeLimit;

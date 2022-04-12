@@ -5,13 +5,10 @@
 #include "cump.cuh"
 #include "../cuda_chain.cuh"
 #include <stdint.h>
-#include <gmp.h>
 #include "ump.hpp"
 
 namespace nexusminer {
 	namespace gpu {
-
-        
 
 		class Fermat_prime_impl
 		{
@@ -21,7 +18,7 @@ namespace nexusminer {
             void fermat_chain_run();
             void fermat_init(uint64_t batch_size, int device);
             void fermat_free();
-            void set_base_int(mpz_t base_big_int);
+            //void set_base_int(mpz_t base_big_int);
             void set_base_int(ump::uint1024_t base_big_int);
             void set_offsets(uint64_t offsets[], uint64_t offset_count);
             void get_results(uint8_t results[]);
@@ -39,9 +36,9 @@ namespace nexusminer {
             //non-fermat related test functions
             void test_init(uint64_t batch_size, int device);
             void test_free();
-            void set_input_a(mpz_t* a, uint64_t count);
-            void set_input_b(mpz_t* b, uint64_t count);
-            void get_test_results(mpz_t* test_results);
+            void set_input_a(ump::uint1024_t* a, uint64_t count);
+            void set_input_b(ump::uint1024_t* b, uint64_t count);
+            void get_test_results(ump::uint1024_t* test_results);
             void logic_test();
 
 
@@ -77,15 +74,10 @@ namespace nexusminer {
 
             //host memory
             int m_device = 0;
-            mpz_t m_base_int;
-            ump::uint1024_t m_base_int_ump;
+            ump::uint1024_t m_base_int;
             uint64_t m_offset_count;
             uint64_t m_test_vector_a_size;
             uint64_t m_test_vector_b_size;
-
-			
-			
-
 		};
 	}
 }

@@ -40,7 +40,7 @@ link_directories(${CMAKE_SOURCE_DIR}/libs)
 
 option(WITH_GPU_AMD "Build with AMD gpu workers, Requires HIP and clang" OFF)
 option(WITH_GPU_CUDA "Build with Nvidia gpu workers, CUDA needed" OFF)
-option(WITH_PRIME "Build with PRIME mining support, BOOST and GMP or MPIR needed" OFF)
+option(WITH_PRIME "Build with PRIME mining support" OFF)
 option(STATIC_OPENSSL "Build with static OpenSSL" ON)
 
 if(UNIX)
@@ -133,18 +133,10 @@ endif()
 
 #PRIME
 if(WITH_PRIME)
-    find_package(Boost)
-    include_directories(${Boost_INCLUDE_DIRS}) 
     CPMAddPackage(NAME fermat_test GITHUB_REPOSITORY ahatstat/fermat_test GIT_TAG main OPTIONS "BUILD_TESTS Off")
     include(FetchContent)
     FetchContent_Declare(primesieve GIT_REPOSITORY https://github.com/kimwalisch/primesieve.git GIT_TAG master)
     FetchContent_MakeAvailable(primesieve)
-    # find_package(primesieve REQUIRED)
-    if(WIN32)
-       find_package(MPIR REQUIRED)
-    else()
-       find_package(GMP REQUIRED)
-    endif()
     add_definitions(-DPRIME_ENABLED)
 endif()
 

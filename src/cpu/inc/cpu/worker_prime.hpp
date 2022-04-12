@@ -9,9 +9,9 @@
 #include "worker.hpp"
 #include "hash/nexus_skein.hpp"
 #include "hash/nexus_keccak.hpp"
-#include <boost/multiprecision/cpp_int.hpp>
 #include <spdlog/spdlog.h>
 #include "LLC/types/bignum.h"
+#include "ump.hpp"
 
 namespace asio { class io_context; }
 
@@ -21,7 +21,7 @@ namespace stats { class Collector; }
 
 namespace cpu
 {
-    using uint1k = boost::multiprecision::uint1024_t;
+    using uint1k = ump::uint1024_t;
     class Prime;
     class Sieve;
 class Worker_prime : public Worker, public std::enable_shared_from_this<Worker_prime>
@@ -75,7 +75,7 @@ private:
     void generate_seive(uint1k);
     void analyze_chains();
     void mine_region(uint1k);
-    static LLC::CBigNum boost_uint1024_t_to_CBignum(uint1k);
+    static LLC::CBigNum ump_uint1024_t_to_CBignum(uint1k);
 
 
     std::vector<bool>m_sieve;

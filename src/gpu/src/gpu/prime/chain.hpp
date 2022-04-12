@@ -3,8 +3,6 @@
 
 #include <string>
 #include <vector>
-//#include "sieve_utils.hpp"
-//#include "../cuda_prime/fermat_test.cuh"
 #include "gpu/prime_common.hpp"
 
 namespace nexusminer {

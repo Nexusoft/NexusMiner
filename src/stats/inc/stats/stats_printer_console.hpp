@@ -75,7 +75,8 @@ inline void Printer_console<PrinterType>::print()
             //GISPS = Billion integers searched per second
             ss << (prime_stats.m_range_searched / (1.0e9 * static_cast<double>(m_stats_collector.get_elapsed_time_seconds().count()))) << " GISPS ";
             ss << "Chain Count: ";
-            for (auto i=5; i< prime_stats.m_chain_histogram.size(); i++)
+            int starting_bin = m_worker_config[worker_config_index].m_mode == config::Worker_mode::CPU ? 3 : 5;
+            for (int i=starting_bin; i < prime_stats.m_chain_histogram.size(); i++)
             {
                 ss << i << ":" << prime_stats.m_chain_histogram[i] << " ";
             }

@@ -7,9 +7,7 @@
 #include <bitset>
 #include <sstream>
 #include <limits>
-#include <boost/integer/mod_inverse.hpp>
 #include "small_sieve_tools.hpp"
-//#include "fastmod.h"
 
 namespace nexusminer {
     namespace gpu
@@ -164,12 +162,6 @@ namespace nexusminer {
 
         void Sieve::gpu_fermat_test_set_base_int(ump::uint1024_t base_big_int)
         {
-            /*boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(base_big_int);
-            mpz_t base_as_mpz_t;
-            mpz_init(base_as_mpz_t);
-            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());
-            m_cuda_prime_test.set_base_int(base_as_mpz_t);
-            mpz_clear(base_as_mpz_t);*/
             m_cuda_prime_test.set_base_int(base_big_int);
         }
 
@@ -496,10 +488,6 @@ namespace nexusminer {
                 offsets.push_back(base_offset + static_cast<uint64_t>(offset));
             }
 
-           /* boost::multiprecision::mpz_int base_as_mpz_int = static_cast<boost::multiprecision::mpz_int>(m_sieve_start);
-            mpz_t base_as_mpz_t;
-            mpz_init(base_as_mpz_t);
-            mpz_set(base_as_mpz_t, base_as_mpz_int.backend().data());*/
             std::vector<uint8_t> primality_test_results;
             primality_test_results.resize(prime_test_actual_batch_size);
             m_cuda_prime_test.set_offsets(offsets.data(), prime_test_actual_batch_size);
@@ -800,7 +788,7 @@ namespace nexusminer {
             {
                 for (auto b = m_sieve_results[n]; b > 0; b &= b - 1)
                 {
-                    int index_of_lowest_set_bit = ump::count_trailing_zeros(b);//boost::multiprecision::lsb(b);//std::countr_zero(b);
+                    int index_of_lowest_set_bit = ump::count_trailing_zeros(b);
                     uint64_t prime_candidate_offset = n * m_sieve_range_per_word +
                         (index_of_lowest_set_bit / 8) * static_cast<uint64_t>(m_sieve_range_per_byte) +
                         sieve30_offsets[index_of_lowest_set_bit % 8];

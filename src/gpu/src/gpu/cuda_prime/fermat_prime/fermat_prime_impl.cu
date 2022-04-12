@@ -1,5 +1,4 @@
 #include "../gpu_helper.hpp"
-
 #include "fermat_prime_impl.cuh"
 #include <stdio.h>
 #include <math.h>
@@ -14,8 +13,6 @@ namespace nexusminer {
         __device__  bool update_fermat_status(CudaChain& chain, bool is_prime);
 
         __global__ void
-        //__launch_bounds__(256, 1)
-
             kernel_fermat(uint64_t* offsets, uint64_t* offset_count,
                 Cump<1024>* base_int, uint8_t* results, unsigned long long* test_count, unsigned long long* pass_count)
         {
@@ -149,22 +146,13 @@ namespace nexusminer {
             checkGPUErrors(NEXUSMINER_GPU_Free(d_trial_division_composite_count));
         }
 
-        void Fermat_prime_impl::set_base_int(mpz_t base_big_int)
-        {
-            checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
-            Cump<1024> cuda_base_big_int;
-            cuda_base_big_int.from_mpz(base_big_int);
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), NEXUSMINER_GPU_MemcpyHostToDevice));
-            mpz_set(m_base_int, base_big_int);
-        }
-
         void Fermat_prime_impl::set_base_int(ump::uint1024_t base_big_int)
         {
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
             Cump<1024> cuda_base_big_int;
             cuda_base_big_int.from_ump(base_big_int);
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), NEXUSMINER_GPU_MemcpyHostToDevice));
-            m_base_int_ump = base_big_int;
+            m_base_int = base_big_int;
         }
 
         void Fermat_prime_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
@@ -315,26 +303,26 @@ namespace nexusminer {
 
         }
 
-        void Fermat_prime_impl::set_input_a(mpz_t* a, uint64_t count)
+        void Fermat_prime_impl::set_input_a(ump::uint1024_t* a, uint64_t count)
         {
             m_test_vector_a_size = count;
             Cump<1024>* vector_a = new Cump<1024>[count];
             for (auto i = 0; i < count; i++)
             {
-                vector_a[i].from_mpz(a[i]);
+                vector_a[i].from_ump(a[i]);
             }
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_a, vector_a, sizeof(*vector_a) * count, NEXUSMINER_GPU_MemcpyHostToDevice));
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_vector_size, &count, sizeof(count), NEXUSMINER_GPU_MemcpyHostToDevice));
             delete[] vector_a;
         }
 
-        void Fermat_prime_impl::set_input_b(mpz_t* b, uint64_t count)
+        void Fermat_prime_impl::set_input_b(ump::uint1024_t* b, uint64_t count)
         {
             m_test_vector_b_size = count;
             Cump<1024>* vector_b = new Cump<1024>[count];
             for (auto i = 0; i < count; i++)
             {
-                vector_b[i].from_mpz(b[i]);
+                vector_b[i].from_ump(b[i]);
             }
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_b, vector_b, sizeof(*vector_b) * count, NEXUSMINER_GPU_MemcpyHostToDevice));
             delete[] vector_b;
@@ -342,14 +330,14 @@ namespace nexusminer {
 
         
 
-        void Fermat_prime_impl::get_test_results(mpz_t* test_results)
+        void Fermat_prime_impl::get_test_results(ump::uint1024_t* test_results)
         {
             Cump<1024>* results = new Cump<1024>[m_test_vector_a_size];
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(results, d_test_results, sizeof(*d_test_results) * m_test_vector_a_size, NEXUSMINER_GPU_MemcpyDeviceToHost));
             for (auto i = 0; i < m_test_vector_a_size; i++)
             {
                 //mpz_init(test_results[i]);
-                results[i].to_mpz(test_results[i]);
+                results[i].to_ump(test_results[i]);
             }
             delete[] results;
         }

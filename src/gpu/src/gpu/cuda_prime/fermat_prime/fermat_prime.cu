@@ -30,11 +30,6 @@ namespace nexusminer {
             m_impl->fermat_free();
         }
 
-        void Fermat_prime::set_base_int(mpz_t base_big_int)
-        {
-            m_impl->set_base_int(base_big_int);
-        }
-
         void Fermat_prime::set_base_int(ump::uint1024_t base_big_int)
         {
             m_impl->set_base_int(base_big_int);
@@ -96,17 +91,17 @@ namespace nexusminer {
             m_impl->test_free();
         }
 
-        void Fermat_prime::set_input_a(mpz_t* a, uint64_t count)
+        void Fermat_prime::set_input_a(ump::uint1024_t* a, uint64_t count)
         {
             m_impl->set_input_a(a, count);
         }
 
-        void Fermat_prime::set_input_b(mpz_t* b, uint64_t count)
+        void Fermat_prime::set_input_b(ump::uint1024_t* b, uint64_t count)
         {
             m_impl->set_input_b(b, count);
         }
 
-        void Fermat_prime::get_test_results(mpz_t* test_results)
+        void Fermat_prime::get_test_results(ump::uint1024_t* test_results)
         {
             m_impl->get_test_results(test_results);
         }
