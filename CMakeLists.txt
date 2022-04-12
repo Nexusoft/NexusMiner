@@ -134,9 +134,7 @@ endif()
 #PRIME
 if(WITH_PRIME)
     CPMAddPackage(NAME fermat_test GITHUB_REPOSITORY ahatstat/fermat_test GIT_TAG main OPTIONS "BUILD_TESTS Off")
-    include(FetchContent)
-    FetchContent_Declare(primesieve GIT_REPOSITORY https://github.com/kimwalisch/primesieve.git GIT_TAG master)
-    FetchContent_MakeAvailable(primesieve)
+    CPMAddPackage(NAME primesieve GITHUB_REPOSITORY kimwalisch/primesieve VERSION 7.8)
     add_definitions(-DPRIME_ENABLED)
 endif()
 
