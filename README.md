@@ -77,6 +77,17 @@ Before running `NexusMiner` copy miner.conf to the build folder and edit it with
 Prime mining with Radeon RX6000 series GPUs is supported on Linux systems.  The [Rocm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html) toolkit is required. Rocm uses a special version of clang who's path must be passed to cmake. Example cmake command for Radeon support:  
 `cmake -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ -DCMAKE_BUILD_TYPE=Release -DWITH_GPU_AMD=On -DWITH_PRIME=On ..`
 
+When using Arch linux you may have to run a build using the following:
+```
+cmake -DOPENSSL_ROOT_DIR=/usr \
+      -DOPENSSL_SSL_LIBRARY=/usr/lib/libssl.so \
+      -DOPENSSL_CRYPTO_LIBRARY=/usr/lib/libcrypto.so \
+      -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DWITH_GPU_AMD=On \
+      -DWITH_PRIME=On ..
+```
+
 ### Windows Build Dependencies
 * OpenSSL: 
     * Download and run OpenSSL [installer](https://slproweb.com/products/Win32OpenSSL.html)
