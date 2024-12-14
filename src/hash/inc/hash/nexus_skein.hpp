@@ -24,6 +24,7 @@
 #define NEXUS_SKEIN_HPP
 
 #include "int_array.hpp"
+#include <cstdint>
 
 class NexusSkein
 {
