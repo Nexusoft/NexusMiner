@@ -3,24 +3,25 @@
 
 #include <string>
 #include <variant>
+#include <cstdint>
 
 namespace nexusminer
 {
 namespace config
 {
-	enum class Mining_mode : std::uint8_t
+	enum class Mining_mode : uint8_t
 	{
 		PRIME = 0,
 		HASH = 1
 	};
 
-    enum class Stats_printer_mode : std::uint8_t
+    enum class Stats_printer_mode : int8_t
 	{
 		CONSOLE = 0,
 		FILE
 	};
 
-    enum class Worker_mode : std::uint8_t
+    enum class Worker_mode : uint8_t
 	{
 		CPU = 0,
 		FPGA,

@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <functional>
+#include <algorithm>
 #include "LLC/types/uint1024.h"
 #include "block.hpp"
 #include "hash/byte_utils.hpp"
@@ -37,8 +38,8 @@ public:
 		std::string hashPrevBlockStr = previous_hash.GetHex();
 		std::vector<unsigned char> merkleB = HexStringToBytes(merkleStr);
 		std::vector<unsigned char> prevHashB = HexStringToBytes(hashPrevBlockStr);
-		std::reverse(merkleB.begin(), merkleB.end());
-		std::reverse(prevHashB.begin(), prevHashB.end());
+		reverse(merkleB.begin(), merkleB.end());
+		reverse(prevHashB.begin(), prevHashB.end());
 
 		//Concatenate the bytes
 		std::vector<unsigned char> headerB = versionB;

@@ -3,6 +3,7 @@
 #define NEXUS_KECCAK_HPP
 
 #include "int_array.hpp"
+#include <cstdint>
 
 class NexusKeccak
 {
