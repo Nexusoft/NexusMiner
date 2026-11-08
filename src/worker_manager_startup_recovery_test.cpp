@@ -17,7 +17,7 @@
 namespace nexusminer {
 class DeadWorker final : public Worker {
 public:
-    void set_block(::LLP::CBlock, std::uint32_t, Block_found_handler) override {}
+    void set_block(const ::LLP::CBlock&, std::uint32_t, Block_found_handler) override {}
     void update_statistics(stats::Collector&) override {}
     bool uses_template_feed() const override { return true; }
     bool is_running() const override { return false; }
