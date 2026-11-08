@@ -119,15 +119,20 @@ private:
 
 int main()
 {
+    // Verify core recovery FSM invariants used by this startup regression test:
+    // once the manager reaches DEGRADED_TERMINAL, it must not transition back.
     assert(!Worker_manager_recovery_test_access::valid_transition(
         RecoveryPhase::DEGRADED_TERMINAL, RecoveryPhase::HEALTHY));
     assert(!Worker_manager_recovery_test_access::valid_transition(
         RecoveryPhase::DEGRADED_TERMINAL, RecoveryPhase::RECONNECTING));
+
+    // Install a null logger to keep test output deterministic and quiet.
     auto sink = std::make_shared<spdlog::sinks::null_sink_mt>();
     auto logger = std::make_shared<spdlog::logger>("logger", sink);
     spdlog::register_logger(logger);
     spdlog::set_default_logger(logger);
 
+    // Create isolated runtime/config state for startup and recovery exercises.
     auto io = std::make_shared<asio::io_context>();
     config::Config config(logger);
     config.set_mining_mode(config::Mining_mode::HASH);
