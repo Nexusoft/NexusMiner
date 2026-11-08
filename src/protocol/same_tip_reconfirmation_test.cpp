@@ -223,7 +223,7 @@ void test_same_tip_refed_after_workers_stop()
     auto solo = make_solo();
     int feeds = 0;
     int confirmations = 0;
-    solo->set_block_handler([&](::LLP::CBlock, std::uint32_t) { ++feeds; return true; });
+    solo->set_block_handler([&](const ::LLP::CBlock&, std::uint32_t) { ++feeds; return true; });
     solo->set_recovery_confirmed_handler([&]() { ++confirmations; });
     auto payload = make_block_payload(6771846, 0xAA);
     auto* tmpl = solo->get_template_interface();
