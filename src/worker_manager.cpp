@@ -944,7 +944,6 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                 }
 
                 if (is_recovery_active()) {
-                    m_recovery.degraded_since = {};
                     restart_recovery_window("authoritative_work_ready");
                 }
 
@@ -2557,6 +2556,9 @@ void Worker_manager::restart_recovery_window(const char* reason)
 
     // Reset per-epoch state in-place (no phase change)
     m_recovery.entered_at = std::chrono::steady_clock::now();  // fresh epoch clock
+    m_recovery.degraded_since = m_recovery.entered_at;
+    m_recovery.timeout.reset();
+    m_recovery.timeout.start_if_unset(m_recovery.degraded_since);
     m_recovery.last_get_block_at = {};
     m_recovery.get_block_confirmed = false;
     m_forced_retry_timer_pending = false;

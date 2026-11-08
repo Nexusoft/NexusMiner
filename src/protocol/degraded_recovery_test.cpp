@@ -326,32 +326,35 @@ void test_successful_reauth_restarts_recovery_epoch() {
         uint64_t m_recovery_epoch{1};
         std::chrono::steady_clock::time_point m_recovery_started_at{};
         std::chrono::steady_clock::time_point m_degraded_since{};
+        nexusminer::worker::RecoveryTimeout m_timeout;
 
         RecoveryTracker() {
             constexpr auto simulated_stale_duration = std::chrono::seconds(1207);
             const auto now = std::chrono::steady_clock::now();
             m_recovery_started_at = now - simulated_stale_duration;
             m_degraded_since = now - simulated_stale_duration;
+            m_timeout.start_if_unset(m_degraded_since);
         }
 
         void restart_recovery_window() {
-            m_recovery_pending = false;
-            m_recovery_started_at = {};
+            m_recovery_started_at = std::chrono::steady_clock::now();
+            m_degraded_since = m_recovery_started_at;
+            m_timeout.reset();
+            m_timeout.start_if_unset(m_degraded_since);
         }
 
         void on_reauthenticated() {
             if (m_degraded_mode || m_recovery_pending) {
-                m_degraded_since = {};
                 restart_recovery_window();
                 ++m_recovery_epoch;
-                m_recovery_pending = true;
-                m_recovery_started_at = std::chrono::steady_clock::now();
             }
         }
     };
 
     RecoveryTracker rt;
     const auto old_started_at = rt.m_recovery_started_at;
+    print_test_result("Old recovery timeout has exceeded the hard stop before re-authentication",
+                      rt.m_timeout.elapsed_seconds(std::chrono::steady_clock::now()) >= 300);
     rt.on_reauthenticated();
 
     print_test_result("Re-authentication starts a new recovery epoch",
@@ -366,7 +369,24 @@ void test_successful_reauth_restarts_recovery_epoch() {
     print_test_result("Fresh recovery epoch elapsed time is near-zero after re-authentication",
                       elapsed_after_reauth >= 0 && elapsed_after_reauth <= 1);
     print_test_result("Degraded timer is reset for the new authenticated session",
-                      rt.m_degraded_since == std::chrono::steady_clock::time_point{});
+                      rt.m_degraded_since == rt.m_recovery_started_at);
+    print_test_result("Recovery timeout is reset without entering HEALTHY",
+                      rt.m_timeout.elapsed_seconds(rt.m_degraded_since) == 0);
+    print_test_result("New session receives the full recovery timeout window",
+                      rt.m_timeout.elapsed_seconds(
+                         rt.m_degraded_since + std::chrono::seconds(299)) == 299);
+
+    const auto old_wait_end = rt.m_degraded_since + std::chrono::seconds(600);
+    rt.m_timeout.observe_node_retry(true, true, rt.m_degraded_since);
+    rt.m_timeout.observe_node_retry(false, true, old_wait_end);
+    rt.m_timeout.observe_node_retry(true, true, old_wait_end);
+    rt.on_reauthenticated();
+    const auto next_tick = rt.m_degraded_since + std::chrono::seconds(1);
+    rt.m_timeout.observe_node_retry(false, true, next_tick);
+    print_test_result("Re-authentication clears the prior session's active retry wait",
+                      rt.m_timeout.elapsed_seconds(next_tick) == 1);
+    print_test_result("Re-authentication clears the prior retry's silence-accounting rebase",
+                      rt.m_timeout.worst_case_outage_seconds(next_tick, 10, 20) == 20);
 
     // Verify EpochCoordinator-based recovery epoch works the same way
     {
