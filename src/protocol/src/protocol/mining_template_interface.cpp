@@ -538,6 +538,24 @@ void MiningTemplateInterface::set_template_feed_handler(TemplateFeedHandler hand
     m_logger->debug("[TemplateInterface] Feed handler registered");
 }
 
+void MiningTemplateInterface::set_template_fed_handler(std::function<void()> handler)
+{
+    m_template_fed_handler = std::move(handler);
+}
+
+void MiningTemplateInterface::set_template_feed_failed_handler(std::function<void()> handler)
+{
+    m_template_feed_failed_handler = std::move(handler);
+}
+
+void MiningTemplateInterface::reset_feed_debounce()
+{
+    std::lock_guard<std::mutex> lock(m_template_mutex);
+    m_last_feed_tp = {};
+    m_last_feed_height = 0;
+    m_last_feed_prev_hash = {};
+}
+
 void MiningTemplateInterface::set_template_cleared_callback(TemplateClearedCallback cb)
 {
     m_template_cleared_callback = std::move(cb);
@@ -552,7 +570,7 @@ void MiningTemplateInterface::set_validation_failure_handler(ValidationFailureHa
 
 bool MiningTemplateInterface::feed_current_template()
 {
-    std::lock_guard<std::mutex> lock(m_template_mutex);
+    std::unique_lock<std::mutex> lock(m_template_mutex);
 
     if (!has_valid_template_unsafe()) {
         m_logger->warn("[TemplateInterface] FEED: No valid template to feed");
@@ -613,6 +631,10 @@ bool MiningTemplateInterface::feed_current_template()
         m_logger->warn("[TemplateInterface] FEED: Handler rejected template at height {}",
             m_current_template.block.nHeight);
         mark_template_stale_unsafe("feed handler rejected template");
+        lock.unlock();
+        if (m_template_feed_failed_handler) {
+            m_template_feed_failed_handler();
+        }
         return false;
     }
 
@@ -623,6 +645,13 @@ bool MiningTemplateInterface::feed_current_template()
     m_last_feed_prev_hash = m_current_template.block.hashPrevBlock;
 
     m_templates_fed.fetch_add(1, std::memory_order_relaxed);
+
+    // Recovery completion queries the current template and must not run while
+    // its non-recursive mutex is held by the feed callback.
+    lock.unlock();
+    if (m_template_fed_handler) {
+        m_template_fed_handler();
+    }
 
     return true;
 }

@@ -281,6 +281,22 @@ add_nexusminer_test(
     LINK_LIBS   chrono asio spdlog::spdlog Threads::Threads
 )
 
+if(NOT WITH_GPU_AMD)
+    add_nexusminer_test(
+        NAME        worker_manager_startup_recovery_test
+        SOURCES     src/worker_manager_startup_recovery_test.cpp src/worker_manager.cpp
+                    src/timer_manager.cpp src/dual_connection_manager.cpp src/colin_agent.cpp
+                    src/miner_keys.cpp
+        LINK_LIBS   NexusMiner_platform chrono network config stats protocol node_session cpu fpga
+                    LLP worker TAO asio spdlog::spdlog ${OPENSSL_LIBRARIES} Threads::Threads
+        INCLUDE_DIRS ${PROJECT_BINARY_DIR}
+    )
+    if(WITH_GPU_CUDA)
+        target_link_libraries(worker_manager_startup_recovery_test PRIVATE gpu)
+    endif()
+    set_tests_properties(worker_manager_startup_recovery_test PROPERTIES TIMEOUT 20)
+endif()
+
 # ============================================================================
 # Installation and packaging
 # ============================================================================

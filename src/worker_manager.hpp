@@ -40,12 +40,7 @@ namespace cpu { class PrimeMiningEngine; }  // Stone 7: defined in cpu/prime/pri
 // ─────────────────────────────────────────────────────────────────────────────
 // ⚡ Explicit Recovery State Machine
 // ─────────────────────────────────────────────────────────────────────────────
-// Single authoritative state machine for connection/session health. Replaces
-// the former DEGRADED_MODE + degraded_mode_recoverable bool pair (a boolean
-// masquerading as a state) with two first-class terminal states, and removes
-// transition_to()'s former force_from_degraded escape hatch: DEGRADED_RECOVERABLE
-// → RECONNECTING is now an ordinary, unconditionally-audited entry in
-// is_valid_transition() rather than a narrowly-carved bypass around it.
+// Single authoritative state machine for connection/session health.
 // Exactly one phase is active at any moment, and EpochCoordinator (see
 // m_epoch_coordinator below) is the sole source of epoch truth for every
 // non-HEALTHY phase — no other counter/flag tracks "which recovery attempt is
@@ -57,15 +52,8 @@ enum class RecoveryPhase : uint8_t {
     SESSION_RECOVERY,      // Authoritative session restoration / re-auth in progress
     RECONNECTING,          // TCP reconnect in progress
     DEGRADED_TERMINAL,     // Full-stop, no legal exit: operator/fatal entry (signal,
-                           // no-failover node shutdown, invalid endpoint config).
+                           // invalid endpoint config).
                            // Requires operator/process restart.
-    DEGRADED_RECOVERABLE,  // Full-stop, but self-healing: retry-budget-exhausted entry
-                           // (session re-auth / recovery window ran out of controlled
-                           // attempts). A low-frequency watchdog keeps probing the node
-                           // so the miner can resume automatically once it is reachable
-                           // again, without looping mining energy in the meantime. The
-                           // only legal exit is → RECONNECTING (see is_valid_transition()),
-                           // driven automatically by on_phase_enter/on_phase_exit hooks.
 };
 
 struct RecoveryContext {
@@ -95,6 +83,7 @@ struct RecoveryContext {
 
 class Worker_manager : public std::enable_shared_from_this<Worker_manager>
 {
+    friend struct Worker_manager_recovery_test_access;
 public:
 
     using Config = config::Config;
@@ -201,34 +190,13 @@ private:
     void enter_terminal_degraded_mode_internal(int signal_number, const char* reason);
     void handle_node_shutdown(uint8_t reason);
 
-    // ── Auto-recoverable degraded mode (retry-budget-exhausted only) ─────────
-    /// Enters DEGRADED_RECOVERABLE (mining fully stopped — no wasted energy) for
-    /// a *retry-budget-exhausted* reason only (never for signal/fatal-config
-    /// reasons, which must keep using enter_terminal_degraded_mode_internal()
-    /// unchanged, entering DEGRADED_TERMINAL instead). The watchdog that
-    /// probes the connection is engaged/disengaged automatically by
-    /// on_phase_enter()/on_phase_exit() for this phase — no separate manual
-    /// bookkeeping at the call site. A no-op if a real terminal stop (signal,
-    /// fatal config) is already in progress or already in DEGRADED_TERMINAL.
-    void enter_recoverable_degraded_mode(const char* reason);
-    void schedule_degraded_watchdog();
-    void run_degraded_watchdog_probe(uint64_t token);
-    /// Called from the session-authenticated success path when a fresh,
-    /// valid session is established while in DEGRADED_RECOVERABLE.
-    /// Transitions back to RECONNECTING (an ordinary, legal transition — see
-    /// is_valid_transition()) so the normal recovery machinery (work-ready /
-    /// template handlers) takes over; on_phase_exit() cancels the watchdog.
-    void exit_recoverable_degraded_mode_if_active(const char* reason);
     uint16_t next_session_auth_retry_delay_seconds() const;
 
     // ── State machine transition API ───────────────────────────────────────────
     /// Transition to a new RecoveryPhase. Logs the transition and validates legality
     /// (in debug builds: asserts; in release builds: logs an error and proceeds),
     /// then runs on_phase_exit() for the old phase and on_phase_enter() for the new one.
-    /// Legality (including the DEGRADED_RECOVERABLE → RECONNECTING auto-recovery
-    /// exit) is fully described by is_valid_transition() — there is no bypass
-    /// parameter; every legal transition, including watchdog auto-recovery, is
-    /// an ordinary entry in the transition table.
+    /// Legality is fully described by is_valid_transition().
     void transition_to(RecoveryPhase new_phase, const char* reason = nullptr);
     static bool is_valid_transition(RecoveryPhase from, RecoveryPhase to);
     void on_phase_enter(RecoveryPhase phase);
@@ -251,14 +219,6 @@ private:
     bool is_session_recovery()      const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::SESSION_RECOVERY; }
     bool is_reconnecting()          const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::RECONNECTING; }
     bool is_degraded_terminal()     const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::DEGRADED_TERMINAL; }
-    bool is_degraded_recoverable()  const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::DEGRADED_RECOVERABLE; }
-    /// True for either flavor of full-stop degraded mode (was previously
-    /// "is_terminal_degraded() && degraded_mode_recoverable"/"!degraded_mode_recoverable"
-    /// checks scattered across call sites — now a single phase-only query).
-    bool is_degraded_any()          const {
-        const auto p = m_recovery.phase.load(std::memory_order_relaxed);
-        return p == RecoveryPhase::DEGRADED_TERMINAL || p == RecoveryPhase::DEGRADED_RECOVERABLE;
-    }
 
     /// Submit a found block via primary NodeSession (handles dual-lane submission internally).
     void submit_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce);
@@ -311,8 +271,9 @@ private:
         protocol::ProtocolConstants::MAX_RETRY_DELAY_SECONDS
     };
 
-    // ── Session authentication retry state (infinite loop prevention) ─────────
+    // Session authentication retries use capped exponential backoff.
     uint32_t m_session_auth_fail_count{0};          // consecutive session_id=0 failures on primary
+    std::shared_ptr<asio::steady_timer> m_session_auth_retry_timer{};
     std::atomic<bool> m_terminal_stop_requested{false};
     std::atomic<bool> m_node_shutdown_quarantine{false};
     std::atomic<uint64_t> m_node_shutdown_generation{0};
@@ -321,21 +282,6 @@ private:
     util::ExponentialBackoff m_session_auth_backoff{
         protocol::ProtocolConstants::BASE_SESSION_RETRY_MS,
         protocol::ProtocolConstants::MAX_SESSION_RETRY_MS
-    };
-
-    // ── Auto-recoverable degraded-mode watchdog state ─────────────────────────
-    // Only active while m_recovery.phase == RecoveryPhase::DEGRADED_RECOVERABLE
-    // (armed/disarmed solely by on_phase_enter()/on_phase_exit() for that phase —
-    // no separate flag to keep in sync with the state machine). Drives a slow,
-    // capped-exponential reconnect probe loop so the miner can resume
-    // automatically after the controlled retry budget was exhausted, without
-    // spinning CPU/network in a tight loop and without mining (no energy is
-    // spent while the node/network is unreachable).
-    std::shared_ptr<asio::steady_timer> m_degraded_watchdog_timer{};
-    uint64_t m_degraded_watchdog_token{0};
-    util::ExponentialBackoffWithState m_degraded_watchdog_backoff{
-        protocol::ProtocolConstants::DEGRADED_WATCHDOG_BASE_SECONDS,
-        protocol::ProtocolConstants::DEGRADED_WATCHDOG_MAX_SECONDS
     };
 
     // ── Session generation counter ──────────────────────────────────────────

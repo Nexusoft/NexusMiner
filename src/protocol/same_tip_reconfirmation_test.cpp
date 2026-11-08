@@ -217,6 +217,33 @@ void test_genuinely_new_tip_bypasses_guard()
                       recovery_confirmed_calls == 0);
 }
 
+void test_same_tip_refed_after_workers_stop()
+{
+    std::cout << "\nTest 4: A replacement worker generation receives the same tip\n";
+    auto solo = make_solo();
+    int feeds = 0;
+    int confirmations = 0;
+    solo->set_block_handler([&](const ::LLP::CBlock&, std::uint32_t) { ++feeds; return true; });
+    solo->set_recovery_confirmed_handler([&]() { ++confirmations; });
+    auto payload = make_block_payload(6771846, 0xAA);
+    auto* tmpl = solo->get_template_interface();
+    print_test_result("Template interface available", tmpl != nullptr);
+    if (tmpl == nullptr) {
+        return;
+    }
+    print_test_result("Initial template accepted",
+                      tmpl->read_template(payload, "test_node", false).is_valid);
+    print_test_result("Initial worker generation fed",
+                      SameTipReconfirmationHarness::finalize(*solo, 6771846, 0, "test"));
+
+    solo->reset_worker_feed_guards();
+    print_test_result("Same-tip replacement accepted",
+                      tmpl->read_template(payload, "test_node", false).is_valid);
+    print_test_result("Same-tip template reaches replacement workers",
+                      SameTipReconfirmationHarness::finalize(*solo, 6771846, 0, "test") &&
+                      feeds == 2 && confirmations == 0);
+}
+
 } // namespace
 
 int main()
@@ -232,6 +259,7 @@ int main()
     test_first_feed_invokes_block_handler_only();
     test_same_tip_reconfirmation_fires_recovery_confirmed_not_block_handler();
     test_genuinely_new_tip_bypasses_guard();
+    test_same_tip_refed_after_workers_stop();
 
     std::cout << "\n========================================\n";
     std::cout << "Test Summary\n";

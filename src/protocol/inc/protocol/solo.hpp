@@ -70,6 +70,7 @@ public:
     network::Shared_payload get_work(GetBlockReason reason);
     GetBlockRequestStatus get_last_get_block_request_status() const { return m_last_get_block_request_status.load(); }
     bool is_get_block_retry_deferred() const;
+    bool is_node_template_wait_active() const;
 
     /// Returns the number of consecutive hashPrevBlock mismatches detected by
     /// validate_current_template() since the last successful template adoption.
@@ -241,6 +242,7 @@ public:
 
     void mark_authoritative_recovery_required(const std::string& reason);
     void mark_authoritative_recovery_healthy(const std::string& reason = "");
+    void reset_worker_feed_guards();
 
     // Recovery callback: called by the push handler when a channel-stale recovery GET_BLOCK
     // is triggered (is_template_stale() is true at request_work_fn invocation time),
@@ -707,6 +709,7 @@ private:
     std::unique_ptr<asio::steady_timer> m_recovery_timer;
     std::unique_ptr<asio::steady_timer> m_get_block_control_timer;
     std::atomic<int64_t> m_get_block_retry_at_ms{0};
+    std::atomic<int64_t> m_node_template_wait_until_ms{0};
     std::atomic<uint64_t> m_get_block_control_generation{0};
     void cancel_get_block_control_retry(bool clear_deadline = true);
     void on_get_block_control(Packet const& packet, const std::shared_ptr<network::Connection>& connection);

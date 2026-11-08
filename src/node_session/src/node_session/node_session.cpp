@@ -543,6 +543,17 @@ void NodeSession::apply_protocol_handlers(LaneSlot slot)
         return false;
     });
 
+    protocol->get_template_interface()->set_template_fed_handler([this]() {
+        if (m_template_fed_handler) {
+            m_template_fed_handler();
+        }
+    });
+    protocol->get_template_interface()->set_template_feed_failed_handler([this]() {
+        if (m_template_feed_failed_handler) {
+            m_template_feed_failed_handler();
+        }
+    });
+
     protocol->set_block_accepted_handler(
         [this](uint32_t height, uint1024_t hash_prev, uint32_t channel, uint64_t nonce) {
             if (m_block_accepted_handler) {
@@ -793,6 +804,18 @@ void NodeSession::reset()
 void NodeSession::set_template_handler(Template_handler handler)
 {
     m_template_handler = std::move(handler);
+    rewire_protocol_handlers();
+}
+
+void NodeSession::set_template_fed_handler(std::function<void()> handler)
+{
+    m_template_fed_handler = std::move(handler);
+    rewire_protocol_handlers();
+}
+
+void NodeSession::set_template_feed_failed_handler(std::function<void()> handler)
+{
+    m_template_feed_failed_handler = std::move(handler);
     rewire_protocol_handlers();
 }
 

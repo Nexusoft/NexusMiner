@@ -4,7 +4,7 @@
 namespace nexusminer {
 
 enum class NodeShutdownAction {
-    FULL_STOP,
+    RETRY_PRIMARY_NODE,
     SWITCH_TO_STANDBY_NODE
 };
 
@@ -19,7 +19,7 @@ inline constexpr NodeShutdownAction decide_node_shutdown_action(bool has_failove
 {
     return has_failover_configured
         ? NodeShutdownAction::SWITCH_TO_STANDBY_NODE
-        : NodeShutdownAction::FULL_STOP;
+        : NodeShutdownAction::RETRY_PRIMARY_NODE;
 }
 
 inline constexpr NodeShutdownWorkInvalidation node_shutdown_work_invalidation() noexcept

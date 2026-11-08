@@ -1377,67 +1377,6 @@ void test_session_status_cooldown_only_advances_after_successful_queue()
                       successful_retry && no_longer_due);
 }
 
-// ============================================================================
-// Test 28: DEGRADED_RECOVERABLE watchdog auto-recovery exit is narrowly scoped
-//
-// Mirrors Worker_manager::is_valid_transition()'s DEGRADED_TERMINAL /
-// DEGRADED_RECOVERABLE handling (see worker_manager.cpp). The former
-// force_from_degraded bypass parameter on transition_to() is gone: the two
-// degraded flavors are now first-class states, and every legal exit --
-// including watchdog auto-recovery -- is an ordinary, unconditionally-checked
-// table entry. This test guards the exact invariant that makes watchdog
-// auto-recovery safe: DEGRADED_RECOVERABLE can only ever exit to RECONNECTING
-// (auto-recovery) or DEGRADED_TERMINAL (an operator/fatal signal escalating
-// it), and DEGRADED_TERMINAL itself has no legal exit at all.
-// ============================================================================
-enum class MirrorPhase : uint8_t {
-    HEALTHY, WAITING_TEMPLATE, RECONNECTING, DEGRADED_TERMINAL, DEGRADED_RECOVERABLE
-};
-
-static bool mirror_is_valid_transition(MirrorPhase from, MirrorPhase to) {
-    // Simplified test mirror of Worker_manager::is_valid_transition()'s
-    // degraded-phase handling. Not a full mirror -- the final `return true`
-    // fallthrough deliberately treats every other (from, to) pair as legal
-    // since this test cares only about the degraded-phase invariants.
-    if (from == to) return true;
-    if (from == MirrorPhase::DEGRADED_TERMINAL) return false;  // truly terminal, no legal exit ever
-    if (from == MirrorPhase::DEGRADED_RECOVERABLE) {
-        return to == MirrorPhase::DEGRADED_TERMINAL || to == MirrorPhase::RECONNECTING;
-    }
-    if (to == MirrorPhase::DEGRADED_TERMINAL || to == MirrorPhase::DEGRADED_RECOVERABLE) return true;
-    return true;  // other transitions not relevant to this invariant
-}
-
-void test_degraded_mode_watchdog_exit_is_narrowly_scoped() {
-    std::cout << "\nTest 28: DEGRADED_RECOVERABLE watchdog-exit is narrowly scoped\n";
-
-    // DEGRADED_TERMINAL is a true dead end -- no transition out, ever, not
-    // even to RECONNECTING.
-    print_test_result("DEGRADED_TERMINAL -> RECONNECTING is always blocked",
-        !mirror_is_valid_transition(MirrorPhase::DEGRADED_TERMINAL, MirrorPhase::RECONNECTING));
-    print_test_result("DEGRADED_TERMINAL -> HEALTHY is always blocked",
-        !mirror_is_valid_transition(MirrorPhase::DEGRADED_TERMINAL, MirrorPhase::HEALTHY));
-
-    // DEGRADED_RECOVERABLE's only legal exits are RECONNECTING (watchdog
-    // auto-recovery) and DEGRADED_TERMINAL (an operator/fatal signal
-    // escalating it) -- never straight to HEALTHY or WAITING_TEMPLATE, so
-    // normal work-ready/template recovery machinery still runs afterward.
-    print_test_result("DEGRADED_RECOVERABLE -> RECONNECTING is legal (auto-recovery)",
-        mirror_is_valid_transition(MirrorPhase::DEGRADED_RECOVERABLE, MirrorPhase::RECONNECTING));
-    print_test_result("DEGRADED_RECOVERABLE -> DEGRADED_TERMINAL is legal (signal escalation)",
-        mirror_is_valid_transition(MirrorPhase::DEGRADED_RECOVERABLE, MirrorPhase::DEGRADED_TERMINAL));
-    print_test_result("DEGRADED_RECOVERABLE -> HEALTHY is blocked",
-        !mirror_is_valid_transition(MirrorPhase::DEGRADED_RECOVERABLE, MirrorPhase::HEALTHY));
-    print_test_result("DEGRADED_RECOVERABLE -> WAITING_TEMPLATE is blocked",
-        !mirror_is_valid_transition(MirrorPhase::DEGRADED_RECOVERABLE, MirrorPhase::WAITING_TEMPLATE));
-
-    // Any phase may still enter either degraded flavor (unchanged invariant).
-    print_test_result("WAITING_TEMPLATE -> DEGRADED_TERMINAL remains legal",
-        mirror_is_valid_transition(MirrorPhase::WAITING_TEMPLATE, MirrorPhase::DEGRADED_TERMINAL));
-    print_test_result("WAITING_TEMPLATE -> DEGRADED_RECOVERABLE remains legal",
-        mirror_is_valid_transition(MirrorPhase::WAITING_TEMPLATE, MirrorPhase::DEGRADED_RECOVERABLE));
-}
-
 void test_node_retry_wait_restarts_recovery_response_window() {
     std::cout << "\nTest 29: Node retry wait is excluded from recovery timeout\n";
 
@@ -1507,7 +1446,6 @@ int main() {
     test_recovery_phase_mutual_exclusivity();
     test_epoch0_recovery_escalation_on_suppressed_get_block();
     test_session_status_cooldown_only_advances_after_successful_queue();
-    test_degraded_mode_watchdog_exit_is_narrowly_scoped();
     test_node_retry_wait_restarts_recovery_response_window();
 
     std::cout << "\n═══════════════════════════════════════════════════════════\n";
