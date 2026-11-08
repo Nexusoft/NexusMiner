@@ -17,7 +17,7 @@
 namespace nexusminer {
 class DeadWorker final : public Worker {
 public:
-    void set_block(const ::LLP::CBlock&, std::uint32_t, Block_found_handler) override {}
+    void set_block(::LLP::CBlock, std::uint32_t, Block_found_handler) override {}
     void update_statistics(stats::Collector&) override {}
     bool uses_template_feed() const override { return true; }
     bool is_running() const override { return false; }
@@ -87,9 +87,13 @@ struct GetBlockControlHarness {
     static void expire_retry(Solo& solo) {
         solo.m_get_block_retry_at_ms.store(1);
     }
-    static void report_auth_failure(Solo& solo) {
-        assert(solo.m_session_authenticated_handler);
-        solo.m_session_authenticated_handler(SessionId{});
+    static void report_auth_failure(Solo& solo, std::shared_ptr<network::Connection> connection,
+                                    bool zero_session_id = false) {
+        auto payload = std::make_shared<network::Payload>(
+            zero_session_id ? network::Payload{1, 0, 0, 0, 0} : network::Payload{0, 1});
+        Packet response(Packet::STATELESS_MINER_AUTH_RESULT, payload);
+        solo.process_messages(response, std::move(connection));
+        assert(solo.m_auth_state == AuthState::NOT_AUTHENTICATED);
     }
     static void report_auth_success(Solo& solo) {
         assert(solo.m_session_authenticated_handler);
@@ -221,12 +225,12 @@ int main()
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::RECONNECTING);
     assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
     const auto retries_before_auth = Worker_manager_recovery_test_access::connection_retries(*manager);
-    protocol::GetBlockControlHarness::report_auth_failure(*solo);
+    protocol::GetBlockControlHarness::report_auth_failure(*solo, connection);
     assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
     io->run_for(std::chrono::milliseconds(1300));
     assert(Worker_manager_recovery_test_access::connection_retries(*manager) > retries_before_auth);
     for (int i = 0; i < 6; ++i) {
-        protocol::GetBlockControlHarness::report_auth_failure(*solo);
+        protocol::GetBlockControlHarness::report_auth_failure(*solo, connection, i % 2 == 0);
     }
     assert(Worker_manager_recovery_test_access::auth_failures(*manager) == 7);
     assert(Worker_manager_recovery_test_access::phase(*manager) != RecoveryPhase::DEGRADED_TERMINAL);
@@ -244,7 +248,7 @@ int main()
     solo->process_messages(template_response, connection);
     assert(Worker_manager_recovery_test_access::workers(*manager) == 1);
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::HEALTHY);
-    protocol::GetBlockControlHarness::report_auth_failure(*solo);
+    protocol::GetBlockControlHarness::report_auth_failure(*solo, connection);
     assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::SESSION_RECOVERY);
     Worker_manager_recovery_test_access::node_shutdown(*manager);

@@ -3865,6 +3865,9 @@ void Solo::on_miner_auth_response(Packet const& packet, std::shared_ptr<network:
                     if (connection) {
                         connection->close();
                     }
+                    if (m_session_authenticated_handler) {
+                        m_session_authenticated_handler(SessionId{});
+                    }
                     return;
                 }
 
@@ -4125,7 +4128,9 @@ void Solo::on_miner_auth_response(Packet const& packet, std::shared_ptr<network:
             m_logger->error("[Solo Auth]   3. Node is running LLL-TAO with Phase 2 miner support");
             m_logger->error("[Solo Auth]   4. System clocks are synchronized between miner and node");
             
-            // Connection will fail - no fallback available
+            if (m_session_authenticated_handler) {
+                m_session_authenticated_handler(SessionId{});
+            }
         }
     }
     else if (matches_opcode(packet, Packet::CHANNEL_ACK))
