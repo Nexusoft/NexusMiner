@@ -623,6 +623,12 @@ namespace StatelessMining {
         PACKET_TOO_SMALL = 0x0F,
         VALIDATION_FAILED = 0x11,
         ACCEPTANCE_FAILED = 0x12,
+        RATE_LIMITED = 0x13,
+        SESSION_INCONSISTENT = 0x14,
+        PACKET_TOO_LARGE = 0x15,
+        CANDIDATE_PREPARATION_FAILED = 0x16,
+        WRONG_BLOCK_TYPE = 0x17,
+        MALFORMED_SUBMISSION = 0x18,
         INTERNAL_ERROR = 0xFF,
     };
     

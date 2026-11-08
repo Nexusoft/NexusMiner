@@ -2733,6 +2733,12 @@ void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Conn
                 case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::PACKET_TOO_SMALL): reason_str = "PACKET_TOO_SMALL"; break;
                 case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::VALIDATION_FAILED): reason_str = "VALIDATION_FAILED"; break;
                 case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::ACCEPTANCE_FAILED): reason_str = "ACCEPTANCE_FAILED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::RATE_LIMITED): reason_str = "RATE_LIMITED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::SESSION_INCONSISTENT): reason_str = "SESSION_INCONSISTENT"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::PACKET_TOO_LARGE): reason_str = "PACKET_TOO_LARGE"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::CANDIDATE_PREPARATION_FAILED): reason_str = "CANDIDATE_PREPARATION_FAILED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::WRONG_BLOCK_TYPE): reason_str = "WRONG_BLOCK_TYPE"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::MALFORMED_SUBMISSION): reason_str = "MALFORMED_SUBMISSION"; break;
                 case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::INTERNAL_ERROR): reason_str = "INTERNAL_ERROR"; break;
                 default: { char buf[16]; snprintf(buf, sizeof(buf), "0x%02x", reason_byte); reason_str = buf; break; }
             }

@@ -324,6 +324,12 @@ int main()
         test_submit_rejection(lane, {0x0f}, "PACKET_TOO_SMALL");
         test_submit_rejection(lane, {0x11}, "VALIDATION_FAILED");
         test_submit_rejection(lane, {0x12}, "ACCEPTANCE_FAILED");
+        test_submit_rejection(lane, {0x13}, "RATE_LIMITED");
+        test_submit_rejection(lane, {0x14}, "SESSION_INCONSISTENT");
+        test_submit_rejection(lane, {0x15}, "PACKET_TOO_LARGE");
+        test_submit_rejection(lane, {0x16}, "CANDIDATE_PREPARATION_FAILED");
+        test_submit_rejection(lane, {0x17}, "WRONG_BLOCK_TYPE");
+        test_submit_rejection(lane, {0x18}, "MALFORMED_SUBMISSION");
         test_submit_rejection(lane, {0xff}, "INTERNAL_ERROR");
         test_submit_rejection(lane, {0xfe}, "0xfe");
         test_template_acceptance_cancels_retry(lane, Packet::BLOCK_DATA);

@@ -162,6 +162,12 @@ Bare-header packets are not valid beta wire format.
 │                │ 0x0F: PACKET_TOO_SMALL                 │
 │                │ 0x11: VALIDATION_FAILED                │
 │                │ 0x12: ACCEPTANCE_FAILED                │
+│                │ 0x13: RATE_LIMITED                     │
+│                │ 0x14: SESSION_INCONSISTENT             │
+│                │ 0x15: PACKET_TOO_LARGE                 │
+│                │ 0x16: CANDIDATE_PREPARATION_FAILED     │
+│                │ 0x17: WRONG_BLOCK_TYPE                 │
+│                │ 0x18: MALFORMED_SUBMISSION             │
 │                │ 0xFF: INTERNAL_ERROR                  │
 └─────────────────────────────────────────────────────────┘
 ```
