@@ -543,6 +543,11 @@ void MiningTemplateInterface::set_template_fed_handler(std::function<void()> han
     m_template_fed_handler = std::move(handler);
 }
 
+void MiningTemplateInterface::set_template_feed_failed_handler(std::function<void()> handler)
+{
+    m_template_feed_failed_handler = std::move(handler);
+}
+
 void MiningTemplateInterface::reset_feed_debounce()
 {
     std::lock_guard<std::mutex> lock(m_template_mutex);
@@ -626,6 +631,10 @@ bool MiningTemplateInterface::feed_current_template()
         m_logger->warn("[TemplateInterface] FEED: Handler rejected template at height {}",
             m_current_template.block.nHeight);
         mark_template_stale_unsafe("feed handler rejected template");
+        lock.unlock();
+        if (m_template_feed_failed_handler) {
+            m_template_feed_failed_handler();
+        }
         return false;
     }
 

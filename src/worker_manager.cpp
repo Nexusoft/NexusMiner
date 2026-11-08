@@ -578,7 +578,7 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                     return true;
                 } else {
                     m_logger->error("[Worker_manager] FAILED: No workers received template!");
-                    // Solo requests replacement work after the feed returns and
+                    // The failed-feed callback tears down this generation after
                     // the template interface has released its mutex.
                     return false;
                 }
@@ -586,6 +586,11 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
         );
         
         m_logger->info("[Worker_manager] Template distribution handler registered");
+
+        m_primary_node_session->set_template_feed_failed_handler([this]() {
+            mark_recovery_initiated("template_distribution_failed");
+            stop_all_workers();
+        });
 
         m_primary_node_session->set_template_fed_handler([this]() {
             if (m_node_shutdown_quarantine.exchange(false, std::memory_order_acq_rel)) {
@@ -816,6 +821,11 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                     if (m_session_auth_fail_count < std::numeric_limits<uint32_t>::max())
                         ++m_session_auth_fail_count;
                     ++m_session_generation;  // Failed auth is still a session transition
+                    m_pending_recovery_completion_kind = RecoveryCompletionKind::PRIMARY_SESSION_REAUTH;
+                    if (!is_reconnecting() && !is_degraded_terminal()) {
+                        transition_to(RecoveryPhase::SESSION_RECOVERY, "session_authentication_failed");
+                    }
+                    stop_all_workers();
                     m_logger->error("[Session] CRITICAL: Node returned session_id=0x00000000 after authentication (attempt #{})",
                         m_session_auth_fail_count);
                     m_logger->error("[Session] This indicates the node rejected the session or is misconfigured");

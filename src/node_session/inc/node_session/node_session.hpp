@@ -228,6 +228,7 @@ public:
      */
     void set_template_handler(Template_handler handler);
     void set_template_fed_handler(std::function<void()> handler);
+    void set_template_feed_failed_handler(std::function<void()> handler);
 
     /**
      * @brief Set block accepted handler
@@ -494,6 +495,7 @@ private:
     // Handlers
     Template_handler m_template_handler;
     std::function<void()> m_template_fed_handler;
+    std::function<void()> m_template_feed_failed_handler;
     Block_accepted_handler m_block_accepted_handler;
     Recovery_handler m_recovery_handler;
     Session_expired_handler m_session_expired_handler;

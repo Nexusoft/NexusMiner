@@ -3,6 +3,7 @@
 #include "protocol/solo.hpp"
 #include "network/connection.hpp"
 #include "config/config.hpp"
+#include "worker/worker.hpp"
 
 #include <asio/io_context.hpp>
 #include <spdlog/sinks/null_sink.h>
@@ -14,6 +15,14 @@
 #include <memory>
 
 namespace nexusminer {
+class DeadWorker final : public Worker {
+public:
+    void set_block(::LLP::CBlock, std::uint32_t, Block_found_handler) override {}
+    void update_statistics(stats::Collector&) override {}
+    bool uses_template_feed() const override { return true; }
+    bool is_running() const override { return false; }
+};
+
 struct Worker_manager_recovery_test_access {
     static std::shared_ptr<NodeSession> session(Worker_manager& manager) {
         return manager.m_primary_node_session;
@@ -36,6 +45,11 @@ struct Worker_manager_recovery_test_access {
     static void stop_workers(Worker_manager& manager) {
         manager.mark_recovery_initiated("replacement_worker_test");
         manager.stop_all_workers();
+    }
+    static void install_dead_worker(Worker_manager& manager) {
+        stop_workers(manager);
+        manager.m_workers.push_back(std::make_shared<DeadWorker>());
+        manager.m_recovery_workers_spawned = true;
     }
     static bool valid_transition(RecoveryPhase from, RecoveryPhase to) {
         return Worker_manager::is_valid_transition(from, to);
@@ -60,6 +74,9 @@ struct NodeSession_recovery_test_access {
         session.m_primary_connection = std::move(connection);
         session.m_primary_connected.store(true);
     }
+    static void restore_template_handler(NodeSession& session) {
+        session.set_template_handler(session.m_template_handler);
+    }
 };
 
 namespace protocol {
@@ -73,6 +90,10 @@ struct GetBlockControlHarness {
     static void report_auth_failure(Solo& solo) {
         assert(solo.m_session_authenticated_handler);
         solo.m_session_authenticated_handler(SessionId{});
+    }
+    static void report_auth_success(Solo& solo) {
+        assert(solo.m_session_authenticated_handler);
+        solo.m_session_authenticated_handler(SessionId{123});
     }
     static void report_session_expired(Solo& solo) {
         assert(solo.m_session_expired_handler);
@@ -173,6 +194,17 @@ int main()
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::HEALTHY);
     assert(Worker_manager_recovery_test_access::workers(*manager) == 1);
 
+    // A non-empty generation with no running pool threads must be destroyed outside the feed lock.
+    Worker_manager_recovery_test_access::install_dead_worker(*manager);
+    solo->mark_get_block_pending(protocol::GetBlockReason::RECOVERY_FORCED);
+    solo->process_messages(template_response, connection);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
+    assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::WAITING_TEMPLATE);
+    solo->mark_get_block_pending(protocol::GetBlockReason::RECOVERY_FORCED);
+    solo->process_messages(template_response, connection);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 1);
+    assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::HEALTHY);
+
     solo->set_block_handler([](::LLP::CBlock, std::uint32_t) { return false; });
     std::fill(block->begin() + 16, block->begin() + 144, 0xcc);
     solo->mark_get_block_pending(protocol::GetBlockReason::RECOVERY_FORCED);
@@ -182,9 +214,10 @@ int main()
     Worker_manager_recovery_test_access::start_old_recovery(*manager);
     manager->check_template_health();
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::RECONNECTING);
-    assert(Worker_manager_recovery_test_access::workers(*manager) == 1);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
     const auto retries_before_auth = Worker_manager_recovery_test_access::connection_retries(*manager);
     protocol::GetBlockControlHarness::report_auth_failure(*solo);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
     io->run_for(std::chrono::milliseconds(1300));
     assert(Worker_manager_recovery_test_access::connection_retries(*manager) > retries_before_auth);
     for (int i = 0; i < 6; ++i) {
@@ -192,6 +225,23 @@ int main()
     }
     assert(Worker_manager_recovery_test_access::auth_failures(*manager) == 7);
     assert(Worker_manager_recovery_test_access::phase(*manager) != RecoveryPhase::DEGRADED_TERMINAL);
+
+    // Authentication alone must not resume stale work; usable work creates a new generation.
+    NodeSession_recovery_test_access::connect(*session, connection);
+    NodeSession_recovery_test_access::restore_template_handler(*session);
+    sessions->commit_authenticated(protocol::SessionId{123}, ProtocolLane::STATELESS);
+    sessions->set_channel_state(2, true, true);
+    protocol::GetBlockControlHarness::sync_session(*solo);
+    solo->get_template_interface()->set_session_binding(sessions->get_session_binding());
+    protocol::GetBlockControlHarness::report_auth_success(*solo);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
+    solo->mark_get_block_pending(protocol::GetBlockReason::RECOVERY_FORCED);
+    solo->process_messages(template_response, connection);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 1);
+    assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::HEALTHY);
+    protocol::GetBlockControlHarness::report_auth_failure(*solo);
+    assert(Worker_manager_recovery_test_access::workers(*manager) == 0);
+    assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::SESSION_RECOVERY);
     Worker_manager_recovery_test_access::node_shutdown(*manager);
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::RECONNECTING);
     assert(Worker_manager_recovery_test_access::workers(*manager) == 0);

@@ -1485,6 +1485,13 @@ int main()
         int rejected_feed_count = 0;
         int accepted_feed_count = 0;
         int completed_feed_count = 0;
+        int failed_feed_count = 0;
+        tmpl_interface.set_template_feed_failed_handler([&] {
+            if (!tmpl_interface.has_valid_template()) {
+                tmpl_interface.reset_feed_debounce();
+                ++failed_feed_count;
+            }
+        });
         tmpl_interface.set_template_fed_handler([&] {
             if (tmpl_interface.has_valid_template()) {
                 ++completed_feed_count;
@@ -1507,6 +1514,8 @@ int main()
             !tmpl_interface.has_valid_template());
         print_test_result("Test 38: rejected feed does not signal completion",
             completed_feed_count == 0);
+        print_test_result("Test 38: rejection callback can query and reset without deadlocking",
+            failed_feed_count == 1);
 
         tmpl_interface.set_template_feed_handler(
             [&](const MiningTemplateInterface::MiningTemplate&, uint32_t) {
@@ -1522,6 +1531,8 @@ int main()
         print_test_result("Test 38: accepting retry handler called once", accepted_feed_count == 1);
         print_test_result("Test 38: completion can query the template without deadlocking",
             completed_feed_count == 1);
+        print_test_result("Test 38: successful retry does not signal rejection",
+            failed_feed_count == 1);
     }
 
     // ====================================================================

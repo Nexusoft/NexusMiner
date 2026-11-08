@@ -262,6 +262,38 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     assert(!solo->is_get_block_retry_deferred());
 }
 
+void test_rejected_template_retry(ProtocolLane lane, uint8_t opcode)
+{
+    auto io = std::make_shared<asio::io_context>();
+    auto solo = std::make_shared<Solo>(1, nullptr, nullptr, io);
+    solo->set_protocol_lane(lane);
+    GetBlockControlHarness::authenticate(*solo);
+    auto connection = std::make_shared<MockConnection>(lane);
+    int feeds = 0;
+    int completions = 0;
+    solo->set_block_handler([&](const ::LLP::CBlock&, std::uint32_t) {
+        return ++feeds > 1;
+    });
+    auto* templates = solo->get_template_interface();
+    assert(templates);
+    templates->set_template_fed_handler([&] { ++completions; });
+    solo->set_recovery_initiated_handler([](GetBlockReason) { return true; });
+    solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
+    solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
+    const auto generation = GetBlockControlHarness::retry_generation(*solo);
+    auto packet = template_packet(lane, opcode);
+    solo->process_messages(packet, connection);
+    assert(feeds == 1 && completions == 0);
+    assert(!templates->has_valid_template());
+    assert(GetBlockControlHarness::retry_generation(*solo) == generation);
+
+    // The same candidate must reach the worker again, not report guard suppression as success.
+    solo->process_messages(packet, connection);
+    assert(feeds == 2 && completions == 1);
+    assert(templates->has_valid_template());
+    assert(GetBlockControlHarness::retry_generation(*solo) > generation);
+}
+
 void test_session_controls(ProtocolLane lane, bool authoritative)
 {
     for (uint8_t reason : {2, 3, 9}) {
@@ -348,5 +380,7 @@ int main()
         test_submit_rejection(lane, {0xfe}, "0xfe");
         test_template_acceptance_cancels_retry(lane, Packet::BLOCK_DATA);
         test_template_acceptance_cancels_retry(lane, Packet::GET_BLOCK);
+        test_rejected_template_retry(lane, Packet::BLOCK_DATA);
+        test_rejected_template_retry(lane, Packet::GET_BLOCK);
     }
 }

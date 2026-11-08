@@ -1150,6 +1150,7 @@ bool Solo::finalize_and_feed_current_template(uint32_t unified_height,
     }
 
     if (!m_template_interface->feed_current_template()) {
+        m_merkle_root_feed_guard.reset();
         m_logger->debug("[{}] Template feed not accepted; TemplateInterface logged whether this was "
                         "debounce suppression, missing handler, or worker-layer rejection",
                         log_scope);
