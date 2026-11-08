@@ -913,7 +913,8 @@ void test_get_block_control_does_not_close_connection()
     auto socket = std::make_shared<MockSocket>(io_context);
     auto session = make_node_session(io_context, config, socket, "TEST_GET_BLOCK_CONTROL");
     configure_valid_auth(*session);
-    assert(session->connect(make_endpoint(ProtocolPorts::STATELESS_PORT), [](bool) {}));
+    const bool connect_started = session->connect(make_endpoint(ProtocolPorts::STATELESS_PORT), [](bool) {});
+    assert(connect_started);
     pump_io(io_context);
     socket->emit_receive(0, build_auth_result_packet(ProtocolLane::STATELESS, 0x01, 0x10203040u));
     assert(session->is_authenticated());

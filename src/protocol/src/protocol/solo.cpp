@@ -1594,6 +1594,13 @@ network::Shared_payload Solo::get_work()
     return get_work(GetBlockReason::INITIAL_REQUEST);
 }
 
+bool Solo::is_get_block_retry_deferred() const
+{
+    const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    return now_ms < m_get_block_retry_at_ms.load(std::memory_order_acquire);
+}
+
 network::Shared_payload Solo::get_work(GetBlockReason reason)
 {
     /// Request a fresh mining template via GET_BLOCK.
@@ -1602,9 +1609,7 @@ network::Shared_payload Solo::get_work(GetBlockReason reason)
 
     refresh_cached_session_state("Solo GET_BLOCK");
 
-    const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    if (now_ms < m_get_block_retry_at_ms.load(std::memory_order_acquire)) {
+    if (is_get_block_retry_deferred()) {
         m_last_get_block_request_status.store(GetBlockRequestStatus::NODE_RETRY_DELAY);
         return nullptr;
     }
@@ -2469,6 +2474,7 @@ void Solo::on_block_data(Packet const& packet, std::shared_ptr<network::Connecti
                                           "[Solo] Template feed recovery GET_BLOCK");
             return;
         }
+        cancel_get_block_control_retry(false);
 }
 
 void Solo::on_block_accepted(Packet const& packet, std::shared_ptr<network::Connection> connection)
@@ -4554,6 +4560,7 @@ void Solo::on_get_block_template(Packet const& packet, std::shared_ptr<network::
             m_logger->error("[Solo GET_BLOCK] Failed to finalize decoded template");
             return;
         }
+        cancel_get_block_control_retry(false);
 
         m_logger->info("[Solo GET_BLOCK] 🎯 Template ready! Mining for height {} (channel {})",
                        unified_height, channel_height);

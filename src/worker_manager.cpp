@@ -2200,6 +2200,9 @@ void Worker_manager::poll_get_round()
                             "unanswered over {}s, push silent {}s — forcing session recovery",
                             unanswered, elapsed_s, push_age_s == INT64_MAX ? -1 : push_age_s);
             mark_recovery_initiated("shadow_ban_unanswered_get_round");
+            if (solo_protocol->is_get_block_retry_deferred()) {
+                retry_connect(m_primary_endpoint, true);
+            }
         } else if (elapsed_s >= ONE_WAY_SHADOW_BAN_ELAPSED_SECONDS && !push_silent && !is_reconnecting()) {
             m_logger->error("[Worker_manager] ONE-WAY SESSION FAILURE SUSPECTED: {} consecutive GET_ROUNDs "
                             "unanswered over {}s while push is still live (push_age={}s, status_ack_age={}s) "
@@ -3128,8 +3131,19 @@ void Worker_manager::check_template_health()
         }
     }
 
+    // A node-requested wait is not a template outage. Transport failures still
+    // use their normal recovery paths, including the reconnect stall guard above.
+    const bool node_retry_deferred = !is_reconnecting() &&
+        m_primary_node_session->is_primary_connected() &&
+        solo_protocol->is_authenticated() &&
+        solo_protocol->is_get_block_retry_deferred();
+
     // WAITING_TEMPLATE: check timing and connection health, retry GET_BLOCK
     if (is_recovery_active() && !is_reconnecting()) {
+        if (node_retry_deferred) {
+            m_logger->debug("[Worker_manager] Template health escalation deferred by node retry deadline");
+            return;
+        }
         auto now = std::chrono::steady_clock::now();
         if (m_recovery.degraded_since == std::chrono::steady_clock::time_point{}) {
             m_recovery.degraded_since = now;
@@ -3255,6 +3269,11 @@ void Worker_manager::check_template_health()
             retry_template_request(protocol::GetBlockReason::HEALTH_NO_TEMPLATE);
             return;
         }
+    }
+
+    if (node_retry_deferred) {
+        m_logger->debug("[Worker_manager] Template health escalation deferred by node retry deadline");
+        return;
     }
 
     if (!has_valid_template) {

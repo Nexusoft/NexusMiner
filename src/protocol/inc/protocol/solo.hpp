@@ -69,6 +69,7 @@ public:
     network::Shared_payload get_work() override;
     network::Shared_payload get_work(GetBlockReason reason);
     GetBlockRequestStatus get_last_get_block_request_status() const { return m_last_get_block_request_status.load(); }
+    bool is_get_block_retry_deferred() const;
 
     /// Returns the number of consecutive hashPrevBlock mismatches detected by
     /// validate_current_template() since the last successful template adoption.
