@@ -150,10 +150,25 @@ Bare-header packets are not valid beta wire format.
 │                │ 0x03: INVALID_SIG                      │
 │                │ 0x04: DUPLICATE                        │
 │                │ 0x05: FORK                             │
+│                │ 0x06: SESSION_INVALID                  │
+│                │ 0x07: REWARD_NOT_BOUND                 │
+│                │ 0x08: RATE_LIMITED / STALE_TIMESTAMP   │
+│                │ 0x09: UNKNOWN_TEMPLATE                 │
+│                │ 0x0A: LOCAL_TEMPLATE_REJECT            │
+│                │ 0x0B: MALFORMED_PRODUCER / DECRYPTION  │
+│                │ 0x0C: ENCRYPTION / SIGNATURE           │
+│                │ 0x0D: NO_SESSION_KEY                   │
+│                │ 0x0E: WORK_REVOKED                     │
+│                │ 0x0F: PACKET_TOO_SMALL                 │
+│                │ 0x11: VALIDATION_FAILED                │
+│                │ 0x12: ACCEPTANCE_FAILED                │
+│                │ 0xFF: INTERNAL_ERROR                  │
 └─────────────────────────────────────────────────────────┘
 ```
 
 An empty submission rejection has no specified reason; consult the node logs.
+Some older nodes reuse `0x08`, `0x0B`, and `0x0C` for different failures, so
+the miner reports their possible meanings rather than guessing which occurred.
 The same opcode with an eight-byte payload is a GET_BLOCK control response, not
 a submission result. The legacy lane uses opcode `0xC9` with the same length and
 payload.

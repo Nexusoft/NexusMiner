@@ -97,6 +97,8 @@ void test_submit_rejection(ProtocolLane lane, const std::vector<uint8_t>& reason
         if (reason.empty()) {
             assert(logs.str().find("check node logs") != std::string::npos);
             assert(logs.str().find("most common cause") == std::string::npos);
+        } else {
+            assert(logs.str().find(fmt::format("code=0x{:02x}", reason.front())) != std::string::npos);
         }
     }
     spdlog::set_default_logger(previous);
@@ -310,7 +312,20 @@ int main()
         test_submit_rejection(lane, {3}, "INVALID_SIG");
         test_submit_rejection(lane, {4}, "DUPLICATE");
         test_submit_rejection(lane, {5}, "FORK");
-        test_submit_rejection(lane, {0xff}, "0xff");
+        test_submit_rejection(lane, {0x06}, "SESSION_INVALID");
+        test_submit_rejection(lane, {0x07}, "REWARD_NOT_BOUND");
+        test_submit_rejection(lane, {0x08}, "RATE_LIMITED_OR_STALE_TIMESTAMP");
+        test_submit_rejection(lane, {0x09}, "UNKNOWN_TEMPLATE");
+        test_submit_rejection(lane, {0x0a}, "LOCAL_TEMPLATE_REJECT");
+        test_submit_rejection(lane, {0x0b}, "MALFORMED_PRODUCER_OR_DECRYPTION_FAILED");
+        test_submit_rejection(lane, {0x0c}, "ENCRYPTION_REQUIRED_OR_SIGNATURE_FAILED");
+        test_submit_rejection(lane, {0x0d}, "NO_SESSION_KEY");
+        test_submit_rejection(lane, {0x0e}, "WORK_REVOKED");
+        test_submit_rejection(lane, {0x0f}, "PACKET_TOO_SMALL");
+        test_submit_rejection(lane, {0x11}, "VALIDATION_FAILED");
+        test_submit_rejection(lane, {0x12}, "ACCEPTANCE_FAILED");
+        test_submit_rejection(lane, {0xff}, "INTERNAL_ERROR");
+        test_submit_rejection(lane, {0xfe}, "0xfe");
         test_template_acceptance_cancels_retry(lane, Packet::BLOCK_DATA);
         test_template_acceptance_cancels_retry(lane, Packet::GET_BLOCK);
     }

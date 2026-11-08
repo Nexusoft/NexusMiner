@@ -2721,10 +2721,29 @@ void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Conn
                     reason_str = "FORK";
                     is_fork_rejection = true;
                     break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::SESSION_INVALID): reason_str = "SESSION_INVALID"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::REWARD_NOT_BOUND): reason_str = "REWARD_NOT_BOUND"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::RATE_LIMITED_OR_STALE_TIMESTAMP): reason_str = "RATE_LIMITED_OR_STALE_TIMESTAMP"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::UNKNOWN_TEMPLATE): reason_str = "UNKNOWN_TEMPLATE"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::LOCAL_TEMPLATE_REJECT): reason_str = "LOCAL_TEMPLATE_REJECT"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::MALFORMED_PRODUCER_OR_DECRYPTION_FAILED): reason_str = "MALFORMED_PRODUCER_OR_DECRYPTION_FAILED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::ENCRYPTION_REQUIRED_OR_SIGNATURE_FAILED): reason_str = "ENCRYPTION_REQUIRED_OR_SIGNATURE_FAILED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::NO_SESSION_KEY): reason_str = "NO_SESSION_KEY"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::WORK_REVOKED): reason_str = "WORK_REVOKED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::PACKET_TOO_SMALL): reason_str = "PACKET_TOO_SMALL"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::VALIDATION_FAILED): reason_str = "VALIDATION_FAILED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::ACCEPTANCE_FAILED): reason_str = "ACCEPTANCE_FAILED"; break;
+                case static_cast<uint8_t>(LLP::StatelessMining::RejectionReason::INTERNAL_ERROR): reason_str = "INTERNAL_ERROR"; break;
                 default: { char buf[16]; snprintf(buf, sizeof(buf), "0x%02x", reason_byte); reason_str = buf; break; }
             }
         }
-        m_logger->warn("❌ BLOCK REJECTED by node — height={} channel={} reason={}", rejected_height, rejected_channel, reason_str);
+        if (packet.m_data && !packet.m_data->empty()) {
+            m_logger->warn("❌ BLOCK REJECTED by node — height={} channel={} reason={} code=0x{:02x}",
+                           rejected_height, rejected_channel, reason_str, (*packet.m_data)[0]);
+        } else {
+            m_logger->warn("❌ BLOCK REJECTED by node — height={} channel={} reason={}",
+                           rejected_height, rejected_channel, reason_str);
+        }
         m_logger->warn("Block Rejected by Nexus Network.");
         record_session_event(SessionManager::SessionEventKind::SUBMIT_REJECTED,
                              "height=" + std::to_string(rejected_height) +
