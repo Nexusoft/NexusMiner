@@ -3012,6 +3012,9 @@ bool Worker_manager::retry_template_request_returning(protocol::GetBlockReason r
         auto last_status = solo_protocol->get_last_get_block_request_status();
         const char* status_str = "request_work_empty";
         switch (last_status) {
+            case protocol::Solo::GetBlockRequestStatus::NODE_RETRY_DELAY:
+                m_logger->debug("[Worker_manager] GET_BLOCK deferred until node retry deadline");
+                return false;
             case protocol::Solo::GetBlockRequestStatus::DUPLICATE_WINDOW:
                 status_str = "duplicate_window";
                 break;

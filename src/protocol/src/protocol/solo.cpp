@@ -9,6 +9,7 @@
 #include "protocol/serialization_helpers.hpp"
 #include "protocol/session_status_policy.hpp"
 #include "protocol/session_start_parser.hpp"
+#include "protocol/get_block_control.hpp"
 #include "packet.hpp"
 #include "network/connection.hpp"
 #include "stats/stats_collector.hpp"
@@ -377,6 +378,7 @@ Solo::Solo(std::uint8_t channel, std::shared_ptr<stats::Collector> stats_collect
     // on_get_round_response falls back to the legacy immediate-GET_BLOCK behaviour.
     if (m_io_context) {
         m_recovery_timer = std::make_unique<asio::steady_timer>(*m_io_context);
+        m_get_block_control_timer = std::make_unique<asio::steady_timer>(*m_io_context);
     }
    // Log constructor call with requested channel value
     m_logger->info("Solo::Solo: ctor called, channel={}", static_cast<int>(m_channel));
@@ -761,6 +763,7 @@ std::vector<uint8_t> Solo::load_tritium_genesis()
 
 void Solo::reset()
 {
+    cancel_get_block_control_retry();
     m_current_height = 0;
     m_current_reward = 0;
     m_authenticated = false;
@@ -946,6 +949,7 @@ void Solo::finalize_keepalive_ack(const char* detail)
 
 void Solo::clear_generation_bound_state(const char* reason)
 {
+    cancel_get_block_control_retry();
     m_last_keepalive_request_owner.clear();
     m_last_session_status_request_owner.clear();
     m_last_reward_request_owner.clear();
@@ -1597,6 +1601,13 @@ network::Shared_payload Solo::get_work(GetBlockReason reason)
     /// Node rate limit: 25 GET_BLOCK per 60 seconds (with 1-second per-request cooldown).
 
     refresh_cached_session_state("Solo GET_BLOCK");
+
+    const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (now_ms < m_get_block_retry_at_ms.load(std::memory_order_acquire)) {
+        m_last_get_block_request_status.store(GetBlockRequestStatus::NODE_RETRY_DELAY);
+        return nullptr;
+    }
 
     /* Validate prerequisites */
     if (!is_authenticated()) {
@@ -2638,6 +2649,11 @@ bool Solo::consume_pending_submit_result_or_warn(const char* opcode_name, Trigge
 
 void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Connection> connection)
 {
+    if (packet.m_length == 8 && matches_opcode(packet, Packet::REJECT)) {
+        on_get_block_control(packet, connection);
+        return;
+    }
+
     const auto last_submitted_owner = get_last_submitted_owner_snapshot();
     PacketIngressPreflightOptions preflight;
     preflight.owner = &last_submitted_owner;
@@ -2825,6 +2841,79 @@ void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Conn
                                     GetBlockReason::BLOCK_REJECTED,
                                     "[Solo] ORPHAN_BLOCK GET_BLOCK");
     }
+}
+
+void Solo::cancel_get_block_control_retry(bool clear_deadline)
+{
+    ++m_get_block_control_generation;
+    if (clear_deadline) {
+        m_get_block_retry_at_ms.store(0, std::memory_order_release);
+    }
+    if (m_get_block_control_timer) {
+        m_get_block_control_timer->cancel();
+    }
+}
+
+void Solo::on_get_block_control(Packet const& packet,
+                                const std::shared_ptr<network::Connection>& connection)
+{
+    PacketIngressPreflightOptions preflight;
+    preflight.owner = &m_last_get_block_request_owner;
+    if (!run_packet_ingress_preflight("Solo GET_BLOCK control", preflight)) {
+        return;
+    }
+    if (!packet.m_data) {
+        m_logger->error("[Solo GET_BLOCK] Control response has no payload");
+        return;
+    }
+    const auto control = GetBlockControl::parse(*packet.m_data);
+    if (!control) {
+        m_logger->error("[Solo GET_BLOCK] Invalid control response (version, reason, or reserved bytes)");
+        return;
+    }
+
+    m_pending_get_block.clear();
+    m_logger->warn("[Solo GET_BLOCK] Node returned {} (retry_after_ms={}); "
+                   "check system/get/info.mining_readiness on the node",
+                   control->reason_name(), control->retry_after_ms);
+    if (!control->retryable()) {
+        cancel_get_block_control_retry(false);
+        m_logger->error("[Solo GET_BLOCK] Non-retryable node response requires session or configuration attention");
+        return;
+    }
+
+    const auto delay = control->retry_delay();
+    const auto due = std::chrono::steady_clock::now() + delay;
+    const auto due_ms = std::chrono::ceil<std::chrono::milliseconds>(
+        due.time_since_epoch()).count();
+    const auto previous_due_ms = m_get_block_retry_at_ms.load(std::memory_order_acquire);
+    const auto effective_due_ms = std::max<int64_t>(due_ms, previous_due_ms);
+    m_get_block_retry_at_ms.store(effective_due_ms, std::memory_order_release);
+    const auto generation = ++m_get_block_control_generation;
+    if (!m_get_block_control_timer || weak_from_this().expired()) {
+        m_logger->warn("[Solo GET_BLOCK] No retry timer available; health monitor must retry");
+        return;
+    }
+    m_get_block_control_timer->expires_at(
+        std::chrono::steady_clock::time_point(std::chrono::milliseconds(effective_due_ms)));
+    m_get_block_control_timer->async_wait(
+        [weak_self = weak_from_this(), weak_connection = std::weak_ptr<network::Connection>(connection),
+         generation](const asio::error_code& ec) {
+            auto self = weak_self.lock();
+            if (!self || ec == asio::error::operation_aborted) return;
+            if (ec) {
+                self->m_logger->error("[Solo GET_BLOCK] Retry timer failed: {}", ec.message());
+                return;
+            }
+            if (generation != self->m_get_block_control_generation.load()) return;
+            self->m_get_block_retry_at_ms.store(0, std::memory_order_release);
+            if (self->m_pending_get_block.active && !self->m_pending_get_block.has_timed_out()) {
+                self->m_logger->debug("[Solo GET_BLOCK] Retry unnecessary: request already in flight");
+                return;
+            }
+            self->dispatch_recovery_or_fallback(weak_connection.lock(), GetBlockReason::RECOVERY_FORCED,
+                                                 "[Solo GET_BLOCK] Node control retry");
+        });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4723,6 +4812,7 @@ void Solo::set_connection(std::shared_ptr<network::Connection> connection)
 
 void Solo::reset_auth_state()
 {
+    cancel_get_block_control_retry();
     m_auth_state = AuthState::NOT_AUTHENTICATED;
     m_auth_in_flight_since = {};
     m_authenticated = false;
@@ -4835,6 +4925,7 @@ void Solo::handle_session_expired(SessionId expired_sid, uint8_t reason, std::sh
 
     // STEP 2: CLEAR LOCAL SESSION STATE (mirror reset_auth_state)
     m_logger->info("[Solo] Clearing local session state");
+    cancel_get_block_control_retry();
     m_current_height = 0;
     m_current_reward = 0;
     m_session_id.clear();

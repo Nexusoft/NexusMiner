@@ -43,6 +43,9 @@ std::string format_prefix_hex(const std::deque<uint8_t>& bytes, std::size_t max_
 
 bool is_submit_result_packet(const Packet& packet)
 {
+    if (packet.m_length > 1) {
+        return false;
+    }
     if (packet.m_is_uint16_opcode) {
         return packet.m_header == LLP::StatelessMining::BLOCK_ACCEPTED ||
                packet.m_header == LLP::StatelessMining::BLOCK_REJECTED ||
