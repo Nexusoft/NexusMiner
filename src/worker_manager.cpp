@@ -3139,11 +3139,7 @@ void Worker_manager::check_template_health()
         solo_protocol->is_get_block_retry_deferred();
 
     // WAITING_TEMPLATE: check timing and connection health, retry GET_BLOCK
-    if (is_recovery_active() && !is_reconnecting()) {
-        if (node_retry_deferred) {
-            m_logger->debug("[Worker_manager] Template health escalation deferred by node retry deadline");
-            return;
-        }
+    if (is_recovery_active() && !is_reconnecting() && !node_retry_deferred) {
         auto now = std::chrono::steady_clock::now();
         if (m_recovery.degraded_since == std::chrono::steady_clock::time_point{}) {
             m_recovery.degraded_since = now;
@@ -3271,7 +3267,7 @@ void Worker_manager::check_template_health()
         }
     }
 
-    if (node_retry_deferred) {
+    if (node_retry_deferred && !has_valid_template) {
         m_logger->debug("[Worker_manager] Template health escalation deferred by node retry deadline");
         return;
     }
@@ -3425,6 +3421,11 @@ void Worker_manager::check_template_health()
                         ht_snap.channel_height, ht_snap.channel_target);
         if (channel == mining::CHANNEL_PRIME) {
             m_logger->error("[Worker_manager]    Prime blocks may be long; treating this as recovery signal only");
+        }
+
+        if (node_retry_deferred) {
+            m_logger->debug("[Worker_manager] BLOCK_DATA timeout recovery deferred by node retry deadline");
+            return;
         }
 
         // Cooldown guard: do not escalate recovery on every 5-second health tick.

@@ -15,6 +15,8 @@ using namespace nexusminer::protocol;
 namespace nexusminer::protocol {
 struct GetBlockControlHarness {
     static void authenticate(Solo& solo) { solo.m_authenticated = true; }
+    static bool locally_authenticated(const Solo& solo) { return solo.m_authenticated; }
+    static void sync_session(Solo& solo) { solo.refresh_cached_session_state("GetBlockControlHarness"); }
     static void mark_submit_pending(Solo& solo) { solo.m_submit_result_gate.mark_pending(); }
     static bool submit_pending(const Solo& solo) { return solo.m_submit_result_gate.has_pending(); }
     static bool get_block_pending(const Solo& solo) { return solo.m_pending_get_block.active; }
@@ -91,10 +93,13 @@ void test_lane(ProtocolLane lane)
     solo->process_messages(parse_frame(lane, {1, 1, 0, 0, 0, 0, 0xEA, 0x60}), connection);
     assert(!solo->get_work(GetBlockReason::RECOVERY_FORCED));
     const auto rate_limit_deadline = GetBlockControlHarness::retry_at(*solo);
+    const auto rate_limit_generation = GetBlockControlHarness::retry_generation(*solo);
     solo->process_messages(packet, connection);
-    assert(GetBlockControlHarness::retry_at(*solo) >= rate_limit_deadline);
+    assert(GetBlockControlHarness::retry_at(*solo) == rate_limit_deadline);
+    assert(GetBlockControlHarness::retry_generation(*solo) == rate_limit_generation);
     solo->process_messages(parse_frame(lane, {1, 2, 0, 0, 0, 0, 0, 0}), connection);
-    assert(GetBlockControlHarness::retry_at(*solo) >= rate_limit_deadline);
+    assert(GetBlockControlHarness::retry_at(*solo) == rate_limit_deadline);
+    assert(solo->is_authenticated());
     assert(!solo->get_work(GetBlockReason::RECOVERY_FORCED));
     solo->reset();
     io->restart();
@@ -140,6 +145,7 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     int retries = 0;
     solo->set_block_handler([&](::LLP::CBlock, std::uint32_t) { ++feeds; return true; });
     solo->set_recovery_initiated_handler([&](GetBlockReason) { ++retries; return true; });
+    solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
     solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
     const auto deadline = GetBlockControlHarness::retry_at(*solo);
     const auto generation = GetBlockControlHarness::retry_generation(*solo);
@@ -163,11 +169,26 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     assert(!work);
     assert(solo->get_last_get_block_request_status() == Solo::GetBlockRequestStatus::NODE_RETRY_DELAY);
 
+    const auto template_generation = GetBlockControlHarness::retry_generation(*solo);
     solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
+    assert(GetBlockControlHarness::retry_at(*solo) == deadline);
     const auto reconfirmation_generation = GetBlockControlHarness::retry_generation(*solo);
+    assert(reconfirmation_generation == template_generation);
+    solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
+    solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
+    const auto active_generation = GetBlockControlHarness::retry_generation(*solo);
+    assert(active_generation > reconfirmation_generation);
     solo->process_messages(packet, connection);
     assert(feeds == 1);
-    assert(GetBlockControlHarness::retry_generation(*solo) > reconfirmation_generation);
+    assert(GetBlockControlHarness::retry_generation(*solo) > active_generation);
+    const auto accepted_generation = GetBlockControlHarness::retry_generation(*solo);
+    const auto accepted_deadline = GetBlockControlHarness::retry_at(*solo);
+    GetBlockControlHarness::mark_submit_pending(*solo);
+    solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 9, 0x27, 0xC0}), connection);
+    assert(GetBlockControlHarness::retry_generation(*solo) == accepted_generation);
+    assert(GetBlockControlHarness::retry_at(*solo) == accepted_deadline);
+    assert(GetBlockControlHarness::submit_pending(*solo));
+    assert(solo->get_template_interface()->has_valid_template());
     io->run_for(std::chrono::seconds(6));
     assert(retries == 0);
 
@@ -177,6 +198,46 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     assert(!solo->is_get_block_retry_deferred());
     solo->reset();
     assert(!solo->is_get_block_retry_deferred());
+}
+
+void test_session_controls(ProtocolLane lane, bool authoritative)
+{
+    for (uint8_t reason : {2, 3, 9}) {
+        auto io = std::make_shared<asio::io_context>();
+        auto context = authoritative
+            ? std::make_shared<NodeSessionContext>(std::make_shared<SessionManager>(24, nullptr))
+            : nullptr;
+        auto solo = std::make_shared<Solo>(1, nullptr, context, io);
+        solo->set_protocol_lane(lane);
+        if (context) {
+            context->start_session(SessionId(12345u));
+        }
+        GetBlockControlHarness::authenticate(*solo);
+        GetBlockControlHarness::sync_session(*solo);
+        auto connection = std::make_shared<MockConnection>(lane);
+        int reauths = 0;
+        int retries = 0;
+        solo->set_session_expired_handler([&] { ++reauths; });
+        solo->set_recovery_initiated_handler([&](GetBlockReason) { ++retries; return true; });
+        solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
+        solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
+        assert(solo->is_get_block_retry_deferred());
+        solo->mark_get_block_pending(GetBlockReason::RECOVERY_FORCED);
+        solo->process_messages(parse_frame(lane, {1, reason, 0, 0, 0, 0, 0, 0}), connection);
+        const bool session_error = reason != 9;
+        assert(reauths == (session_error ? 1 : 0));
+        assert(solo->is_authenticated() == !session_error);
+        assert(GetBlockControlHarness::locally_authenticated(*solo) == !session_error);
+        assert(!GetBlockControlHarness::get_block_pending(*solo));
+        assert(GetBlockControlHarness::retry_at(*solo) == 0);
+        if (context && session_error) {
+            assert(context->get_session_id() == SessionId{});
+        }
+        solo->process_messages(parse_frame(lane, {1, reason, 0, 0, 0, 0, 0, 0}), connection);
+        assert(reauths == (session_error ? 1 : 0));
+        io->run_for(std::chrono::seconds(6));
+        assert(retries == 0);
+    }
 }
 
 int main()
@@ -195,6 +256,8 @@ int main()
     test_lane(ProtocolLane::STATELESS);
     test_lane(ProtocolLane::LEGACY);
     for (auto lane : {ProtocolLane::STATELESS, ProtocolLane::LEGACY}) {
+        test_session_controls(lane, false);
+        test_session_controls(lane, true);
         test_template_acceptance_cancels_retry(lane, Packet::BLOCK_DATA);
         test_template_acceptance_cancels_retry(lane, Packet::GET_BLOCK);
     }
