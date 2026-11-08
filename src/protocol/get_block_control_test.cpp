@@ -1,12 +1,17 @@
 #include "protocol/get_block_control.hpp"
 #include "protocol/solo.hpp"
 #include "network/connection.hpp"
+#include "config/config.hpp"
+#include "stats/stats_collector.hpp"
 
 #include <asio/io_context.hpp>
+#include <spdlog/sinks/ostream_sink.h>
+#include <spdlog/spdlog.h>
 #include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 using namespace nexusminer;
@@ -52,6 +57,47 @@ Packet parse_frame(ProtocolLane lane, std::vector<uint8_t> payload)
         std::make_shared<network::Payload>(wire), consumed, 0, lane, result);
     assert(result == ParseResult::SUCCESS && consumed == wire.size());
     return packet;
+}
+
+void test_submit_rejection(ProtocolLane lane, const std::vector<uint8_t>& reason,
+                           const std::string& expected)
+{
+    std::ostringstream logs;
+    auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(logs);
+    auto logger = std::make_shared<spdlog::logger>("rejection-test", sink);
+    auto previous = spdlog::default_logger();
+    spdlog::set_default_logger(logger);
+    {
+        config::Config config(logger);
+        auto stats = std::make_shared<stats::Hash_collector>(config);
+        auto io = std::make_shared<asio::io_context>();
+        auto solo = std::make_shared<Solo>(1, stats, nullptr, io);
+        auto connection = std::make_shared<MockConnection>(lane);
+        solo->set_protocol_lane(lane);
+        GetBlockControlHarness::authenticate(*solo);
+        GetBlockControlHarness::mark_submit_pending(*solo);
+
+        network::Payload wire = lane == ProtocolLane::STATELESS
+            ? network::Payload{0xD0, 0xC9}
+            : network::Payload{0xC9};
+        wire.insert(wire.end(), {0, 0, 0, static_cast<uint8_t>(reason.size())});
+        wire.insert(wire.end(), reason.begin(), reason.end());
+        std::size_t consumed = 0;
+        ParseResult result;
+        auto packet = extract_packet_from_buffer_with_result(
+            std::make_shared<network::Payload>(wire), consumed, 0, lane, result);
+        assert(result == ParseResult::SUCCESS && consumed == wire.size());
+        solo->process_messages(packet, connection);
+        logger->flush();
+        assert(logs.str().find("reason=" + expected) != std::string::npos);
+        assert(stats->get_global_stats().m_rejected_blocks == 1);
+        assert(!GetBlockControlHarness::submit_pending(*solo));
+        if (reason.empty()) {
+            assert(logs.str().find("check node logs") != std::string::npos);
+            assert(logs.str().find("most common cause") == std::string::npos);
+        }
+    }
+    spdlog::set_default_logger(previous);
 }
 
 void test_lane(ProtocolLane lane)
@@ -195,6 +241,13 @@ int main()
     test_lane(ProtocolLane::STATELESS);
     test_lane(ProtocolLane::LEGACY);
     for (auto lane : {ProtocolLane::STATELESS, ProtocolLane::LEGACY}) {
+        test_submit_rejection(lane, {}, "NONE");
+        test_submit_rejection(lane, {1}, "STALE");
+        test_submit_rejection(lane, {2}, "INVALID_POW");
+        test_submit_rejection(lane, {3}, "INVALID_SIG");
+        test_submit_rejection(lane, {4}, "DUPLICATE");
+        test_submit_rejection(lane, {5}, "FORK");
+        test_submit_rejection(lane, {0xff}, "0xff");
         test_template_acceptance_cancels_retry(lane, Packet::BLOCK_DATA);
         test_template_acceptance_cancels_retry(lane, Packet::GET_BLOCK);
     }

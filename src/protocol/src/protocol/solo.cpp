@@ -2701,7 +2701,7 @@ void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Conn
             }
         }
 
-        // Parse rejection reason byte if present (stateless lane sends it in payload).
+        // Both protocol lanes may carry a one-byte submission rejection reason.
         std::string reason_str = "NONE";
         bool is_fork_rejection = false;
         if (packet.m_data && !packet.m_data->empty()) {
@@ -2735,21 +2735,8 @@ void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Conn
         }
 
         if (reason_str == "NONE") {
-            // Node sent BLOCK_REJECTED with no reason byte. The generic stale/PoW/reorg
-            // hint list is misleading here — the most common cause in this state is a
-            // coinbase/signature failure (reward_address points at a genesis the node's
-            // logged-in sigchain does not own). See Solo::send_set_reward + the
-            // SESSION_START reward-genesis cross-check.
-            m_logger->info("[Solo] Node sent rejection with no reason code. The most common cause is"
-                           " a coinbase signature failure, which happens when mining.reward_address"
-                           " refers to a different Tritium sigchain than the node's logged-in"
-                           " (auto-login) user. Verify reward_address matches the genesis hash"
-                           " reported by 'system/get/info' on the node you are connected to.");
-        } else {
-            m_logger->info("[Solo] Possible rejection reasons:");
-            m_logger->info("[Solo]   - Block already found by another miner (stale)");
-            m_logger->info("[Solo]   - Invalid proof-of-work (nonce doesn't meet difficulty)");
-            m_logger->info("[Solo]   - Blockchain reorganization occurred");
+            m_logger->info("[Solo] Node sent no rejection reason code; check node logs for the"
+                           " submission failure. Older nodes may not send a reason.");
         }
 
         // Special handling for FORK rejections: invalidate template and trigger recovery
