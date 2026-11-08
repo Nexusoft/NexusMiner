@@ -26,6 +26,7 @@
 #include "protocol/height_tracker.hpp"
 #include "protocol/packet_builder.hpp"
 #include "protocol/epoch_coordinator.hpp"
+#include "worker/recovery_timeout.hpp"
 #include "miner_opcodes.hpp"
 #include <iostream>
 #include <cassert>
@@ -1417,6 +1418,38 @@ void test_degraded_mode_watchdog_exit_is_narrowly_scoped() {
         mirror_is_valid_transition(MirrorPhase::WAITING_TEMPLATE, MirrorPhase::DEGRADED_RECOVERABLE));
 }
 
+void test_node_retry_wait_restarts_recovery_response_window() {
+    std::cout << "\nTest 29: Node retry wait is excluded from recovery timeout\n";
+
+    using RecoveryClock = nexusminer::worker::RecoveryTimeout::Clock;
+    nexusminer::worker::RecoveryTimeout timeout;
+    const auto start = RecoveryClock::time_point{} + std::chrono::seconds(1);
+    timeout.start_if_unset(start);
+
+    auto before_wait = start + std::chrono::seconds(299);
+    timeout.observe_node_retry(true, true, before_wait);
+    auto retry_deadline = before_wait + std::chrono::seconds(600);
+    timeout.observe_node_retry(false, true, retry_deadline);
+
+    print_test_result("A long node wait does not count toward recovery timeout",
+        timeout.elapsed_seconds(retry_deadline) == 0);
+    print_test_result("Old push and lane silence do not immediately trip hard stop",
+        timeout.worst_case_outage_seconds(retry_deadline, 899, 899) == 0);
+    print_test_result("GET_BLOCK receives a full post-deadline response window",
+        timeout.worst_case_outage_seconds(
+            retry_deadline + std::chrono::seconds(299), 1198, 1198) == 299);
+    print_test_result("Hard-stop accounting resumes after the response window",
+        timeout.worst_case_outage_seconds(
+            retry_deadline + std::chrono::seconds(300), 1199, 1199) == 300);
+
+    auto disconnected_at = retry_deadline + std::chrono::seconds(1);
+    timeout.observe_node_retry(true, true, disconnected_at);
+    auto transport_failure_at = disconnected_at + std::chrono::seconds(301);
+    timeout.observe_node_retry(false, false, transport_failure_at);
+    print_test_result("Transport failure does not rebase the recovery timeout",
+        timeout.elapsed_seconds(transport_failure_at) == 302);
+}
+
 int main() {
     std::cout << "\n═══════════════════════════════════════════════════════════\n";
     std::cout << "Degraded Recovery / Keepalive Epoch Tests\n";
@@ -1455,6 +1488,7 @@ int main() {
     test_epoch0_recovery_escalation_on_suppressed_get_block();
     test_session_status_cooldown_only_advances_after_successful_queue();
     test_degraded_mode_watchdog_exit_is_narrowly_scoped();
+    test_node_retry_wait_restarts_recovery_response_window();
 
     std::cout << "\n═══════════════════════════════════════════════════════════\n";
     std::cout << "Test Results: " << tests_passed << "/" << tests_run << " passed";
