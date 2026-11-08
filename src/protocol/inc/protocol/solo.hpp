@@ -44,12 +44,13 @@ enum class AuthState {
     AUTHENTICATED
 };
 
-class Solo : public Protocol {
+class Solo : public Protocol, public std::enable_shared_from_this<Solo> {
 public:
     enum class GetBlockRequestStatus : uint8_t {
         NONE = 0,
         SENT,
         DUPLICATE_WINDOW,
+        NODE_RETRY_DELAY,
         UNAUTHENTICATED,
         REWARD_NOT_BOUND,
         SESSION_INVALID,
@@ -64,10 +65,11 @@ public:
     network::Shared_payload login(Login_handler handler) override;
     /// Request a fresh mining template via GET_BLOCK.
     /// Authentication-guarded; returns null if not authenticated or reward not bound.
-    /// No miner-side rate limiting — the node's 2-second AutoCoolDown enforces the server-side floor.
+    /// Node retry hints are enforced across all GET_BLOCK request paths.
     network::Shared_payload get_work() override;
     network::Shared_payload get_work(GetBlockReason reason);
     GetBlockRequestStatus get_last_get_block_request_status() const { return m_last_get_block_request_status.load(); }
+    bool is_get_block_retry_deferred() const;
 
     /// Returns the number of consecutive hashPrevBlock mismatches detected by
     /// validate_current_template() since the last successful template adoption.
@@ -703,6 +705,11 @@ private:
     static constexpr auto POST_ADOPTION_SUPPRESSION_WINDOW = std::chrono::milliseconds(2500);
     std::shared_ptr<asio::io_context> m_io_context;
     std::unique_ptr<asio::steady_timer> m_recovery_timer;
+    std::unique_ptr<asio::steady_timer> m_get_block_control_timer;
+    std::atomic<int64_t> m_get_block_retry_at_ms{0};
+    std::atomic<uint64_t> m_get_block_control_generation{0};
+    void cancel_get_block_control_retry(bool clear_deadline = true);
+    void on_get_block_control(Packet const& packet, const std::shared_ptr<network::Connection>& connection);
     std::chrono::steady_clock::time_point m_last_block_accepted_time{
         std::chrono::steady_clock::time_point::min()};
     std::chrono::steady_clock::time_point m_last_push_received_time{
@@ -1013,6 +1020,7 @@ private:
 
     friend struct PostAdoptionSuppressionHarness;
     friend struct SameTipReconfirmationHarness;
+    friend struct GetBlockControlHarness;
 
 public:
     /// Mark a GET_BLOCK request as successfully transmitted using the current

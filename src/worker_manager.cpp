@@ -944,7 +944,6 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                 }
 
                 if (is_recovery_active()) {
-                    m_recovery.degraded_since = {};
                     restart_recovery_window("authoritative_work_ready");
                 }
 
@@ -2118,7 +2117,7 @@ void Worker_manager::log_lane_health()
 
     // Refresh the aggregate lane-alive heartbeat on every periodic tick so it
     // reflects sustained liveness (not just alive-transition edges), matching
-    // how push liveness is tracked. Feeds compute_worst_case_outage_seconds().
+    // how push liveness is tracked.
     m_sim_link.touch_alive_heartbeat();
 
     send_session_status_if_due();
@@ -2200,6 +2199,9 @@ void Worker_manager::poll_get_round()
                             "unanswered over {}s, push silent {}s — forcing session recovery",
                             unanswered, elapsed_s, push_age_s == INT64_MAX ? -1 : push_age_s);
             mark_recovery_initiated("shadow_ban_unanswered_get_round");
+            if (solo_protocol->is_get_block_retry_deferred()) {
+                retry_connect(m_primary_endpoint, true);
+            }
         } else if (elapsed_s >= ONE_WAY_SHADOW_BAN_ELAPSED_SECONDS && !push_silent && !is_reconnecting()) {
             m_logger->error("[Worker_manager] ONE-WAY SESSION FAILURE SUSPECTED: {} consecutive GET_ROUNDs "
                             "unanswered over {}s while push is still live (push_age={}s, status_ack_age={}s) "
@@ -2347,6 +2349,7 @@ void Worker_manager::on_phase_enter(RecoveryPhase new_phase) {
         case RecoveryPhase::HEALTHY: {
             auto now = std::chrono::steady_clock::now();
             m_recovery.degraded_since = {};
+            m_recovery.timeout.reset();
             m_recovery.last_completed_at = now;
             m_recovery.entered_at = {};
             m_recovery.recovery_in_progress.store(false, std::memory_order_release);
@@ -2363,6 +2366,7 @@ void Worker_manager::on_phase_enter(RecoveryPhase new_phase) {
                 m_recovery.degraded_since = now;
                 ++m_degraded_enter_total;
             }
+            m_recovery.timeout.start_if_unset(m_recovery.degraded_since);
             m_stats_collector->set_degraded_mode(true);
             break;
         }
@@ -2373,6 +2377,7 @@ void Worker_manager::on_phase_enter(RecoveryPhase new_phase) {
                 m_recovery.degraded_since = now;
                 ++m_degraded_enter_total;
             }
+            m_recovery.timeout.start_if_unset(m_recovery.degraded_since);
             m_recovery.recovery_in_progress.store(true, std::memory_order_release);
             m_stats_collector->set_degraded_mode(true);
             break;
@@ -2551,6 +2556,9 @@ void Worker_manager::restart_recovery_window(const char* reason)
 
     // Reset per-epoch state in-place (no phase change)
     m_recovery.entered_at = std::chrono::steady_clock::now();  // fresh epoch clock
+    m_recovery.degraded_since = m_recovery.entered_at;
+    m_recovery.timeout.reset();
+    m_recovery.timeout.start_if_unset(m_recovery.degraded_since);
     m_recovery.last_get_block_at = {};
     m_recovery.get_block_confirmed = false;
     m_forced_retry_timer_pending = false;
@@ -3012,6 +3020,9 @@ bool Worker_manager::retry_template_request_returning(protocol::GetBlockReason r
         auto last_status = solo_protocol->get_last_get_block_request_status();
         const char* status_str = "request_work_empty";
         switch (last_status) {
+            case protocol::Solo::GetBlockRequestStatus::NODE_RETRY_DELAY:
+                m_logger->debug("[Worker_manager] GET_BLOCK deferred until node retry deadline");
+                return false;
             case protocol::Solo::GetBlockRequestStatus::DUPLICATE_WINDOW:
                 status_str = "duplicate_window";
                 break;
@@ -3045,18 +3056,6 @@ bool Worker_manager::retry_template_request_returning(protocol::GetBlockReason r
         }
         return false;
     }
-}
-
-int64_t Worker_manager::compute_worst_case_outage_seconds(int64_t degraded_secs, int64_t since_push_s) const
-{
-    auto now = std::chrono::steady_clock::now();
-    int64_t since_lane_alive_s = std::chrono::duration_cast<std::chrono::seconds>(
-        now - m_sim_link.last_alive_at()).count();
-    // Guard against clock skew / not-yet-initialized timestamps producing a
-    // spurious negative age.
-    since_lane_alive_s = std::max<int64_t>(since_lane_alive_s, 0);
-
-    return std::max({degraded_secs, since_push_s, since_lane_alive_s});
 }
 
 void Worker_manager::check_template_health()
@@ -3125,14 +3124,29 @@ void Worker_manager::check_template_health()
         }
     }
 
+    // A node-requested wait is not a template outage. Transport failures still
+    // use their normal recovery paths, including the reconnect stall guard above.
+    const bool node_retry_deferred = !is_reconnecting() &&
+        m_primary_node_session->is_primary_connected() &&
+        solo_protocol->is_authenticated() &&
+        solo_protocol->is_get_block_retry_deferred();
+
+    if (is_recovery_active()) {
+        const auto now = std::chrono::steady_clock::now();
+        const bool session_usable = !is_reconnecting() &&
+            m_primary_node_session->is_primary_connected() &&
+            solo_protocol->is_authenticated();
+        m_recovery.timeout.observe_node_retry(node_retry_deferred, session_usable, now);
+    }
+
     // WAITING_TEMPLATE: check timing and connection health, retry GET_BLOCK
-    if (is_recovery_active() && !is_reconnecting()) {
+    if (is_recovery_active() && !is_reconnecting() && !node_retry_deferred) {
         auto now = std::chrono::steady_clock::now();
         if (m_recovery.degraded_since == std::chrono::steady_clock::time_point{}) {
             m_recovery.degraded_since = now;
         }
-        auto degraded_secs = std::chrono::duration_cast<std::chrono::seconds>(
-            now - m_recovery.degraded_since).count();
+        m_recovery.timeout.start_if_unset(m_recovery.degraded_since);
+        auto degraded_secs = m_recovery.timeout.elapsed_seconds(now);
 
         auto ht_snap = solo_protocol->get_height_tracker_snapshot();
         bool push_received = (ht_snap.last_push_notification_at != std::chrono::steady_clock::time_point{});
@@ -3149,8 +3163,10 @@ void Worker_manager::check_template_health()
         // logging/resubscribe). Do not feed that sentinel into the aggregator — it would
         // make worst_case_secs trip the hard-stop immediately on first WAITING_TEMPLATE.
         // Pass 0 so the hard-stop is driven only by real elapsed outage signals.
-        int64_t worst_case_secs = compute_worst_case_outage_seconds(
-            degraded_secs, push_received ? since_push_s : 0);
+        int64_t lane_alive_age_s = std::chrono::duration_cast<std::chrono::seconds>(
+            now - m_sim_link.last_alive_at()).count();
+        int64_t worst_case_secs = m_recovery.timeout.worst_case_outage_seconds(
+            now, push_received ? since_push_s : 0, std::max<int64_t>(lane_alive_age_s, 0));
 
         m_logger->info("[Worker_manager] WAITING_TEMPLATE: {}s elapsed, push {}s ago (recent={}), "
                        "worst_case_outage={}s",
@@ -3252,6 +3268,11 @@ void Worker_manager::check_template_health()
             retry_template_request(protocol::GetBlockReason::HEALTH_NO_TEMPLATE);
             return;
         }
+    }
+
+    if (node_retry_deferred && !has_valid_template) {
+        m_logger->debug("[Worker_manager] Template health escalation deferred by node retry deadline");
+        return;
     }
 
     if (!has_valid_template) {
@@ -3403,6 +3424,11 @@ void Worker_manager::check_template_health()
                         ht_snap.channel_height, ht_snap.channel_target);
         if (channel == mining::CHANNEL_PRIME) {
             m_logger->error("[Worker_manager]    Prime blocks may be long; treating this as recovery signal only");
+        }
+
+        if (node_retry_deferred) {
+            m_logger->debug("[Worker_manager] BLOCK_DATA timeout recovery deferred by node retry deadline");
+            return;
         }
 
         // Cooldown guard: do not escalate recovery on every 5-second health tick.

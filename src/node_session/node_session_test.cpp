@@ -904,6 +904,29 @@ void test_malformed_packet_closes_connection_without_lane_fail()
     std::cout << "  ✓ Malformed framed bytes close transport instead of byte-drop resync" << std::endl;
 }
 
+void test_get_block_control_does_not_close_connection()
+{
+    auto io_context = std::make_shared<asio::io_context>();
+    config::Config config(make_logger("test_logger_get_block_control"));
+    config.set_mining_mode(config::Mining_mode::HASH);
+    config.set_enable_sim_link(false);
+    auto socket = std::make_shared<MockSocket>(io_context);
+    auto session = make_node_session(io_context, config, socket, "TEST_GET_BLOCK_CONTROL");
+    configure_valid_auth(*session);
+    const bool connect_started = session->connect(make_endpoint(ProtocolPorts::STATELESS_PORT), [](bool) {});
+    assert(connect_started);
+    pump_io(io_context);
+    socket->emit_receive(0, build_auth_result_packet(ProtocolLane::STATELESS, 0x01, 0x10203040u));
+    assert(session->is_authenticated());
+    socket->emit_receive(0, std::make_shared<network::Payload>(
+        network::Payload{0xD0, 0xC9, 0, 0, 0, 8, 1, 4}));
+    assert(!socket->connection(0)->closed());
+    socket->emit_receive(0, std::make_shared<network::Payload>(
+        network::Payload{0, 0, 0, 0, 3, 0xE8}));
+    assert(!socket->connection(0)->closed());
+    session->stop();
+}
+
 void test_transmit_returns_false_when_connection_rejects_payload()
 {
     std::cout << "Test: NodeSession::transmit returns false when no active authenticated connection..." << std::endl;
@@ -1027,6 +1050,9 @@ int main()
         std::cout << std::endl;
 
         test_malformed_packet_closes_connection_without_lane_fail();
+        std::cout << std::endl;
+
+        test_get_block_control_does_not_close_connection();
         std::cout << std::endl;
 
         test_transmit_returns_false_when_connection_rejects_payload();

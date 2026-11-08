@@ -26,6 +26,7 @@
 #include "protocol/height_tracker.hpp"
 #include "protocol/packet_builder.hpp"
 #include "protocol/epoch_coordinator.hpp"
+#include "worker/recovery_timeout.hpp"
 #include "miner_opcodes.hpp"
 #include <iostream>
 #include <cassert>
@@ -325,32 +326,35 @@ void test_successful_reauth_restarts_recovery_epoch() {
         uint64_t m_recovery_epoch{1};
         std::chrono::steady_clock::time_point m_recovery_started_at{};
         std::chrono::steady_clock::time_point m_degraded_since{};
+        nexusminer::worker::RecoveryTimeout m_timeout;
 
         RecoveryTracker() {
             constexpr auto simulated_stale_duration = std::chrono::seconds(1207);
             const auto now = std::chrono::steady_clock::now();
             m_recovery_started_at = now - simulated_stale_duration;
             m_degraded_since = now - simulated_stale_duration;
+            m_timeout.start_if_unset(m_degraded_since);
         }
 
         void restart_recovery_window() {
-            m_recovery_pending = false;
-            m_recovery_started_at = {};
+            m_recovery_started_at = std::chrono::steady_clock::now();
+            m_degraded_since = m_recovery_started_at;
+            m_timeout.reset();
+            m_timeout.start_if_unset(m_degraded_since);
         }
 
         void on_reauthenticated() {
             if (m_degraded_mode || m_recovery_pending) {
-                m_degraded_since = {};
                 restart_recovery_window();
                 ++m_recovery_epoch;
-                m_recovery_pending = true;
-                m_recovery_started_at = std::chrono::steady_clock::now();
             }
         }
     };
 
     RecoveryTracker rt;
     const auto old_started_at = rt.m_recovery_started_at;
+    print_test_result("Old recovery timeout has exceeded the hard stop before re-authentication",
+                      rt.m_timeout.elapsed_seconds(std::chrono::steady_clock::now()) >= 300);
     rt.on_reauthenticated();
 
     print_test_result("Re-authentication starts a new recovery epoch",
@@ -365,7 +369,24 @@ void test_successful_reauth_restarts_recovery_epoch() {
     print_test_result("Fresh recovery epoch elapsed time is near-zero after re-authentication",
                       elapsed_after_reauth >= 0 && elapsed_after_reauth <= 1);
     print_test_result("Degraded timer is reset for the new authenticated session",
-                      rt.m_degraded_since == std::chrono::steady_clock::time_point{});
+                      rt.m_degraded_since == rt.m_recovery_started_at);
+    print_test_result("Recovery timeout is reset without entering HEALTHY",
+                      rt.m_timeout.elapsed_seconds(rt.m_degraded_since) == 0);
+    print_test_result("New session receives the full recovery timeout window",
+                      rt.m_timeout.elapsed_seconds(
+                         rt.m_degraded_since + std::chrono::seconds(299)) == 299);
+
+    const auto old_wait_end = rt.m_degraded_since + std::chrono::seconds(600);
+    rt.m_timeout.observe_node_retry(true, true, rt.m_degraded_since);
+    rt.m_timeout.observe_node_retry(false, true, old_wait_end);
+    rt.m_timeout.observe_node_retry(true, true, old_wait_end);
+    rt.on_reauthenticated();
+    const auto next_tick = rt.m_degraded_since + std::chrono::seconds(1);
+    rt.m_timeout.observe_node_retry(false, true, next_tick);
+    print_test_result("Re-authentication clears the prior session's active retry wait",
+                      rt.m_timeout.elapsed_seconds(next_tick) == 1);
+    print_test_result("Re-authentication clears the prior retry's silence-accounting rebase",
+                      rt.m_timeout.worst_case_outage_seconds(next_tick, 10, 20) == 20);
 
     // Verify EpochCoordinator-based recovery epoch works the same way
     {
@@ -1417,6 +1438,38 @@ void test_degraded_mode_watchdog_exit_is_narrowly_scoped() {
         mirror_is_valid_transition(MirrorPhase::WAITING_TEMPLATE, MirrorPhase::DEGRADED_RECOVERABLE));
 }
 
+void test_node_retry_wait_restarts_recovery_response_window() {
+    std::cout << "\nTest 29: Node retry wait is excluded from recovery timeout\n";
+
+    using RecoveryClock = nexusminer::worker::RecoveryTimeout::Clock;
+    nexusminer::worker::RecoveryTimeout timeout;
+    const auto start = RecoveryClock::time_point{} + std::chrono::seconds(1);
+    timeout.start_if_unset(start);
+
+    auto before_wait = start + std::chrono::seconds(299);
+    timeout.observe_node_retry(true, true, before_wait);
+    auto retry_deadline = before_wait + std::chrono::seconds(600);
+    timeout.observe_node_retry(false, true, retry_deadline);
+
+    print_test_result("A long node wait does not count toward recovery timeout",
+        timeout.elapsed_seconds(retry_deadline) == 0);
+    print_test_result("Old push and lane silence do not immediately trip hard stop",
+        timeout.worst_case_outage_seconds(retry_deadline, 899, 899) == 0);
+    print_test_result("GET_BLOCK receives a full post-deadline response window",
+        timeout.worst_case_outage_seconds(
+            retry_deadline + std::chrono::seconds(299), 1198, 1198) == 299);
+    print_test_result("Hard-stop accounting resumes after the response window",
+        timeout.worst_case_outage_seconds(
+            retry_deadline + std::chrono::seconds(300), 1199, 1199) == 300);
+
+    auto disconnected_at = retry_deadline + std::chrono::seconds(1);
+    timeout.observe_node_retry(true, true, disconnected_at);
+    auto transport_failure_at = disconnected_at + std::chrono::seconds(301);
+    timeout.observe_node_retry(false, false, transport_failure_at);
+    print_test_result("Transport failure does not rebase the recovery timeout",
+        timeout.elapsed_seconds(transport_failure_at) == 302);
+}
+
 int main() {
     std::cout << "\n═══════════════════════════════════════════════════════════\n";
     std::cout << "Degraded Recovery / Keepalive Epoch Tests\n";
@@ -1455,6 +1508,7 @@ int main() {
     test_epoch0_recovery_escalation_on_suppressed_get_block();
     test_session_status_cooldown_only_advances_after_successful_queue();
     test_degraded_mode_watchdog_exit_is_narrowly_scoped();
+    test_node_retry_wait_restarts_recovery_response_window();
 
     std::cout << "\n═══════════════════════════════════════════════════════════\n";
     std::cout << "Test Results: " << tests_passed << "/" << tests_run << " passed";

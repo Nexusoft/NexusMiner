@@ -611,6 +611,25 @@ namespace StatelessMining {
         INVALID_SIG = 0x03,  // Falcon signature verification failed
         DUPLICATE   = 0x04,  // Duplicate block submission
         FORK        = 0x05,  // Blockchain forked, block invalid
+        SESSION_INVALID = 0x06,
+        REWARD_NOT_BOUND = 0x07,
+        RATE_LIMITED_OR_STALE_TIMESTAMP = 0x08,
+        UNKNOWN_TEMPLATE = 0x09,
+        LOCAL_TEMPLATE_REJECT = 0x0A,
+        MALFORMED_PRODUCER_OR_DECRYPTION_FAILED = 0x0B,
+        ENCRYPTION_REQUIRED_OR_SIGNATURE_FAILED = 0x0C,
+        NO_SESSION_KEY = 0x0D,
+        WORK_REVOKED = 0x0E,
+        PACKET_TOO_SMALL = 0x0F,
+        VALIDATION_FAILED = 0x11,
+        ACCEPTANCE_FAILED = 0x12,
+        RATE_LIMITED = 0x13,
+        SESSION_INCONSISTENT = 0x14,
+        PACKET_TOO_LARGE = 0x15,
+        CANDIDATE_PREPARATION_FAILED = 0x16,
+        WRONG_BLOCK_TYPE = 0x17,
+        MALFORMED_SUBMISSION = 0x18,
+        INTERNAL_ERROR = 0xFF,
     };
     
     /**

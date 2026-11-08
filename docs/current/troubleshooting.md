@@ -202,6 +202,24 @@ system/get/info
 
 ## Mining Issues
 
+### GET_BLOCK returns TEMPLATE_NOT_READY
+
+Authentication and channel setup can succeed even when the node is not ready
+to issue mining templates. `BLOCK_REJECTED` with an eight-byte control payload
+is a GET_BLOCK response, not a rejected block submission. Older miners may
+report it as a malformed `d0 c9 00 00 00 08 01 04` packet and disconnect.
+Update the miner to handle the response and retry without closing the session.
+
+On the node, inspect `system/get/info.mining_readiness`, especially `ready`,
+`reason`, `fresh_peers`, and `required_peers`. Restore synchronization and
+healthy peer connections as indicated by the reason. `TEMPLATE_NOT_READY` can
+also indicate session/channel setup or a template-building problem; check the
+node's GET_BLOCK and template logs if readiness is already true. Public-network mining
+requires two distinct supporting peers by default. `-miningminpeers=1` is an
+explicit reduction in safety evidence for an intentional single-peer setup,
+not a way to make an unsynchronized node ready. Do not bypass readiness merely
+to suppress the message.
+
 ### "No work received"
 
 **Symptoms:**

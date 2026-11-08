@@ -1564,8 +1564,12 @@ void test_stateless_block_rejected_framed_with_reason_byte() {
     Packet packet;
     ParseResult result;
 
-    // [D0 C9][00 00 00 01][2A]  — length=1, reason=0x2A (STALE or similar)
-    acc.feed({0xD0, 0xC9, 0x00, 0x00, 0x00, 0x01, 0x2A});
+    // The reason byte may arrive separately from the length field.
+    acc.feed({0xD0, 0xC9, 0x00, 0x00, 0x00, 0x01});
+    bool incomplete = !acc.parse_one_packet(ProtocolLane::STATELESS, packet, result) &&
+                      result == ParseResult::NEED_MORE_DATA && acc.size() == 6;
+    print_test_result("STATELESS_BLOCK_REJECTED waits for fragmented reason byte", incomplete);
+    acc.feed({0x2A});
     bool parsed = acc.parse_one_packet(ProtocolLane::STATELESS, packet, result);
     bool test1 = parsed &&
                  (result == ParseResult::SUCCESS) &&
@@ -1575,6 +1579,43 @@ void test_stateless_block_rejected_framed_with_reason_byte() {
                  ((*packet.m_data)[0] == 0x2A) &&
                  acc.empty();
     print_test_result("STATELESS_BLOCK_REJECTED framed+reason: SUCCESS, bytes_consumed=7, length=1", test1);
+}
+
+void test_get_block_control_frames() {
+    std::cout << "\nGET_BLOCK control frame fragmentation and coalescing" << std::endl;
+    for (auto lane : {ProtocolLane::STATELESS, ProtocolLane::LEGACY}) {
+        TestAccumulator acc;
+        Packet packet;
+        ParseResult result;
+        if (lane == ProtocolLane::STATELESS)
+            acc.feed({0xD0, 0xC9, 0, 0, 0, 8, 1, 4});
+        else
+            acc.feed({0xC9, 0, 0, 0, 8, 1, 4});
+        const bool incomplete = !acc.parse_one_packet(lane, packet, result) &&
+                                result == ParseResult::NEED_MORE_DATA;
+        acc.feed({0, 0, 0, 0, 3, 0xE8});
+        if (lane == ProtocolLane::STATELESS)
+            acc.feed({0xD0, 0xC8, 0, 0, 0, 0});
+        else
+            acc.feed({0xC8, 0, 0, 0, 0});
+        const bool control = acc.parse_one_packet(lane, packet, result) &&
+                             packet.m_length == 8 && packet.m_data &&
+                             (*packet.m_data)[1] == 4;
+        const bool next = acc.parse_one_packet(lane, packet, result) &&
+                          packet.m_length == 0 && acc.empty();
+        print_test_result(lane == ProtocolLane::STATELESS
+                          ? "Stateless control is fragmented and followed by a submit result"
+                          : "Legacy control is fragmented and followed by a submit result",
+                          incomplete && control && next);
+    }
+
+    TestAccumulator acc;
+    Packet packet;
+    ParseResult result;
+    acc.feed({0xD0, 0xC8, 0, 0, 0, 8});
+    print_test_result("Eight-byte BLOCK_ACCEPTED remains malformed",
+                      !acc.parse_one_packet(ProtocolLane::STATELESS, packet, result) &&
+                      result == ParseResult::MALFORMED);
 }
 
 // ============================================================================
@@ -1797,6 +1838,7 @@ int main() {
     test_stateless_block_accepted_framed_form();
     test_stateless_block_rejected_framed_form();
     test_stateless_block_rejected_framed_with_reason_byte();
+    test_get_block_control_frames();
     test_stateless_block_accepted_bare_form_is_rejected();
     test_stateless_block_accepted_followed_by_prime_available();
     test_legacy_block_accepted_followed_by_prime_available();

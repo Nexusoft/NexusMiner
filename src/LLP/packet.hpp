@@ -118,7 +118,8 @@ namespace nexusminer
 		// always have length+payload.
 		//
 		// NOTE on opcodes 200-203 (BLOCK_ACCEPTED/REJECTED, COINBASE_SET/FAIL):
-		//   These carry an optional 0-1 byte payload on the wire (e.g., a reason code).
+		//   Submit results carry an optional 0-1 byte payload. BLOCK_REJECTED can
+		//   also carry an 8-byte GET_BLOCK control response.
 		//   LLL-TAO sends BLOCK_REJECTED (0xC9) with a 1-byte reason payload on the legacy
 		//   lane; classifying it as header-only causes `length != 0` → MALFORMED → connection
 		//   drop.  This matches the stateless lane where 0xD0C8/0xD0C9 are also data-bearing
@@ -177,8 +178,8 @@ namespace nexusminer
 			return is_legacy_header_only_opcode(legacy);
 		}
 
-		// Returns true for opcodes whose stateless wire form is an explicit
-		// zero/one-length framed packet.
+		// Submit-result opcodes use explicit zero/one-length frames; canonical
+		// BLOCK_REJECTED also carries the eight-byte GET_BLOCK control payload.
 		inline bool is_stateless_zero_payload_compat_opcode(uint16_t opcode) {
 			return opcode == LLP::StatelessMining::BLOCK_ACCEPTED_COMPAT ||
 			       opcode == LLP::StatelessMining::BLOCK_REJECTED_COMPAT ||
@@ -1367,10 +1368,8 @@ namespace nexusminer
 				return packet;
 			}
 			
-			// Special-case compat submit-result opcodes that some node builds emit either
-			// as bare 2-byte headers or as explicit zero/one-length stateless frames.
-			// Prefer the explicit framed form when it is fully present in the buffer;
-			// otherwise accept the bare header form so adjacent packets are not misframed.
+			// Submit results use explicit zero/one-length frames. Canonical
+			// BLOCK_REJECTED also carries the eight-byte GET_BLOCK control.
 			if (is_valid_stateless && PacketConstants::is_stateless_zero_payload_compat_opcode(header16))
 			{
 				if (buffer_size < MIN_PACKET_SIZE)
@@ -1382,7 +1381,8 @@ namespace nexusminer
 				std::uint32_t const compat_length = read_be32(buffer->data() + start_index + 2);
 				if (compat_length == 0 ||
 				    ((header16 == LLP::StatelessMining::BLOCK_REJECTED_COMPAT ||
-				      header16 == LLP::StatelessMining::BLOCK_REJECTED) && compat_length == 1))
+				      header16 == LLP::StatelessMining::BLOCK_REJECTED) && compat_length == 1) ||
+				    (header16 == LLP::StatelessMining::BLOCK_REJECTED && compat_length == 8))
 				{
 					std::size_t const compat_packet_size = MIN_PACKET_SIZE + compat_length;
 					if (buffer_size < compat_packet_size)
