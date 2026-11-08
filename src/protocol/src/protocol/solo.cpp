@@ -4131,6 +4131,7 @@ void Solo::on_miner_auth_response(Packet const& packet, std::shared_ptr<network:
             if (m_session_authenticated_handler) {
                 m_session_authenticated_handler(SessionId{});
             }
+            return;
         }
     }
     else if (matches_opcode(packet, Packet::CHANNEL_ACK))
