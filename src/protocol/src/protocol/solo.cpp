@@ -2177,6 +2177,12 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         return;
     }
 
+    if (packet.m_length == 8 && matches_opcode(packet, Packet::REJECT) &&
+        !m_pending_get_block.active) {
+        m_logger->debug("[Solo GET_BLOCK] Ignoring stale control response: no request in flight");
+        return;
+    }
+
     // Template-lifeline packets (push notifications and template deliveries) must
     // stay open even when older session-debugging logic would otherwise defer or
     // stale-drop ingress. Dedicated handlers apply their own template validity
@@ -2850,6 +2856,10 @@ void Solo::cancel_get_block_control_retry(bool clear_deadline)
 void Solo::on_get_block_control(Packet const& packet,
                                 const std::shared_ptr<network::Connection>& connection)
 {
+    if (!m_pending_get_block.active) {
+        m_logger->debug("[Solo GET_BLOCK] Ignoring stale control response: no request in flight");
+        return;
+    }
     PacketIngressPreflightOptions preflight;
     preflight.owner = &m_last_get_block_request_owner;
     if (!run_packet_ingress_preflight("Solo GET_BLOCK control", preflight)) {
@@ -2870,8 +2880,20 @@ void Solo::on_get_block_control(Packet const& packet,
                    "check system/get/info.mining_readiness on the node",
                    control->reason_name(), control->retry_after_ms);
     if (!control->retryable()) {
-        cancel_get_block_control_retry(false);
-        m_logger->error("[Solo GET_BLOCK] Non-retryable node response requires session or configuration attention");
+        cancel_get_block_control_retry();
+        if (control->reason == GetBlockControlReason::SESSION_INVALID ||
+            control->reason == GetBlockControlReason::UNAUTHENTICATED) {
+            if (m_session_context) {
+                handle_session_expired(get_session_id(), static_cast<uint8_t>(control->reason), connection);
+            } else {
+                reset_auth_state();
+                if (m_session_expired_handler) {
+                    m_session_expired_handler();
+                }
+            }
+        } else {
+            m_logger->error("[Solo GET_BLOCK] Non-retryable node response requires configuration attention");
+        }
         return;
     }
 
