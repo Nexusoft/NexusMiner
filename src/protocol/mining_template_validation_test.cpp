@@ -1484,6 +1484,12 @@ int main()
         MiningTemplateInterface tmpl_interface(2, 0);
         int rejected_feed_count = 0;
         int accepted_feed_count = 0;
+        int completed_feed_count = 0;
+        tmpl_interface.set_template_fed_handler([&] {
+            if (tmpl_interface.has_valid_template()) {
+                ++completed_feed_count;
+            }
+        });
         tmpl_interface.set_template_feed_handler(
             [&](const MiningTemplateInterface::MiningTemplate&, uint32_t) {
                 ++rejected_feed_count;
@@ -1499,6 +1505,8 @@ int main()
         print_test_result("Test 38: feed_current_template reports worker rejection", !fed);
         print_test_result("Test 38: rejected feed clears current template state",
             !tmpl_interface.has_valid_template());
+        print_test_result("Test 38: rejected feed does not signal completion",
+            completed_feed_count == 0);
 
         tmpl_interface.set_template_feed_handler(
             [&](const MiningTemplateInterface::MiningTemplate&, uint32_t) {
@@ -1512,6 +1520,8 @@ int main()
         print_test_result("Test 38: same template can be retried immediately after rejection",
             retry_res.is_valid && retry_fed);
         print_test_result("Test 38: accepting retry handler called once", accepted_feed_count == 1);
+        print_test_result("Test 38: completion can query the template without deadlocking",
+            completed_feed_count == 1);
     }
 
     // ====================================================================

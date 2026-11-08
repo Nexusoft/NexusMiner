@@ -209,6 +209,11 @@ to issue mining templates. `BLOCK_REJECTED` with an eight-byte control payload
 is a GET_BLOCK response, not a rejected block submission. Older miners may
 report it as a malformed `d0 c9 00 00 00 08 01 04` packet and disconnect.
 Update the miner to handle the response and retry without closing the session.
+The miner keeps retrying while waiting for the node instead of entering a
+full-stop degraded mode. Workers remain idle when there is no valid template;
+the existing readiness and template validation checks are not bypassed.
+After a node shutdown, a miner without a failover node waits 60 seconds before
+retrying the primary; it discards the old work and waits for a new session.
 
 On the node, inspect `system/get/info.mining_readiness`, especially `ready`,
 `reason`, `fresh_peers`, and `required_peers`. Restore synchronization and

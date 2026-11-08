@@ -48,30 +48,9 @@ namespace ProtocolConstants {
 
     /**
      * Maximum delay cap for session authentication retry (milliseconds)
-     * Caps exponential backoff at 3 minutes. Widened from 60s so a
-     * reorg-storm-driven burst of SESSION_EXPIRED/auth failures has more
-     * headroom to self-resolve before the controlled attempt budget
-     * (CONTROLLED_SESSION_AUTH_MAX_ATTEMPTS) is exhausted.
+     * Caps exponential backoff at 3 minutes while authentication is retried.
      */
     constexpr uint32_t MAX_SESSION_RETRY_MS = 180000;
-
-    /**
-     * Auto-recoverable degraded-mode watchdog base delay (seconds).
-     *
-     * When DEGRADED_MODE is entered because a controlled retry budget was
-     * exhausted (not a signal/fatal-config reason), a watchdog probes the
-     * node at this interval, doubling up to DEGRADED_WATCHDOG_MAX_SECONDS.
-     * Deliberately coarse: no mining happens while degraded, so a slow probe
-     * costs nothing, and it avoids re-entering a reorg storm in a tight loop
-     * if the node/network is still not ready.
-     */
-    constexpr uint32_t DEGRADED_WATCHDOG_BASE_SECONDS = 60;
-
-    /**
-     * Auto-recoverable degraded-mode watchdog max delay cap (seconds).
-     * Caps the reconnect-probe backoff at 10 minutes.
-     */
-    constexpr uint32_t DEGRADED_WATCHDOG_MAX_SECONDS = 600;
 
     //==========================================================================
     // Connection Retry Constants

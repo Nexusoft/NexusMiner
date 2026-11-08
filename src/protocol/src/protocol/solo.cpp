@@ -1179,6 +1179,17 @@ void Solo::mark_authoritative_recovery_required(const std::string& reason)
     }
 }
 
+void Solo::reset_worker_feed_guards()
+{
+    m_last_fed_time = {};
+    m_last_fed_unified_height = 0;
+    m_last_fed_hash_prev_block = {};
+    m_merkle_root_feed_guard.reset();
+    if (m_template_interface) {
+        m_template_interface->reset_feed_debounce();
+    }
+}
+
 void Solo::mark_authoritative_recovery_healthy(const std::string& reason)
 {
     if (m_session_context) {
@@ -1599,6 +1610,13 @@ bool Solo::is_get_block_retry_deferred() const
     const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
     return now_ms < m_get_block_retry_at_ms.load(std::memory_order_acquire);
+}
+
+bool Solo::is_node_template_wait_active() const
+{
+    const auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    return now_ms < m_node_template_wait_until_ms.load(std::memory_order_acquire);
 }
 
 network::Shared_payload Solo::get_work(GetBlockReason reason)
@@ -2870,6 +2888,7 @@ void Solo::on_block_rejected(Packet const& packet, std::shared_ptr<network::Conn
 void Solo::cancel_get_block_control_retry(bool clear_deadline)
 {
     ++m_get_block_control_generation;
+    m_node_template_wait_until_ms.store(0, std::memory_order_release);
     if (clear_deadline) {
         m_get_block_retry_at_ms.store(0, std::memory_order_release);
     }
@@ -2929,6 +2948,11 @@ void Solo::on_get_block_control(Packet const& packet,
     const auto previous_due_ms = m_get_block_retry_at_ms.load(std::memory_order_acquire);
     const auto effective_due_ms = std::max<int64_t>(due_ms, previous_due_ms);
     m_get_block_retry_at_ms.store(effective_due_ms, std::memory_order_release);
+    // Keep the node's explicit response visible across the retry/response gap.
+    // A missing follow-up response must eventually restore transport recovery.
+    constexpr int64_t RESPONSE_GRACE_MS = 30000;
+    m_node_template_wait_until_ms.store(effective_due_ms + RESPONSE_GRACE_MS,
+                                        std::memory_order_release);
     const auto generation = ++m_get_block_control_generation;
     if (!m_get_block_control_timer || weak_from_this().expired()) {
         m_logger->warn("[Solo GET_BLOCK] No retry timer available; health monitor must retry");
@@ -4592,6 +4616,9 @@ void Solo::on_get_block_template(Packet const& packet, std::shared_ptr<network::
                                                  "Solo GET_BLOCK",
                                                  false)) {
             m_logger->error("[Solo GET_BLOCK] Failed to finalize decoded template");
+            dispatch_recovery_or_fallback(connection,
+                                          GetBlockReason::TEMPLATE_FEED_FAILURE,
+                                          "[Solo GET_BLOCK] Template feed recovery GET_BLOCK");
             return;
         }
         cancel_get_block_control_retry(false);
@@ -5006,7 +5033,7 @@ void Solo::handle_session_expired(SessionId expired_sid, uint8_t reason, std::sh
 
     // STEP 4 & 5: EXPONENTIAL BACKOFF THEN RE-AUTH
     // The Worker_manager's session_expired_handler callback will handle:
-    // - Exponential backoff using MAX_SESSION_AUTH_RETRIES / BASE_SESSION_RETRY_MS / MAX_SESSION_RETRY_MS
+    // - Exponential backoff capped by MAX_SESSION_RETRY_MS
     // - Incrementing retry counter
     // - Scheduling io_context timer to delay re-auth
     // - Calling login(m_login_handler) to re-send MINER_AUTH_INIT on same TCP connection

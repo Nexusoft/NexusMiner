@@ -28,6 +28,7 @@ struct GetBlockControlHarness {
     static int64_t retry_at(const Solo& solo) { return solo.m_get_block_retry_at_ms.load(); }
     static uint64_t retry_generation(const Solo& solo) { return solo.m_get_block_control_generation.load(); }
     static void expire_retry(Solo& solo) { solo.m_get_block_retry_at_ms.store(1); }
+    static void expire_node_wait(Solo& solo) { solo.m_node_template_wait_until_ms.store(1); }
 };
 }
 
@@ -127,6 +128,7 @@ void test_lane(ProtocolLane lane)
     auto packet = parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8});
     solo->process_messages(packet, connection);
     assert(!GetBlockControlHarness::get_block_pending(*solo));
+    assert(solo->is_node_template_wait_active());
     assert(GetBlockControlHarness::submit_pending(*solo));
     assert(!solo->get_work(GetBlockReason::RECOVERY_FORCED));
     assert(solo->get_last_get_block_request_status() == Solo::GetBlockRequestStatus::NODE_RETRY_DELAY);
@@ -135,6 +137,9 @@ void test_lane(ProtocolLane lane)
     io->restart();
     io->run_for(std::chrono::seconds(6));
     assert(retries == 1);
+    assert(solo->is_node_template_wait_active());
+    GetBlockControlHarness::expire_node_wait(*solo);
+    assert(!solo->is_node_template_wait_active());
     assert(GetBlockControlHarness::get_block_pending(*solo));
     assert(solo->get_work(GetBlockReason::RECOVERY_FORCED));
 
@@ -150,6 +155,7 @@ void test_lane(ProtocolLane lane)
     assert(solo->is_authenticated());
     assert(!solo->get_work(GetBlockReason::RECOVERY_FORCED));
     solo->reset();
+    assert(!solo->is_node_template_wait_active());
     io->restart();
     io->poll();
     assert(retries == 1);
@@ -190,8 +196,13 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     GetBlockControlHarness::authenticate(*solo);
     auto connection = std::make_shared<MockConnection>(lane);
     int feeds = 0;
+    int completed_feeds = 0;
     int retries = 0;
     solo->set_block_handler([&](const ::LLP::CBlock&, std::uint32_t) { ++feeds; return true; });
+    solo->get_template_interface()->set_template_fed_handler([&] {
+        assert(solo->get_template_interface()->has_valid_template());
+        ++completed_feeds;
+    });
     solo->set_recovery_initiated_handler([&](GetBlockReason) { ++retries; return true; });
     solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
     solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
@@ -210,6 +221,8 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     auto packet = template_packet(lane, opcode);
     solo->process_messages(packet, connection);
     assert(feeds == 1);
+    assert(completed_feeds == 1);
+    assert(!solo->is_node_template_wait_active());
     assert(GetBlockControlHarness::retry_generation(*solo) > generation);
     assert(GetBlockControlHarness::retry_at(*solo) == deadline);
     assert(solo->is_get_block_retry_deferred());
@@ -228,6 +241,7 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     assert(active_generation > reconfirmation_generation);
     solo->process_messages(packet, connection);
     assert(feeds == 1);
+    assert(completed_feeds == 1);
     assert(GetBlockControlHarness::retry_generation(*solo) > active_generation);
     const auto accepted_generation = GetBlockControlHarness::retry_generation(*solo);
     const auto accepted_deadline = GetBlockControlHarness::retry_at(*solo);

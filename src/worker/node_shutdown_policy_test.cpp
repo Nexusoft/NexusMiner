@@ -18,11 +18,11 @@ void check(bool condition, const char* label)
     }
 }
 
-void test_no_failover_full_stops()
+void test_no_failover_retries_primary()
 {
     check(nexusminer::decide_node_shutdown_action(false) ==
-              nexusminer::NodeShutdownAction::FULL_STOP,
-          "NODE_SHUTDOWN with no failover selects FULL_STOP");
+              nexusminer::NodeShutdownAction::RETRY_PRIMARY_NODE,
+          "NODE_SHUTDOWN with no failover retries the primary");
 }
 
 void test_failover_switches_to_standby()
@@ -51,7 +51,7 @@ int main()
 {
     std::cout << "node_shutdown_policy_test\n";
 
-    test_no_failover_full_stops();
+    test_no_failover_retries_primary();
     test_failover_switches_to_standby();
     test_shutdown_invalidates_current_work();
 

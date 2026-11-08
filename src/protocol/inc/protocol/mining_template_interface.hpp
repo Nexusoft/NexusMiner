@@ -246,6 +246,12 @@ public:
      * @param handler Callback function to receive templates
      */
     void set_template_feed_handler(TemplateFeedHandler handler);
+
+    /// Called after a successful feed, with the template mutex released.
+    void set_template_fed_handler(std::function<void()> handler);
+
+    /// Allow a new worker generation to receive the same template again.
+    void reset_feed_debounce();
     
     /**
      * @brief Register a handler to receive validation failure notifications
@@ -754,6 +760,7 @@ private:
     
     MiningTemplate m_current_template;
     TemplateFeedHandler m_feed_handler;
+    std::function<void()> m_template_fed_handler;
     ValidationFailureHandler m_validation_failure_handler;
     TemplateClearedCallback m_template_cleared_callback;
     mutable std::mutex m_template_mutex;  // Protects m_current_template access
