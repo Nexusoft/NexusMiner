@@ -227,6 +227,10 @@ void test_same_tip_refed_after_workers_stop()
     solo->set_recovery_confirmed_handler([&]() { ++confirmations; });
     auto payload = make_block_payload(6771846, 0xAA);
     auto* tmpl = solo->get_template_interface();
+    print_test_result("Template interface available", tmpl != nullptr);
+    if (tmpl == nullptr) {
+        return;
+    }
     print_test_result("Initial template accepted",
                       tmpl->read_template(payload, "test_node", false).is_valid);
     print_test_result("Initial worker generation fed",
