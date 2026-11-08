@@ -106,7 +106,7 @@ std::string ColinAgent::check_block_rejected_none(const std::string& log_line)
 {
     if (log_line.find("BLOCK REJECTED") != std::string::npos &&
         log_line.find("reason=NONE") != std::string::npos)
-        return "Stale block / nonce does not meet difficulty → check template age and PUSH trigger paths";
+        return "Node supplied no rejection reason → check node logs for the submission failure";
     return {};
 }
 

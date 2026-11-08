@@ -78,7 +78,7 @@ add_nexusminer_test(NAME packet_builder_test
 
 add_nexusminer_test(NAME get_block_control_test
     SOURCES     get_block_control_test.cpp ${CMAKE_SOURCE_DIR}/src/miner_keys.cpp
-    LINK_LIBS   protocol LLP LLC network asio spdlog ${OPENSSL_LIBRARIES}
+    LINK_LIBS   protocol LLP LLC network asio spdlog stats config ${OPENSSL_LIBRARIES}
     INCLUDE_DIRS ${_LLP_INC} ${_LLC_INC})
 
 add_nexusminer_test(NAME keepalive_v2_test

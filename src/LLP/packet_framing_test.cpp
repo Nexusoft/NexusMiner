@@ -1564,8 +1564,12 @@ void test_stateless_block_rejected_framed_with_reason_byte() {
     Packet packet;
     ParseResult result;
 
-    // [D0 C9][00 00 00 01][2A]  — length=1, reason=0x2A (STALE or similar)
-    acc.feed({0xD0, 0xC9, 0x00, 0x00, 0x00, 0x01, 0x2A});
+    // The reason byte may arrive separately from the length field.
+    acc.feed({0xD0, 0xC9, 0x00, 0x00, 0x00, 0x01});
+    bool incomplete = !acc.parse_one_packet(ProtocolLane::STATELESS, packet, result) &&
+                      result == ParseResult::NEED_MORE_DATA && acc.size() == 6;
+    print_test_result("STATELESS_BLOCK_REJECTED waits for fragmented reason byte", incomplete);
+    acc.feed({0x2A});
     bool parsed = acc.parse_one_packet(ProtocolLane::STATELESS, packet, result);
     bool test1 = parsed &&
                  (result == ParseResult::SUCCESS) &&

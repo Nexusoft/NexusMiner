@@ -142,7 +142,9 @@ Bare-header packets are not valid beta wire format.
 ┌─────────────────────────────────────────────────────────┐
 │ Opcode (2)     │ 0xD0C9                                 │
 ├─────────────────────────────────────────────────────────┤
-│ Reason (1)     │ Rejection reason code                  │
+│ Length (4)     │ 0 or 1, big-endian                     │
+├─────────────────────────────────────────────────────────┤
+│ Reason (0 or 1)│ Optional rejection reason code         │
 │                │ 0x01: STALE                            │
 │                │ 0x02: INVALID_POW                      │
 │                │ 0x03: INVALID_SIG                      │
@@ -150,6 +152,11 @@ Bare-header packets are not valid beta wire format.
 │                │ 0x05: FORK                             │
 └─────────────────────────────────────────────────────────┘
 ```
+
+An empty submission rejection has no specified reason; consult the node logs.
+The same opcode with an eight-byte payload is a GET_BLOCK control response, not
+a submission result. The legacy lane uses opcode `0xC9` with the same length and
+payload.
 
 ---
 
