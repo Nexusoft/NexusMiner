@@ -210,7 +210,7 @@ int main()
     assert(Worker_manager_recovery_test_access::workers(*manager) == 1);
     assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::HEALTHY);
 
-    solo->set_block_handler([](::LLP::CBlock, std::uint32_t) { return false; });
+    solo->set_block_handler([](const ::LLP::CBlock&, std::uint32_t) { return false; });
     std::fill(block->begin() + 16, block->begin() + 144, 0xcc);
     solo->mark_get_block_pending(protocol::GetBlockReason::RECOVERY_FORCED);
     solo->process_messages(template_response, connection);
