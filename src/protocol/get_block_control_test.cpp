@@ -191,7 +191,7 @@ void test_template_acceptance_cancels_retry(ProtocolLane lane, uint8_t opcode)
     auto connection = std::make_shared<MockConnection>(lane);
     int feeds = 0;
     int retries = 0;
-    solo->set_block_handler([&](::LLP::CBlock, std::uint32_t) { ++feeds; return true; });
+    solo->set_block_handler([&](const ::LLP::CBlock&, std::uint32_t) { ++feeds; return true; });
     solo->set_recovery_initiated_handler([&](GetBlockReason) { ++retries; return true; });
     solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
     solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
