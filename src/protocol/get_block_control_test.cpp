@@ -294,6 +294,59 @@ void test_rejected_template_retry(ProtocolLane lane, uint8_t opcode)
     assert(GetBlockControlHarness::retry_generation(*solo) > generation);
 }
 
+void test_first_template_after_node_startup(ProtocolLane lane)
+{
+    // Block deserialization retains its first logger across test cases.
+    static std::ostringstream logs;
+    logs.str("");
+    logs.clear();
+    auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(logs);
+    auto logger = std::make_shared<spdlog::logger>("startup-test", sink);
+    auto previous = spdlog::default_logger();
+    spdlog::set_default_logger(logger);
+    {
+        config::Config config(logger);
+        auto stats = std::make_shared<stats::Hash_collector>(config);
+        auto io = std::make_shared<asio::io_context>();
+        auto solo = std::make_shared<Solo>(1, stats, nullptr, io);
+        auto connection = std::make_shared<MockConnection>(lane);
+        solo->set_protocol_lane(lane);
+        GetBlockControlHarness::authenticate(*solo);
+        int feeds = 0;
+        solo->set_block_handler([&](const ::LLP::CBlock&, uint32_t) {
+            ++feeds;
+            return true;
+        });
+        solo->set_recovery_initiated_handler([&](GetBlockReason reason) {
+            auto work = solo->get_work(reason);
+            assert(work && connection->transmit(work));
+            solo->mark_get_block_pending(reason);
+            return true;
+        });
+
+        solo->mark_get_block_pending(GetBlockReason::INITIAL_REQUEST);
+        solo->process_messages(parse_frame(lane, {1, 4, 0, 0, 0, 0, 3, 0xE8}), connection);
+        assert(feeds == 0);
+        assert(stats->get_global_stats().m_rejected_blocks == 0);
+        assert(solo->is_authenticated());
+        assert(!GetBlockControlHarness::submit_pending(*solo));
+        assert(solo->is_node_template_wait_active());
+        logger->flush();
+        assert(logs.str().find("RECEIVED PACKET: GET_BLOCK_CONTROL_RESPONSE") != std::string::npos);
+        assert(logs.str().find("no submitted block was rejected") != std::string::npos);
+
+        io->run_for(std::chrono::seconds(6));
+        assert(GetBlockControlHarness::get_block_pending(*solo));
+        solo->process_messages(template_packet(lane, Packet::BLOCK_DATA), connection);
+        assert(feeds == 1);
+        assert(solo->get_template_interface()->has_valid_template());
+        assert(!solo->is_node_template_wait_active());
+        assert(!GetBlockControlHarness::get_block_pending(*solo));
+        assert(stats->get_global_stats().m_rejected_blocks == 0);
+    }
+    spdlog::set_default_logger(previous);
+}
+
 void test_session_controls(ProtocolLane lane, bool authoritative)
 {
     for (uint8_t reason : {2, 3, 9}) {
@@ -350,6 +403,7 @@ int main()
     test_lane(ProtocolLane::STATELESS);
     test_lane(ProtocolLane::LEGACY);
     for (auto lane : {ProtocolLane::STATELESS, ProtocolLane::LEGACY}) {
+        test_first_template_after_node_startup(lane);
         test_session_controls(lane, false);
         test_session_controls(lane, true);
         test_submit_rejection(lane, {}, "NONE");

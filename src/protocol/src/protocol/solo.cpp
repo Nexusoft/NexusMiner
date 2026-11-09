@@ -2216,6 +2216,14 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         }
     }
     
+    const auto packet_name =
+        packet.m_length == 8 && matches_opcode(packet, Packet::REJECT) &&
+        packet.m_data && GetBlockControl::parse(*packet.m_data)
+            ? std::string("GET_BLOCK_CONTROL_RESPONSE")
+            : (packet.m_is_uint16_opcode
+                ? get_llp_header_name(packet.m_header)
+                : get_llp_header_name(static_cast<uint8_t>(packet.m_header)));
+
     // Log received packet for diagnostics with port information
     if (connection) {
         auto const& remote_ep = connection->remote_endpoint();
@@ -2224,10 +2232,10 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         // Use appropriate format based on opcode type
         if (packet.m_is_uint16_opcode) {
             m_logger->info("[Solo] RECEIVED PACKET: {} (0x{:04x})", 
-                get_llp_header_name(packet.m_header), packet.m_header);
+                packet_name, packet.m_header);
         } else {
             m_logger->info("[Solo] RECEIVED PACKET: {} (0x{:02x})", 
-                get_llp_header_name(static_cast<uint8_t>(packet.m_header)), 
+                packet_name,
                 static_cast<uint8_t>(packet.m_header));
         }
         m_logger->info("[Solo]   Length: {} bytes", packet.m_length);
@@ -2244,11 +2252,11 @@ void Solo::process_messages(Packet packet, std::shared_ptr<network::Connection> 
         m_logger->info("[Solo] ══════════════════════════════════════════════");
         if (packet.m_is_uint16_opcode) {
             m_logger->info("[Solo] RECEIVED PACKET: {} (0x{:04x}), length={}", 
-                get_llp_header_name(packet.m_header), packet.m_header,
+                packet_name, packet.m_header,
                 packet.m_length);
         } else {
             m_logger->info("[Solo] RECEIVED PACKET: {} (0x{:02x}), length={}", 
-                get_llp_header_name(static_cast<uint8_t>(packet.m_header)), 
+                packet_name,
                 static_cast<uint8_t>(packet.m_header), packet.m_length);
         }
         
@@ -2921,9 +2929,16 @@ void Solo::on_get_block_control(Packet const& packet,
     }
 
     m_pending_get_block.clear();
-    m_logger->warn("[Solo GET_BLOCK] Node returned {} (retry_after_ms={}); "
-                   "check system/get/info.mining_readiness on the node",
-                   control->reason_name(), control->retry_after_ms);
+    if (control->reason == GetBlockControlReason::TEMPLATE_NOT_READY) {
+        m_logger->warn("[Solo GET_BLOCK] Waiting for node mining readiness: TEMPLATE_NOT_READY "
+                      "(retry_after_ms={}); no submitted block was rejected. "
+                      "Check node GET_BLOCK readiness logs or system/get/info.mining_readiness",
+                      control->retry_after_ms);
+    } else {
+        m_logger->warn("[Solo GET_BLOCK] Node returned {} (retry_after_ms={}); "
+                      "check node GET_BLOCK logs",
+                      control->reason_name(), control->retry_after_ms);
+    }
     if (!control->retryable()) {
         cancel_get_block_control_retry();
         if (control->reason == GetBlockControlReason::SESSION_INVALID ||
