@@ -209,6 +209,12 @@ to issue mining templates. `BLOCK_REJECTED` with an eight-byte control payload
 is a GET_BLOCK response, not a rejected block submission. Older miners may
 report it as a malformed `d0 c9 00 00 00 08 01 04` packet and disconnect.
 Update the miner to handle the response and retry without closing the session.
+Current packet diagnostics label a valid eight-byte response
+`GET_BLOCK_CONTROL_RESPONSE`, retaining the actual wire opcode. A startup
+`TEMPLATE_NOT_READY` warning explicitly says that no submitted block was
+rejected. The miner retries after at least five seconds (or the node's longer
+hint) to stay within the node's rolling request budget; the first valid
+`BLOCK_DATA` is fed to workers and cancels the pending control retry.
 The miner keeps retrying while waiting for the node instead of entering a
 full-stop degraded mode. Workers remain idle when there is no valid template;
 the existing readiness and template validation checks are not bypassed.
@@ -224,6 +230,12 @@ requires two distinct supporting peers by default. `-miningminpeers=1` is an
 explicit reduction in safety evidence for an intentional single-peer setup,
 not a way to make an unsynchronized node ready. Do not bypass readiness merely
 to suppress the message.
+
+Current node GET_BLOCK logs expose the readiness reason, epoch, fresh/required
+peer counts, and local-bypass state at default verbosity. Repeated peer
+`Unavailable` or `Poll Error` disconnects are a node connectivity problem,
+not a miner decoding failure. A running local miner connection is not evidence
+that the node has synchronized with healthy public peers.
 
 ### "No work received"
 
