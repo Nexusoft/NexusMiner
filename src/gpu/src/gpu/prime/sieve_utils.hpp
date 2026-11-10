@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define NEXUSMINER_HOST_DEVICE __host__ __device__
 #else
 #define NEXUSMINER_HOST_DEVICE
