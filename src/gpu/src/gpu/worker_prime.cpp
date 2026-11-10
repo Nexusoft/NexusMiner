@@ -374,7 +374,8 @@ void Worker_prime::run()
 					// and avoids idling a worker that never submitted.
 					{
 						std::scoped_lock<std::mutex> lck(m_mtx);
-						m_template_consumed = true;
+						if (!m_new_work)
+							m_template_consumed = true;
 					}
 				}
 				else
