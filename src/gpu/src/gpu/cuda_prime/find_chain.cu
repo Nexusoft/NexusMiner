@@ -4,6 +4,7 @@
 #include "find_chain.cuh"
 #include "sieve_lookup_tables.cuh"
 #include "cuda_chain.cuh"
+#include "chain_slot.cuh"
 #include "mining/prime_thresholds.hpp"
 
 #include <stdio.h>
@@ -18,24 +19,6 @@ namespace nexusminer {
         __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset, int target_length);
         __device__  bool is_there_still_hope(CudaChain& chain);
         __device__  void get_best_fermat_chain(const CudaChain& chain, uint64_t& base_offset, int& offset, int& best_length);
-
-        // atomicInc(counter, capacity) returns `capacity` and stores 0 once the
-        // buffer is full.  Callers then write one past the allocation and the
-        // next claim overwrites slot 0.  Claim only an in-range slot.  A rejected
-        // claim is not a stored chain, so the counter is rolled back and the
-        // caller must not count it.
-        __device__ __forceinline__ bool claim_chain_slot(uint32_t* counter, uint32_t capacity, uint32_t& out_index)
-        {
-            const uint32_t idx = atomicAdd(counter, 1u);
-            if (idx >= capacity)
-            {
-                atomicSub(counter, 1u);
-                return false;
-            }
-            out_index = idx;
-            return true;
-        }
-
 
         //get the nth bit from the sieve.
         __device__ __forceinline__ bool get_bit(uint64_t bit_position, Cuda_sieve::sieve_word_t* sieve)

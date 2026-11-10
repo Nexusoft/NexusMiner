@@ -186,6 +186,12 @@ target_include_directories(gpu_sieve_region_offset_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_test(NAME gpu_sieve_region_offset_test COMMAND gpu_sieve_region_offset_test)
 
+add_executable(gpu_chain_slot_test chain_slot_test.cpp)
+target_include_directories(gpu_chain_slot_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(gpu_chain_slot_test PRIVATE Threads::Threads)
+add_test(NAME gpu_chain_slot_test COMMAND gpu_chain_slot_test)
+
 if(WITH_PRIME)
     add_executable(gpu_chain_test
         gpu_chain_test.cpp
