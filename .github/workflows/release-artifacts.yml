@@ -56,7 +56,7 @@ jobs:
             args+=(-DNEXUSMINER_STATIC_OPENSSL=ON
               "-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)"
               "-DGMP_INCLUDES=$(brew --prefix gmp)/include"
-              "-DGMP_LIBRARIES=$(brew --prefix gmp)/lib/libgmp.a")
+              "-DGMP_LIBRARIES=$(brew --prefix gmp)/lib/libgmp.dylib")
           fi
           cmake -S . -B build/release-artifacts -G Ninja "${args[@]}" 2>&1 | tee configure.log
           grep -q 'PRIME big integer backend:' configure.log
@@ -83,7 +83,16 @@ jobs:
           cp build/release-artifacts/_deps/primesieve-src/COPYING "dist/$name/third-party-licenses/primesieve.txt"
           if [[ "$RUNNER_OS" == macOS ]]; then
             cp "$(brew --prefix openssl@3)/LICENSE.txt" "dist/$name/third-party-licenses/openssl.txt"
-            cp "$(brew --prefix gmp)/share/doc/gmp/COPYING.LESSERv3" "dist/$name/third-party-licenses/gmp.txt"
+            curl -fsSL https://www.gnu.org/licenses/lgpl-3.0.txt > "dist/$name/third-party-licenses/gmp-lgpl-3.0.txt"
+            curl -fsSL https://www.gnu.org/licenses/gpl-3.0.txt > "dist/$name/third-party-licenses/gmp-gpl-3.0.txt"
+            gmp_path=$(otool -L "dist/$name/NexusMiner" | awk '/libgmp[.]/ {print $1; exit}')
+            test -n "$gmp_path"
+            cp -L "$gmp_path" "dist/$name/libgmp.dylib"
+            chmod u+w "dist/$name/NexusMiner"
+            install_name_tool -change "$gmp_path" '@executable_path/libgmp.dylib' "dist/$name/NexusMiner"
+            codesign --force --sign - "dist/$name/NexusMiner"
+            "dist/$name/NexusMiner" --version
+            otool -L "dist/$name/NexusMiner"
           fi
           git rev-parse HEAD > "dist/$name/SOURCE_COMMIT.txt"
           git -C build/release-artifacts/_deps/primesieve-src rev-parse HEAD > "dist/$name/PRIMESIEVE_COMMIT.txt"
@@ -113,6 +122,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/cache@v4
+        with:
+          path: vcpkg/installed
+          key: windows-2022-vcpkg-c4c072aa-x64-windows-openssl-gmp-boost
+      - name: Install release libraries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
           & "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe" install --triplet x64-windows openssl gmp boost-integer boost-multiprecision
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Configure
@@ -152,6 +169,9 @@ jobs:
           Copy-Item vcpkg/installed/x64-windows/share/openssl/copyright "dist\$name\third-party-licenses\openssl.txt"
           git rev-parse HEAD | Set-Content -Encoding ascii "dist\$name\SOURCE_COMMIT.txt"
           git -C build/windows-msvc/_deps/primesieve-src rev-parse HEAD | Set-Content -Encoding ascii "dist\$name\PRIMESIEVE_COMMIT.txt"
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $stagedVersion = (& "dist\$name\NexusMiner.exe" --version)
+          if ($LASTEXITCODE -ne 0 -or $stagedVersion -ne $version) { throw "Staged executable failed: $stagedVersion" }
           Compress-Archive -Path "dist\$name" -DestinationPath "dist\$name.zip"
           $hash = (Get-FileHash -Algorithm SHA256 "dist\$name.zip").Hash.ToLower()
           "$hash  $name.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt

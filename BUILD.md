@@ -209,7 +209,8 @@ Artifacts are not automatically published as a GitHub release.
 Linux binaries are built on Ubuntu 24.04 and require compatible glibc,
 libstdc++, OpenSSL 3, and GMP libraries. The NVIDIA build uses CUDA 12.8 and
 targets architectures 61, 75, 80, 86, 89 and 90; it requires a compatible
-NVIDIA GPU and driver. macOS CPU archives statically link GMP and OpenSSL.
+NVIDIA GPU and driver. macOS CPU archives include the GMP dynamic library and
+statically link OpenSSL.
 Windows CPU archives include the vcpkg runtime DLLs and require the MSVC
 runtime. Check the runner OS version and architecture before distributing
 each archive.
