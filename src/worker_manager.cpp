@@ -1911,11 +1911,21 @@ void Worker_manager::accept_solved_block(std::unique_ptr<Block_data> block_data)
 
 void Worker_manager::flush_pending_submit(const char* reason)
 {
+    // Flushes a worker-found solved block that may have been stashed while
+    // transport/session state was unstable. This routine is intentionally
+    // conservative: it only submits when all runtime gates are healthy, and it
+    // drops stale cached work to avoid emitting obsolete submissions.
+
+    // Preconditions: there must be a cached solved snapshot to submit.
+    // If none exists, or it has already been cleared, there is nothing to do.
     if (!m_pending_submit || !m_pending_submit->solved)
     {
         return;
     }
 
+    // Staleness guard: solved blocks buffered during outages are only valid for
+    // a bounded window. After TTL expiry we must discard to avoid submitting
+    // stale work against a newer chain/template state.
     const auto age_s = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - m_pending_submit->found_at).count();
     if (age_s > PENDING_SUBMIT_MAX_AGE_SECONDS)
