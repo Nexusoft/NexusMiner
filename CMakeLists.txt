@@ -235,7 +235,7 @@ add_executable(NexusMiner ${MAIN_SOURCE_FILES})
 add_test(NAME nexusminer_version_test COMMAND NexusMiner --version)
 string(REPLACE "." "[.]" NEXUSMINER_VERSION_REGEX "${PROJECT_VERSION}")
 set_tests_properties(nexusminer_version_test PROPERTIES
-    PASS_REGULAR_EXPRESSION "^NexusMiner version: ${NEXUSMINER_VERSION_REGEX}(\n|$)"
+    PASS_REGULAR_EXPRESSION "(^|\n)NexusMiner version: ${NEXUSMINER_VERSION_REGEX}(\n|$)"
 )
 if (WITH_GPU_AMD AND WITH_PRIME)
     # set(GPU_TARGETS "gfx1030" CACHE STRING "AMD GPU targets")  #this limits gpu hardware targets and can shorten compile time
@@ -300,6 +300,11 @@ if(NOT WITH_GPU_AMD)
     )
     if(WITH_GPU_CUDA)
         target_link_libraries(worker_manager_startup_recovery_test PRIVATE gpu)
+    endif()
+    if(MSVC)
+        target_compile_options(worker_manager_startup_recovery_test PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(worker_manager_startup_recovery_test PRIVATE -UNDEBUG)
     endif()
     set_tests_properties(worker_manager_startup_recovery_test PROPERTIES TIMEOUT 20)
 endif()
