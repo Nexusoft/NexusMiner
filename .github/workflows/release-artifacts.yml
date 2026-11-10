@@ -6,12 +6,17 @@ on:
     branches: [MINER]
     paths:
       - '.github/workflows/release-artifacts.yml'
+      - 'BUILD.md'
       - 'CMakeLists.txt'
       - 'CMakePresets.json'
+      - 'COPYING'
+      - 'README.md'
       - 'cmake/**'
       - 'src/**'
       - 'include/**'
       - 'configs/**'
+      - 'example.miner.config'
+      - 'third-party-licenses/**'
   push:
     tags: ['v*']
 
@@ -83,8 +88,8 @@ jobs:
           cp build/release-artifacts/_deps/primesieve-src/COPYING "dist/$name/third-party-licenses/primesieve.txt"
           if [[ "$RUNNER_OS" == macOS ]]; then
             cp "$(brew --prefix openssl@3)/LICENSE.txt" "dist/$name/third-party-licenses/openssl.txt"
-            curl -fsSL https://www.gnu.org/licenses/lgpl-3.0.txt > "dist/$name/third-party-licenses/gmp-lgpl-3.0.txt"
-            curl -fsSL https://www.gnu.org/licenses/gpl-3.0.txt > "dist/$name/third-party-licenses/gmp-gpl-3.0.txt"
+            cp third-party-licenses/LGPL-3.0.txt "dist/$name/third-party-licenses/gmp-lgpl-3.0.txt"
+            cp COPYING "dist/$name/third-party-licenses/gmp-gpl-3.0.txt"
             gmp_path=$(otool -L "dist/$name/NexusMiner" | awk '/libgmp[.]/ {print $1; exit}')
             test -n "$gmp_path"
             cp -L "$gmp_path" "dist/$name/libgmp.dylib"

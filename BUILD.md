@@ -24,11 +24,11 @@ sudo apt-get install -y libboost-all-dev libgmp-dev
 ### Windows
 
 * **OpenSSL**: Download and run [OpenSSL installer](https://slproweb.com/products/Win32OpenSSL.html)
-* **MPIR** (required for WITH_PRIME): Download and build from [http://www.mpir.org/](http://www.mpir.org/). Copy gmp*.lib and mpir.lib to NexusMiner/libs
+* **GMP or MPIR** (required for WITH_PRIME): Install GMP with vcpkg, or download and build [MPIR](http://www.mpir.org/). For MPIR, copy gmp*.lib and mpir.lib to NexusMiner/libs
 * **boost** (required for WITH_PRIME): Download from [https://www.boost.org/users/download/](https://www.boost.org/users/download/) and extract to C:\boost
 * **Visual Studio** or **MinGW** with CMake
 
-**Note:** Windows builds require MPIR instead of GMP for Prime mining. NOMINMAX and _CRT_SECURE_NO_WARNINGS are set automatically by the build system.
+**Note:** The release workflow uses vcpkg's GMP with MSVC. NOMINMAX and _CRT_SECURE_NO_WARNINGS are set automatically by the build system.
 
 ## Clone and Checkout
 
