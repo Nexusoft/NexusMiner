@@ -106,13 +106,23 @@ is not evidence that the TCP session is still alive.
 3. posts `transport_lost` unless `connect()` still owns the failure
 
 `Worker_manager` stops workers and force-reconnects. It does not consult the
-push-alive guard on that path. The template health monitor repeats the same
-recovery if the socket is down, because `get_active_protocol()` is null for the
-entire reconnect window and cannot be the only place stall detection runs.
+push-alive guard on that path. The transport-lost handler is registered from
+the first `connect()`, after shared ownership exists — a `weak_ptr` captured
+in the constructor is empty and would drop every notification. Duplicate
+notifications are ignored only while a retry timer or `connect()` attempt is
+actually outstanding. A socket that drops after the connect callback has
+completed, while the manager is still `RECONNECTING` and waiting for work,
+schedules a new reconnect immediately. The template health monitor repeats
+the same recovery if the socket is down and no retry is armed, because
+`get_active_protocol()` is null for the entire reconnect window and cannot be
+the only place stall detection runs.
 
-A solved block that could not be queued is stashed for up to 180 seconds and
-retried after the replacement session can build a payload. The retry is one
-shot; a moved tip is still the node's rejection to make.
+A solved block is snapshotted before the authentication and template gates.
+If the socket is already gone, that worker-owned snapshot is kept for up to
+180 seconds. Payload construction and transmission wait until the replacement
+session can build them. The retry is one shot. A tip that is already known to
+have moved is discarded locally; otherwise a moved tip is the node's rejection
+to make.
 
 ## Local recovery phases vs authoritative session truth
 

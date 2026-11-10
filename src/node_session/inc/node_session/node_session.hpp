@@ -197,6 +197,11 @@ public:
      */
     bool is_primary_connected() const;
 
+    /// True while connect() has stored a callback that has not yet completed.
+    /// A dropped socket during that window is delivered to the callback, not as
+    /// a second transport-lost notification.
+    bool has_pending_connect() const { return static_cast<bool>(m_pending_connect_callback); }
+
     /**
      * @brief Check if the secondary TCP connection is currently established
      * @return True if the secondary connection is up (may be authenticated or pending auth)

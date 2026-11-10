@@ -67,6 +67,32 @@ struct Worker_manager_recovery_test_access {
         manager.m_primary_endpoint = network::Endpoint{
             network::Transport_protocol::tcp, "127.0.0.1", 9323};
     }
+    static void ensure_transport_handler(Worker_manager& manager) {
+        manager.ensure_transport_lost_handler();
+    }
+    static void transport_lost(Worker_manager& manager, const char* reason) {
+        manager.handle_transport_lost(reason);
+    }
+    static bool retry_scheduled(const Worker_manager& manager) {
+        return manager.m_connection_retry_scheduled;
+    }
+    static void enter_reconnecting(Worker_manager& manager) {
+        manager.transition_to(RecoveryPhase::RECONNECTING, "review_comment_test");
+    }
+    static bool has_pending_submit(const Worker_manager& manager) {
+        return manager.m_pending_submit.has_value();
+    }
+    static uint32_t pending_height(const Worker_manager& manager) {
+        return manager.m_pending_submit && manager.m_pending_submit->solved
+            ? manager.m_pending_submit->solved->nHeight : 0;
+    }
+    static uint64_t pending_nonce(const Worker_manager& manager) {
+        return manager.m_pending_submit && manager.m_pending_submit->solved
+            ? manager.m_pending_submit->solved->nNonce : 0;
+    }
+    static void accept_solved(Worker_manager& manager, std::unique_ptr<Block_data> block) {
+        manager.accept_solved_block(std::move(block));
+    }
 };
 
 struct NodeSession_recovery_test_access {
@@ -76,6 +102,12 @@ struct NodeSession_recovery_test_access {
     }
     static void restore_template_handler(NodeSession& session) {
         session.set_template_handler(session.m_template_handler);
+    }
+    static bool has_transport_lost_handler(const NodeSession& session) {
+        return static_cast<bool>(session.m_transport_lost_handler);
+    }
+    static void drop_primary(NodeSession& session) {
+        session.mark_lane_socket_failed(NodeSession::LaneSlot::Primary);
     }
 };
 
@@ -269,4 +301,55 @@ int main()
     assert(Worker_manager_recovery_test_access::phase(*manager2) == RecoveryPhase::RECONNECTING);
     assert(Worker_manager_recovery_test_access::connection_retries(*manager2) == 0);
     manager2->stop();
+
+    // Review: transport-lost must be registered after shared ownership exists.
+    // A constructor-time weak_ptr stays empty, so the posted handler never reconnects.
+    auto io3 = std::make_shared<asio::io_context>();
+    auto manager3 = std::make_shared<Worker_manager>(
+        io3, config, std::make_shared<chrono::Timer_factory>(io3), nullptr);
+    auto session3 = Worker_manager_recovery_test_access::session(*manager3);
+    assert(!NodeSession_recovery_test_access::has_transport_lost_handler(*session3));
+    Worker_manager_recovery_test_access::ensure_transport_handler(*manager3);
+    assert(NodeSession_recovery_test_access::has_transport_lost_handler(*session3));
+    Worker_manager_recovery_test_access::set_endpoint(*manager3);
+    NodeSession_recovery_test_access::connect(*session3, std::make_shared<MockConnection>());
+    NodeSession_recovery_test_access::drop_primary(*session3);
+    io3->poll();
+    assert(Worker_manager_recovery_test_access::phase(*manager3) == RecoveryPhase::RECONNECTING);
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager3) == 1);
+    assert(Worker_manager_recovery_test_access::retry_scheduled(*manager3));
+    Worker_manager_recovery_test_access::transport_lost(*manager3, "primary_socket_closed");
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager3) == 1);
+    manager3->stop();
+
+    // Review: RECONNECTING after the connect callback is not itself an outstanding
+    // retry. A later socket loss must schedule a new reconnect.
+    auto io4 = std::make_shared<asio::io_context>();
+    auto manager4 = std::make_shared<Worker_manager>(
+        io4, config, std::make_shared<chrono::Timer_factory>(io4), nullptr);
+    Worker_manager_recovery_test_access::set_endpoint(*manager4);
+    Worker_manager_recovery_test_access::enter_reconnecting(*manager4);
+    assert(Worker_manager_recovery_test_access::phase(*manager4) == RecoveryPhase::RECONNECTING);
+    assert(!Worker_manager_recovery_test_access::retry_scheduled(*manager4));
+    Worker_manager_recovery_test_access::transport_lost(*manager4, "primary_socket_closed");
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager4) == 1);
+    assert(Worker_manager_recovery_test_access::retry_scheduled(*manager4));
+    Worker_manager_recovery_test_access::transport_lost(*manager4, "primary_socket_closed");
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager4) == 1);
+    manager4->stop();
+
+    // Review: a solved block that arrives after the session is gone must be
+    // retained, not dropped at the authentication guard.
+    auto io5 = std::make_shared<asio::io_context>();
+    auto manager5 = std::make_shared<Worker_manager>(
+        io5, config, std::make_shared<chrono::Timer_factory>(io5), nullptr);
+    auto solved = std::make_unique<Block_data>();
+    solved->nHeight = 424242;
+    solved->nNonce = 0xabcdu;
+    solved->nChannel = 2;
+    Worker_manager_recovery_test_access::accept_solved(*manager5, std::move(solved));
+    assert(Worker_manager_recovery_test_access::has_pending_submit(*manager5));
+    assert(Worker_manager_recovery_test_access::pending_height(*manager5) == 424242);
+    assert(Worker_manager_recovery_test_access::pending_nonce(*manager5) == 0xabcdu);
+    manager5->stop();
 }

@@ -1,4 +1,5 @@
 #include "worker_manager.hpp"
+#include "worker/worker.hpp"
 #include "worker/template_feed.hpp"
 #include "worker/node_shutdown_policy.hpp"
 #include "colin_agent.hpp"
@@ -364,150 +365,10 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                     m_logger->info("   Nonce:      0x{:016x}", block_data->nNonce);
                     m_logger->info("════════════════════════════════════════════════════════");
 
-                    if (!m_primary_node_session || !m_primary_node_session->is_authenticated())
-                    {
-                        m_logger->error("[Worker_manager] No authenticated session. Can't submit block.");
-                        return;
-                    }
-
-                    // Get the mining template interface to prepare full block submission
-                    auto solo_protocol = m_primary_node_session->get_primary_protocol();
-                    if (!solo_protocol)
-                    {
-                        m_logger->error("[Worker_manager] Failed to get protocol from NodeSession");
-                        return;
-                    }
-
-                    auto* template_interface = solo_protocol->get_template_interface();
-                    if (!template_interface)
-                    {
-                        m_logger->error("[Worker_manager] Template interface not available");
-                        return;
-                    }
-
-                    // ✅ Final validity gate before submission (Template Staleness Prevention)
-                    // Use HeightTracker snapshot as single source of truth.
-                    //
-                    // Authority: the only thing that makes a solution structurally invalid at
-                    // submit time is hashPrevBlock no longer matching the node's tip
-                    // (node-side Guard 2: pBlock->hashPrevBlock == hashBestChain).  The
-                    // worker-snapshot Block_data carries the exact previous_hash the worker
-                    // proved against; the canonical HeightTracker exposes the current tip
-                    // anchor as snap.hash_prev_block (updated only by BLOCK_DATA receipt).
-                    //
-                    // Mismatch → tip moved out from under us, discard + soft-refresh.
-                    // Match → submit, regardless of template age.  At low-rate / solo mining
-                    // a valid template can legitimately sit for >600s on a quiet channel
-                    // without losing validity, so the prior 600s wall-clock gate
-                    // (is_template_age_stale) silently dropped otherwise-valid solutions.
-                    //
-                    // Liveness of the push pipe is now reported as a warn-only diagnostic
-                    // (template_age) instead of being conflated with submit-time validity.
-                    auto ht_snap = solo_protocol->get_height_tracker_snapshot();
-                    uint64_t template_age = ht_snap.get_template_age_seconds();
-
-                    const bool tip_known = (ht_snap.hash_prev_block != uint1024_t(0));
-                    const bool prev_hash_mismatch =
-                        tip_known && (block_data->previous_hash != ht_snap.hash_prev_block);
-
-                    if (prev_hash_mismatch)
-                    {
-                        const char* soft_refresh_reason = "submit_side_prev_hash_mismatch";
-                        m_logger->error("[Worker_manager] ❌ Solution found but tip has moved — hashPrevBlock mismatch (age: {}s)",
-                                       template_age);
-                        m_logger->error("[Worker_manager]    solved_prev={}... canonical_tip={}...",
-                                       block_data->previous_hash.SubString(),
-                                       ht_snap.hash_prev_block.SubString());
-                        m_logger->error("[Worker_manager]    Discarding stale solution (node would reject as 'stale block')");
-                        mark_soft_refresh_requested(soft_refresh_reason);
-                        template_interface->discard_template("hashPrevBlock no longer matches canonical tip");
-
-                        // Request fresh work/GET_BLOCK via NodeSession
-                        m_logger->info("[Worker_manager] Requesting fresh work/GET_BLOCK via NodeSession");
-                        auto work_payload = m_primary_node_session->request_work(protocol::GetBlockReason::HEALTH_CHANNEL_STALE);
-                        if (work_payload && !work_payload->empty()) {
-                            if (m_primary_node_session->transmit(work_payload)) {
-                                auto proto = m_primary_node_session->get_active_protocol();
-                                if (proto) proto->mark_get_block_pending(protocol::GetBlockReason::HEALTH_CHANNEL_STALE);
-                            }
-                        }
-                        return;
-                    }
-
-                    // Warn-only age diagnostic: an old-but-still-valid template means push
-                    // pipe may be quiet (chain has not advanced).  Surface it without
-                    // dropping the solution — node-side Guard 2 is the canonical authority.
-                    //
-                    // Two thresholds (defined in height_tracker.hpp):
-                    //   is_template_age_old()    > 300s — proactive warning (info)
-                    //   is_template_age_stale()  > 600s — push-pipe-likely-dead (warn)
-                    // Neither blocks submission anymore; both are reported for operator
-                    // visibility into push-pipe health on quiet channels.
-                    if (ht_snap.is_template_age_stale()) {
-                        m_logger->warn("[Worker_manager] ⚠️  Submitting solution on aged template ({}s > 600s) — "
-                                       "hashPrevBlock still matches tip; push pipe may be quiet",
-                                       template_age);
-                    } else if (ht_snap.is_template_age_old()) {
-                        m_logger->info("[Worker_manager] Submitting solution on aged template ({}s) — "
-                                       "hashPrevBlock still matches tip",
-                                       template_age);
-                    }
-
-                    m_logger->info("[Worker_manager] 💎 Solution found! Age: {}s, hashPrevBlock matches canonical tip ✅ - SUBMITTING", template_age);
-
-                    // Gap 2: Log hashPrevBlock before submission (SUBMIT AUDIT).
-                    // Cross-reference: node Guard 2 checks pBlock->hashPrevBlock == hashBestChain.
-                    // If node rejects "stale block", compare this log against node's hashBestChain.
-                    {
-                        auto const* submit_tmpl = template_interface->get_current_template();
-                        if (submit_tmpl) {
-                            auto prev_bytes = submit_tmpl->block.hashPrevBlock.GetBytes();
-                            std::string prev_hex;
-                            for (size_t i = 0; i < std::min(prev_bytes.size(), size_t(8)); ++i) {
-                                char buf[3];
-                                snprintf(buf, sizeof(buf), "%02x", prev_bytes[i]);
-                                prev_hex += buf;
-                            }
-                            m_logger->info("[SUBMIT AUDIT]   block.hashPrevBlock = {}... (tip anchor — node Guard 2 will verify this == hashBestChain)", prev_hex);
-                        }
-                    }
-
-                    // Prepare the canonical submit bytes from the worker-owned snapshot.
-                    // Flow ownership matters here:
-                    //   worker -> Block_data snapshot -> worker_manager ->
-                    //   prepare_block_submission_from_solved(...) -> Solo::submit_block()
-                    //
-                    // The worker snapshot is the exact header the worker proved.  We must
-                    // not rebuild it from m_current_template here because a concurrent
-                    // BLOCK_DATA push can advance height / prevhash after the worker found
-                    // the solution but before the submit path runs.
-                    //
-                    // Prime channel keeps one extra tail: the worker-computed vOffsets.
-                    // Those bytes are appended after the 216-byte Tritium block body so
-                    // the node can validate the prime cluster against the same snapshot.
-                    m_logger->info("[Worker_manager] Preparing full block submission");
-                    m_logger->info("[Worker_manager]   Height: {}", block_data->nHeight);
-                    m_logger->info("[Worker_manager]   Nonce:  0x{:016x}", block_data->nNonce);
-                    if (!block_data->vOffsets.empty())
-                        m_logger->info("[Worker_manager]   vOffsets: {} bytes (Prime channel)",
-                                       block_data->vOffsets.size());
-
-                    auto full_block_bytes = (block_data->nChannel == 1 && !block_data->vOffsets.empty())
-                        ? template_interface->prepare_block_submission_from_solved(*block_data, block_data->vOffsets)
-                        : template_interface->prepare_block_submission_from_solved(*block_data);
-
-                    if (full_block_bytes.empty())
-                    {
-                        m_logger->error("[Worker_manager] Failed to prepare block submission - empty payload");
-                        m_logger->error("[Worker_manager]   This indicates template or block data is invalid");
-                        return;
-                    }
-
-                    m_logger->info("[Worker_manager] Full block serialized: {} bytes", full_block_bytes.size());
-                    m_logger->info("[Worker_manager] Submitting block to protocol layer...");
-
-                    // Submit the full block via NodeSession
-                    submit_solution(full_block_bytes, block_data->nNonce);
+                    // Snapshot is retained before auth/template gates. A socket
+                    // drop ends the session before this callback runs, so returning
+                    // here used to discard the only copy of the solved header.
+                    accept_solved_block(std::move(block_data));
                 };
 
                 // Stone 4: publish a single TemplateEpoch into the shared feed.
@@ -796,17 +657,8 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
         );
         m_logger->info("[Worker_manager] Session expired handler registered");
 
-        // Established socket loss is not SESSION_EXPIRED: the node is gone, so
-        // in-band re-auth cannot run. NodeSession posts this off the receive
-        // stack. weak_from_this() keeps a queued event safe if stop() wins the race.
-        m_primary_node_session->set_transport_lost_handler([weak_self = weak_from_this()]() {
-            auto self = weak_self.lock();
-            if (!self) {
-                return;
-            }
-            self->handle_transport_lost("primary_socket_closed");
-        });
-        m_logger->info("[Worker_manager] Transport-lost handler registered");
+        // Transport-lost is registered from connect(), not here. weak_from_this()
+        // is empty until the owning shared_ptr finishes constructing this object.
 
         /* ========== REGISTER RECOVERY-CONFIRMED HANDLER ========== */
         /* Called by Solo when the node re-serves BLOCK_DATA identical to the template   */
@@ -1288,6 +1140,7 @@ void Worker_manager::create_workers()
 void Worker_manager::stop()
 {
     m_terminal_stop_requested.store(true, std::memory_order_release);
+    m_connection_retry_scheduled = false;
     m_timer_manager.stop();
     if (m_session_auth_retry_timer) {
         m_session_auth_retry_timer->cancel();
@@ -1402,8 +1255,8 @@ void Worker_manager::handle_node_shutdown(uint8_t reason)
         transition_to(RecoveryPhase::RECONNECTING, "node_shutdown_retry_primary");
         m_logger->warn("[Worker_manager] NODE_SHUTDOWN: no failover configured; retrying primary in {}s",
                        protocol::Solo::NODE_SHUTDOWN_BACKOFF_S);
-        m_timer_manager.start_connection_retry_timer(
-            protocol::Solo::NODE_SHUTDOWN_BACKOFF_S, shared_from_this(), m_primary_endpoint);
+        schedule_connection_retry(
+            static_cast<std::uint16_t>(protocol::Solo::NODE_SHUTDOWN_BACKOFF_S), m_primary_endpoint);
         return;
     }
 
@@ -1451,7 +1304,7 @@ void Worker_manager::handle_node_shutdown(uint8_t reason)
     m_sim_link.set_failover_active(m_using_failover, standby_endpoint.to_string());
 
     m_logger->warn("[Worker_manager] NODE_SHUTDOWN standby reconnect scheduled immediately");
-    m_timer_manager.start_connection_retry_timer(0, shared_from_this(), standby_endpoint);
+    schedule_connection_retry(0, standby_endpoint);
 }
 
 uint16_t Worker_manager::get_effective_keepalive_interval() const
@@ -1623,7 +1476,7 @@ void Worker_manager::retry_connect(network::Endpoint const& wallet_endpoint, boo
         m_logger->info("Connection retry {} seconds (attempt #{})",
                        current_delay, m_connection_retry_count);
 
-    m_timer_manager.start_connection_retry_timer(current_delay, shared_from_this(), effective_endpoint);
+    schedule_connection_retry(static_cast<std::uint16_t>(current_delay), effective_endpoint);
 }
 
 Worker_manager::FailoverStatus Worker_manager::get_failover_status() const
@@ -1744,6 +1597,14 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
     m_logger->info("[Solo] Connecting to wallet {}:{}", wallet_addr, configured_port);
     m_logger->info("[Solo] Port Configuration: Using port {} from miner.conf", configured_port);
     m_logger->debug("[Solo] Connection initiated to endpoint: {}", wallet_endpoint.to_string());
+
+    // Register only after shared ownership exists. Doing this in the constructor
+    // captures an empty weak_from_this(), so every later notification no-ops.
+    ensure_transport_lost_handler();
+
+    // The retry timer has fired (or this is the initial connect). The in-flight
+    // attempt is now NodeSession's pending connect callback, not the timer.
+    m_connection_retry_scheduled = false;
 
     // Use NodeSession to connect on the configured lane; no cross-lane fallback.
     std::weak_ptr<Worker_manager> weak_self = shared_from_this();
@@ -1998,9 +1859,59 @@ bool Worker_manager::transmit_prepared_solution(const std::vector<uint8_t>& full
     return true;
 }
 
+void Worker_manager::schedule_connection_retry(std::uint16_t delay_seconds,
+                                               network::Endpoint const& endpoint)
+{
+    m_connection_retry_scheduled = true;
+    m_timer_manager.start_connection_retry_timer(delay_seconds, shared_from_this(), endpoint);
+}
+
+void Worker_manager::ensure_transport_lost_handler()
+{
+    if (!m_primary_node_session) {
+        return;
+    }
+
+    // Captured here, after std::make_shared has attached enable_shared_from_this.
+    // The constructor runs before that attachment, so a weak_ptr taken there
+    // stays empty and every notification returns without reconnecting.
+    m_primary_node_session->set_transport_lost_handler([weak_self = weak_from_this()]() {
+        auto self = weak_self.lock();
+        if (!self) {
+            return;
+        }
+        self->handle_transport_lost("primary_socket_closed");
+    });
+    m_logger->info("[Worker_manager] Transport-lost handler registered");
+}
+
+bool Worker_manager::transport_recovery_outstanding() const
+{
+    return m_connection_retry_scheduled ||
+           (m_primary_node_session && m_primary_node_session->has_pending_connect());
+}
+
+void Worker_manager::accept_solved_block(std::unique_ptr<Block_data> block_data)
+{
+    if (!block_data) {
+        m_logger->error("[Worker_manager] Solved-block callback had no block data");
+        return;
+    }
+
+    // Preserve the worker-owned snapshot before authentication or template gates.
+    // mark_lane_socket_failed() ends the session immediately, so a callback that
+    // arrives after the drop never reaches payload construction. Session-dependent
+    // work is deferred to flush_pending_submit().
+    m_pending_submit = PendingSubmit{
+        std::shared_ptr<Block_data>(std::move(block_data)),
+        std::chrono::steady_clock::now()
+    };
+    flush_pending_submit("block_found");
+}
+
 void Worker_manager::flush_pending_submit(const char* reason)
 {
-    if (!m_pending_submit)
+    if (!m_pending_submit || !m_pending_submit->solved)
     {
         return;
     }
@@ -2016,41 +1927,102 @@ void Worker_manager::flush_pending_submit(const char* reason)
         return;
     }
 
+    const auto solved = m_pending_submit->solved;
+    const char* why = reason ? reason : "recovery";
+
     if (!m_primary_node_session ||
         !m_primary_node_session->is_primary_connected() ||
         !m_primary_node_session->is_authenticated())
     {
+        m_logger->error("[Worker_manager] No authenticated session. Solved block retained for recovery "
+                        "(height={} nonce=0x{:016x}, reason={})",
+                        solved->nHeight, solved->nNonce, why);
         return;
     }
 
-    const auto pending = *m_pending_submit;
-    if (!transmit_prepared_solution(pending.block_bytes, pending.nonce))
+    auto solo_protocol = m_primary_node_session->get_primary_protocol();
+    if (!solo_protocol)
+    {
+        m_logger->error("[Worker_manager] Failed to get protocol from NodeSession — solved block retained");
+        return;
+    }
+
+    auto* template_interface = solo_protocol->get_template_interface();
+    if (!template_interface)
+    {
+        m_logger->error("[Worker_manager] Template interface not available — solved block retained");
+        return;
+    }
+
+    auto ht_snap = solo_protocol->get_height_tracker_snapshot();
+    uint64_t template_age = ht_snap.get_template_age_seconds();
+    const bool tip_known = (ht_snap.hash_prev_block != uint1024_t(0));
+    const bool prev_hash_mismatch =
+        tip_known && (solved->previous_hash != ht_snap.hash_prev_block);
+
+    if (prev_hash_mismatch)
+    {
+        const char* soft_refresh_reason = "submit_side_prev_hash_mismatch";
+        m_logger->error("[Worker_manager] ❌ Solution found but tip has moved — hashPrevBlock mismatch (age: {}s)",
+                       template_age);
+        m_logger->error("[Worker_manager]    solved_prev={}... canonical_tip={}...",
+                       solved->previous_hash.SubString(),
+                       ht_snap.hash_prev_block.SubString());
+        m_logger->error("[Worker_manager]    Discarding stale solution (node would reject as 'stale block')");
+        m_pending_submit.reset();
+        mark_soft_refresh_requested(soft_refresh_reason);
+        template_interface->discard_template("hashPrevBlock no longer matches canonical tip");
+
+        m_logger->info("[Worker_manager] Requesting fresh work/GET_BLOCK via NodeSession");
+        auto work_payload = m_primary_node_session->request_work(protocol::GetBlockReason::HEALTH_CHANNEL_STALE);
+        if (work_payload && !work_payload->empty()) {
+            if (m_primary_node_session->transmit(work_payload)) {
+                auto proto = m_primary_node_session->get_active_protocol();
+                if (proto) proto->mark_get_block_pending(protocol::GetBlockReason::HEALTH_CHANNEL_STALE);
+            }
+        }
+        return;
+    }
+
+    if (ht_snap.is_template_age_stale()) {
+        m_logger->warn("[Worker_manager] ⚠️  Submitting solution on aged template ({}s > 600s) — "
+                       "hashPrevBlock still matches tip; push pipe may be quiet",
+                       template_age);
+    } else if (ht_snap.is_template_age_old()) {
+        m_logger->info("[Worker_manager] Submitting solution on aged template ({}s) — "
+                       "hashPrevBlock still matches tip",
+                       template_age);
+    }
+
+    m_logger->info("[Worker_manager] 💎 Solution found! Age: {}s, hashPrevBlock matches canonical tip ✅ - SUBMITTING", template_age);
+    m_logger->info("[Worker_manager] Preparing full block submission ({})", why);
+    m_logger->info("[Worker_manager]   Height: {}", solved->nHeight);
+    m_logger->info("[Worker_manager]   Nonce:  0x{:016x}", solved->nNonce);
+    if (!solved->vOffsets.empty())
+        m_logger->info("[Worker_manager]   vOffsets: {} bytes (Prime channel)",
+                       solved->vOffsets.size());
+
+    auto full_block_bytes = (solved->nChannel == 1 && !solved->vOffsets.empty())
+        ? template_interface->prepare_block_submission_from_solved(*solved, solved->vOffsets)
+        : template_interface->prepare_block_submission_from_solved(*solved);
+
+    if (full_block_bytes.empty())
+    {
+        m_logger->error("[Worker_manager] Failed to prepare block submission — solved block retained "
+                        "until a template can build the payload");
+        return;
+    }
+
+    m_logger->info("[Worker_manager] Full block serialized: {} bytes", full_block_bytes.size());
+    if (!transmit_prepared_solution(full_block_bytes, solved->nNonce))
     {
         m_logger->warn("[Worker_manager] Solved block still queued after {} (age {}s)",
-                       reason ? reason : "recovery", age_s);
+                       why, age_s);
         return;
     }
 
-    m_logger->info("[Worker_manager] Retried solved block after transport recovery ({}, age {}s)",
-                   reason ? reason : "recovery", age_s);
+    m_logger->info("[Worker_manager] Submitted solved block ({}, age {}s)", why, age_s);
     m_pending_submit.reset();
-}
-
-void Worker_manager::submit_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce)
-{
-    if (transmit_prepared_solution(full_block_bytes, nNonce))
-    {
-        m_pending_submit.reset();
-        return;
-    }
-
-    m_pending_submit = PendingSubmit{
-        full_block_bytes,
-        nNonce,
-        std::chrono::steady_clock::now()
-    };
-    m_logger->error("[Worker_manager] Block submission not queued — stashing solved block "
-                    "for one retry after the session is usable again");
 }
 
 void Worker_manager::handle_transport_lost(const char* reason)
@@ -2059,9 +2031,12 @@ void Worker_manager::handle_transport_lost(const char* reason)
     {
         return;
     }
-    if (is_reconnecting())
+    // RECONNECTING covers the whole recovery phase, including the window after
+    // the connect callback has completed and before work is ready. Ignore a
+    // duplicate only when a retry timer or connect attempt is actually outstanding.
+    if (transport_recovery_outstanding())
     {
-        m_logger->debug("[Worker_manager] Transport lost ({}) ignored — reconnect already in progress",
+        m_logger->debug("[Worker_manager] Transport lost ({}) ignored — reconnect already scheduled",
                         reason ? reason : "unknown");
         return;
     }
@@ -3007,12 +2982,30 @@ void Worker_manager::check_template_health()
         // that may have a scheduled attempt at 60-65s.
         constexpr int64_t MAX_RECONNECT_WAIT_SECONDS = 90;
         if (reconnect_age_s <= MAX_RECONNECT_WAIT_SECONDS) {
+            // A replacement socket can die after the connect callback returns,
+            // while this phase is still RECONNECTING and no retry is armed.
+            // Do not wait out the stall guard for that loss.
+            if (!m_primary_node_session->is_primary_connected() &&
+                !transport_recovery_outstanding()) {
+                m_logger->warn("[Worker_manager] Primary socket down during RECONNECTING with no "
+                               "retry scheduled — forcing TCP reconnect");
+                handle_transport_lost("health_primary_disconnected");
+            }
             return;
         }
         if (!m_primary_node_session->is_primary_connected()) {
+            if (m_primary_node_session->has_pending_connect()) {
+                m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s but connect() "
+                               "is still in flight — not starting a second attempt",
+                               reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
+                return;
+            }
             m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s with no socket — "
                            "forcing a fresh TCP reconnect",
                            reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
+            // The armed timer did not restore the socket. Clear it so the forced
+            // reconnect is not treated as a duplicate of that stale schedule.
+            m_connection_retry_scheduled = false;
             transition_to(RecoveryPhase::WAITING_TEMPLATE, "reconnect_timeout");
             handle_transport_lost("reconnect_stall");
             return;
