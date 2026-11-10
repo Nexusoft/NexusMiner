@@ -129,6 +129,9 @@ endif()
 
 #GPU
 if(WITH_GPU_CUDA)
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES "61;75;80;86;89;90" CACHE STRING "CUDA target architectures")
+    endif()
     include(CheckLanguage)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)

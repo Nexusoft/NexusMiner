@@ -62,10 +62,10 @@ than driver-bundling metapackages if the machine has no GPU.
 
 On a GPU-less NVIDIA build host, specify an architecture at configure time so
 CMake does not need to detect a GPU, for example
-`-DCMAKE_CUDA_ARCHITECTURES=75`. The `gpu` target currently builds for CUDA
-architectures 61, 75, 80, 86, 89 and 90 regardless of that setting, so the
-installed CUDA toolkit must support all of them. AMD builds may likewise need
-an explicit target architecture supported by the installed ROCm compiler.
+`-DCMAKE_CUDA_ARCHITECTURES=75`. The default CUDA architecture list is 61, 75,
+80, 86, 89 and 90; the installed toolkit must support every selected target.
+All CUDA targets, including the final device link, use the configured list.
+AMD builds may likewise need an explicit target architecture supported by the installed ROCm compiler.
 AMD Prime support remains experimental; AMD hash mining is not supported.
 
 Compilation and host-only tests do **not** demonstrate GPU mining works. To

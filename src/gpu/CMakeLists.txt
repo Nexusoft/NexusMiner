@@ -14,7 +14,6 @@ if (WITH_GPU_CUDA)
     endif()
 
     set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    set_property(TARGET gpu PROPERTY CUDA_ARCHITECTURES 61 75 80 86 89 90)
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info")
     include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
     include_directories(${CUDA_HOME}/samples/common/inc/)
