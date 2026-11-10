@@ -1149,6 +1149,7 @@ void Worker_manager::stop()
     // Destroy workers before tearing down transport so worker-side submit/request
     // callbacks cannot race a closing session or cleared connection state.
     stop_all_workers();
+    clear_pending_submit();
 
     if (m_colin_agent)
     {
@@ -1394,6 +1395,7 @@ void Worker_manager::retry_connect(network::Endpoint const& wallet_endpoint, boo
     // prevents session_expired from re-entering during TCP reconnect window.
     ++m_session_generation;  // TCP disconnect — invalidate stale timer dispatches
     transition_to(RecoveryPhase::RECONNECTING, "tcp_reconnect");
+    m_recovery.reconnect_started_at = std::chrono::steady_clock::now();
 
     // Reset NodeSession for reconnection
     if (m_primary_node_session) {
@@ -1608,9 +1610,17 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 
     // Use NodeSession to connect on the configured lane; no cross-lane fallback.
     std::weak_ptr<Worker_manager> weak_self = shared_from_this();
-    return m_primary_node_session->connect(wallet_endpoint, [weak_self, wallet_endpoint](bool success) {
+    const auto generation = m_session_generation.load(std::memory_order_acquire);
+    return m_primary_node_session->connect(wallet_endpoint, [weak_self, wallet_endpoint, generation](bool success) {
         auto self = weak_self.lock();
         if (!self) return;
+        // reset() completes the old connect callback synchronously. A forced
+        // retry already owns recovery, so it must not schedule a second retry.
+        if (self->m_terminal_stop_requested.load(std::memory_order_acquire) ||
+            self->m_session_generation.load(std::memory_order_acquire) != generation) {
+            self->m_logger->debug("[Worker_manager] Ignoring superseded connect callback");
+            return;
+        }
 
         if (!success) {
             self->m_logger->error("[Solo] Connection to wallet {} not successful", wallet_endpoint.to_string());
@@ -1897,6 +1907,10 @@ void Worker_manager::accept_solved_block(std::unique_ptr<Block_data> block_data)
         m_logger->error("[Worker_manager] Solved-block callback had no block data");
         return;
     }
+    if (m_terminal_stop_requested.load(std::memory_order_acquire)) {
+        m_logger->warn("[Worker_manager] Solved block ignored after terminal stop");
+        return;
+    }
 
     // Preserve the worker-owned snapshot before authentication or template gates.
     // mark_lane_socket_failed() ends the session immediately, so a callback that
@@ -1906,7 +1920,38 @@ void Worker_manager::accept_solved_block(std::unique_ptr<Block_data> block_data)
         std::shared_ptr<Block_data>(std::move(block_data)),
         std::chrono::steady_clock::now()
     };
+    schedule_pending_submit_expiry();
     flush_pending_submit("block_found");
+}
+
+void Worker_manager::schedule_pending_submit_expiry()
+{
+    if (m_pending_submit_expiry_timer) {
+        m_pending_submit_expiry_timer->cancel();
+    }
+    auto timer = std::make_shared<asio::steady_timer>(
+        *m_io_context, m_pending_submit->found_at + std::chrono::seconds(PENDING_SUBMIT_MAX_AGE_SECONDS));
+    m_pending_submit_expiry_timer = timer;
+    timer->async_wait([weak_self = weak_from_this(), timer](const asio::error_code& ec) {
+        if (ec == asio::error::operation_aborted) return;
+        auto self = weak_self.lock();
+        // A replaced snapshot may have an old timer callback already queued.
+        if (!self || self->m_pending_submit_expiry_timer != timer) return;
+        if (ec) {
+            self->m_logger->error("[Worker_manager] Solved-block expiry timer failed: {}", ec.message());
+            return;
+        }
+        self->flush_pending_submit("expiry_timer");
+    });
+}
+
+void Worker_manager::clear_pending_submit()
+{
+    m_pending_submit.reset();
+    if (m_pending_submit_expiry_timer) {
+        m_pending_submit_expiry_timer->cancel();
+        m_pending_submit_expiry_timer.reset();
+    }
 }
 
 void Worker_manager::flush_pending_submit(const char* reason)
@@ -1926,14 +1971,15 @@ void Worker_manager::flush_pending_submit(const char* reason)
     // Staleness guard: solved blocks buffered during outages are only valid for
     // a bounded window. After TTL expiry we must discard to avoid submitting
     // stale work against a newer chain/template state.
+    const auto now = std::chrono::steady_clock::now();
     const auto age_s = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - m_pending_submit->found_at).count();
-    if (age_s > PENDING_SUBMIT_MAX_AGE_SECONDS)
+        now - m_pending_submit->found_at).count();
+    if (now >= m_pending_submit->found_at + std::chrono::seconds(PENDING_SUBMIT_MAX_AGE_SECONDS))
     {
         m_logger->error("[Worker_manager] Dropping solved block stashed during transport loss "
-                        "(age {}s > {}s)",
+                        "(age {}s >= {}s)",
                         age_s, PENDING_SUBMIT_MAX_AGE_SECONDS);
-        m_pending_submit.reset();
+        clear_pending_submit();
         return;
     }
 
@@ -1979,7 +2025,7 @@ void Worker_manager::flush_pending_submit(const char* reason)
                        solved->previous_hash.SubString(),
                        ht_snap.hash_prev_block.SubString());
         m_logger->error("[Worker_manager]    Discarding stale solution (node would reject as 'stale block')");
-        m_pending_submit.reset();
+        clear_pending_submit();
         mark_soft_refresh_requested(soft_refresh_reason);
         template_interface->discard_template("hashPrevBlock no longer matches canonical tip");
 
@@ -2032,7 +2078,7 @@ void Worker_manager::flush_pending_submit(const char* reason)
     }
 
     m_logger->info("[Worker_manager] Submitted solved block ({}, age {}s)", why, age_s);
-    m_pending_submit.reset();
+    clear_pending_submit();
 }
 
 void Worker_manager::handle_transport_lost(const char* reason)
@@ -3003,21 +3049,14 @@ void Worker_manager::check_template_health()
             }
             return;
         }
-        if (!m_primary_node_session->is_primary_connected()) {
-            if (m_primary_node_session->has_pending_connect()) {
-                m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s but connect() "
-                               "is still in flight — not starting a second attempt",
-                               reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
-                return;
-            }
-            m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s with no socket — "
-                           "forcing a fresh TCP reconnect",
+        if (!m_primary_node_session->is_primary_connected() ||
+            m_primary_node_session->has_pending_connect()) {
+            m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s — "
+                           "resetting the timed-out transport and scheduling a fresh TCP reconnect",
                            reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
-            // The armed timer did not restore the socket. Clear it so the forced
-            // reconnect is not treated as a duplicate of that stale schedule.
-            m_connection_retry_scheduled = false;
-            transition_to(RecoveryPhase::WAITING_TEMPLATE, "reconnect_timeout");
-            handle_transport_lost("reconnect_stall");
+            stop_all_workers();
+            m_pending_recovery_completion_kind = RecoveryCompletionKind::TRANSPORT_RECONNECT;
+            retry_connect(m_primary_endpoint, true);
             return;
         }
         // The socket came back. Leave RECONNECTING so the template ladder below

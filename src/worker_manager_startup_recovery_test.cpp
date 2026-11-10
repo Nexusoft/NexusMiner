@@ -79,6 +79,10 @@ struct Worker_manager_recovery_test_access {
     static void enter_reconnecting(Worker_manager& manager) {
         manager.transition_to(RecoveryPhase::RECONNECTING, "review_comment_test");
     }
+    static void age_reconnect(Worker_manager& manager,
+                              std::chrono::seconds age = std::chrono::seconds(91)) {
+        manager.m_recovery.reconnect_started_at = std::chrono::steady_clock::now() - age;
+    }
     static bool has_pending_submit(const Worker_manager& manager) {
         return manager.m_pending_submit.has_value();
     }
@@ -92,6 +96,23 @@ struct Worker_manager_recovery_test_access {
     }
     static void accept_solved(Worker_manager& manager, std::unique_ptr<Block_data> block) {
         manager.accept_solved_block(std::move(block));
+    }
+    static bool has_pending_submit_timer(const Worker_manager& manager) {
+        return static_cast<bool>(manager.m_pending_submit_expiry_timer);
+    }
+    static std::chrono::steady_clock::duration pending_submit_ttl(const Worker_manager& manager) {
+        return manager.m_pending_submit_expiry_timer->expiry() - manager.m_pending_submit->found_at;
+    }
+    static std::weak_ptr<Block_data> pending_snapshot(const Worker_manager& manager) {
+        return manager.m_pending_submit->solved;
+    }
+    static void set_pending_time_remaining(Worker_manager& manager, std::chrono::milliseconds remaining) {
+        manager.m_pending_submit->found_at = std::chrono::steady_clock::now() -
+            std::chrono::seconds(Worker_manager::PENDING_SUBMIT_MAX_AGE_SECONDS) + remaining;
+        manager.schedule_pending_submit_expiry();
+    }
+    static void flush_pending(Worker_manager& manager) {
+        manager.flush_pending_submit("test_recovery");
     }
 };
 
@@ -146,12 +167,172 @@ public:
     network::Endpoint const& remote_endpoint() const override { return m_remote; }
     network::Endpoint const& local_endpoint() const override { return m_local; }
     bool transmit(network::Shared_payload data) override { return data && !data->empty(); }
-    void close() override {}
+    void close() override {
+        closed = true;
+        if (close_handler) {
+            auto handler = std::move(close_handler);
+            handler(network::Result::connection_closed, {});
+        }
+    }
     ProtocolLane get_protocol_lane() const override { return ProtocolLane::STATELESS; }
+    bool closed{false};
+    Handler close_handler;
 private:
     network::Endpoint m_remote{network::Transport_protocol::tcp, "127.0.0.1", 9323};
     network::Endpoint m_local{network::Transport_protocol::tcp, "127.0.0.1", 0};
 };
+
+class PendingConnectSocket final : public network::Socket {
+public:
+    network::Result::Code listen(Connect_handler) override {
+        return network::Result::socket_ok;
+    }
+    void stop_listen() override {}
+    network::Endpoint const& local_endpoint() const override { return m_local; }
+    network::Connection::Sptr connect(network::Endpoint, network::Connection::Handler handler) override {
+        auto connection = std::make_shared<MockConnection>();
+        connection->close_handler = handler;
+        connections.push_back(connection);
+        handlers.push_back(std::move(handler));
+        return connection;
+    }
+    void emit_connect_result(size_t index, network::Result::Code result) {
+        handlers.at(index)(result, {});
+    }
+    std::vector<std::shared_ptr<MockConnection>> connections;
+private:
+    network::Endpoint m_local{network::Transport_protocol::tcp, "127.0.0.1", 0};
+    std::vector<network::Connection::Handler> handlers;
+};
+
+void test_stalled_connect_recovery(config::Config& config)
+{
+    auto io = std::make_shared<asio::io_context>();
+    auto socket = std::make_shared<PendingConnectSocket>();
+    auto manager = std::make_shared<Worker_manager>(
+        io, config, std::make_shared<chrono::Timer_factory>(io), socket);
+    auto session = Worker_manager_recovery_test_access::session(*manager);
+    session->set_miner_keys(std::vector<uint8_t>(897, 0xaa), std::vector<uint8_t>(1281, 0xbb));
+    session->set_tritium_genesis(std::vector<uint8_t>(32, 0x11));
+    const network::Endpoint endpoint{network::Transport_protocol::tcp, "127.0.0.1", 9323};
+    Worker_manager_recovery_test_access::enter_reconnecting(*manager);
+    const bool started = manager->connect(endpoint);
+    assert(started);
+    assert(session->has_pending_connect());
+    assert(!session->is_primary_connected());
+
+    Worker_manager_recovery_test_access::age_reconnect(*manager, std::chrono::seconds(90));
+    manager->check_template_health();
+    assert(session->has_pending_connect());
+    assert(!socket->connections[0]->closed);
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 0);
+
+    Worker_manager_recovery_test_access::age_reconnect(*manager);
+    manager->check_template_health();
+    assert(socket->connections[0]->closed);
+    assert(!session->has_pending_connect());
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 1);
+    assert(Worker_manager_recovery_test_access::retry_scheduled(*manager));
+    manager->check_template_health();
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 1);
+
+    io->poll();
+    assert(socket->connections.size() == 2);
+    assert(session->has_pending_connect());
+    socket->emit_connect_result(0, network::Result::connection_ok);
+    assert(!session->is_primary_connected());
+    assert(session->has_pending_connect());
+
+    // The TCP socket may connect while authentication never completes.
+    socket->emit_connect_result(1, network::Result::connection_ok);
+    assert(session->is_primary_connected());
+    assert(session->has_pending_connect());
+    Worker_manager_recovery_test_access::age_reconnect(*manager);
+    manager->check_template_health();
+    assert(socket->connections[1]->closed);
+    assert(!session->has_pending_connect());
+    assert(!session->is_primary_connected());
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 2);
+    assert(Worker_manager_recovery_test_access::retry_scheduled(*manager));
+
+    io->restart();
+    io->poll();
+    assert(socket->connections.size() == 3);
+    socket->emit_connect_result(2, network::Result::connection_ok);
+    auto solo = session->get_primary_protocol();
+    solo->get_session_manager()->commit_authenticated(protocol::SessionId{123}, ProtocolLane::STATELESS);
+    protocol::GetBlockControlHarness::sync_session(*solo);
+    protocol::GetBlockControlHarness::report_auth_success(*solo);
+    assert(!session->has_pending_connect());
+    assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 0);
+
+    // Work readiness can be slow after authentication without making the socket dead.
+    Worker_manager_recovery_test_access::age_reconnect(*manager);
+    manager->check_template_health();
+    assert(session->is_primary_connected());
+    assert(!socket->connections[2]->closed);
+    assert(Worker_manager_recovery_test_access::phase(*manager) == RecoveryPhase::WAITING_TEMPLATE);
+    manager->stop();
+}
+
+void test_pending_submit_expiry(config::Config& config)
+{
+    auto io = std::make_shared<asio::io_context>();
+    auto manager = std::make_shared<Worker_manager>(
+        io, config, std::make_shared<chrono::Timer_factory>(io), nullptr);
+    auto session = Worker_manager_recovery_test_access::session(*manager);
+    auto make_solved = [](uint64_t nonce) {
+        auto solved = std::make_unique<Block_data>();
+        solved->nNonce = nonce;
+        return solved;
+    };
+
+    Worker_manager_recovery_test_access::accept_solved(*manager, make_solved(1));
+    assert(Worker_manager_recovery_test_access::has_pending_submit(*manager));
+    assert(Worker_manager_recovery_test_access::has_pending_submit_timer(*manager));
+    assert(Worker_manager_recovery_test_access::pending_submit_ttl(*manager) == std::chrono::seconds(180));
+    const auto old_snapshot = Worker_manager_recovery_test_access::pending_snapshot(*manager);
+
+    // An overdue callback belonging to the replaced snapshot must not clear its successor.
+    Worker_manager_recovery_test_access::set_pending_time_remaining(*manager, std::chrono::milliseconds(0));
+    Worker_manager_recovery_test_access::accept_solved(*manager, make_solved(2));
+    io->poll();
+    assert(old_snapshot.expired());
+    assert(Worker_manager_recovery_test_access::pending_nonce(*manager) == 2);
+    assert(Worker_manager_recovery_test_access::pending_submit_ttl(*manager) == std::chrono::seconds(180));
+
+    // Exercise the real expiry callback without waiting 180 seconds or delivering recovery events.
+    const auto expiring_snapshot = Worker_manager_recovery_test_access::pending_snapshot(*manager);
+    Worker_manager_recovery_test_access::flush_pending(*manager);
+    assert(Worker_manager_recovery_test_access::has_pending_submit(*manager));
+    assert(Worker_manager_recovery_test_access::pending_submit_ttl(*manager) == std::chrono::seconds(180));
+    assert(!session->is_authenticated());
+    Worker_manager_recovery_test_access::set_pending_time_remaining(*manager, std::chrono::milliseconds(0));
+    io->restart();
+    io->run_for(std::chrono::milliseconds(200));
+    assert(!Worker_manager_recovery_test_access::has_pending_submit(*manager));
+    assert(!Worker_manager_recovery_test_access::has_pending_submit_timer(*manager));
+    assert(expiring_snapshot.expired());
+    assert(!session->is_authenticated());
+
+    // A recovery callback at the TTL boundary must not get an extra truncated second.
+    Worker_manager_recovery_test_access::accept_solved(*manager, make_solved(3));
+    Worker_manager_recovery_test_access::set_pending_time_remaining(*manager, std::chrono::milliseconds(0));
+    Worker_manager_recovery_test_access::flush_pending(*manager);
+    assert(!Worker_manager_recovery_test_access::has_pending_submit(*manager));
+    assert(!Worker_manager_recovery_test_access::has_pending_submit_timer(*manager));
+
+    Worker_manager_recovery_test_access::accept_solved(*manager, make_solved(4));
+    const auto stopped_snapshot = Worker_manager_recovery_test_access::pending_snapshot(*manager);
+    manager->stop();
+    assert(!Worker_manager_recovery_test_access::has_pending_submit(*manager));
+    assert(!Worker_manager_recovery_test_access::has_pending_submit_timer(*manager));
+    assert(stopped_snapshot.expired());
+    io->restart();
+    io->poll();
+    Worker_manager_recovery_test_access::accept_solved(*manager, make_solved(5));
+    assert(!Worker_manager_recovery_test_access::has_pending_submit(*manager));
+}
 
 int main()
 {
@@ -352,4 +533,9 @@ int main()
     assert(Worker_manager_recovery_test_access::pending_height(*manager5) == 424242);
     assert(Worker_manager_recovery_test_access::pending_nonce(*manager5) == 0xabcdu);
     manager5->stop();
+
+    config.set_connection_retry_interval(0);
+    config.set_colin_enabled(false);
+    test_stalled_connect_recovery(config);
+    test_pending_submit_expiry(config);
 }

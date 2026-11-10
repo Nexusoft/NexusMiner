@@ -117,12 +117,21 @@ the same recovery if the socket is down and no retry is armed, because
 `get_active_protocol()` is null for the entire reconnect window and cannot be
 the only place stall detection runs.
 
+If reconnect remains stalled for more than 90 seconds, the health monitor resets
+the transport even when `connect()` still has a pending callback. This closes
+the old socket, fences its callbacks, and schedules one fresh retry with the
+normal backoff/failover policy. Each retry starts a new stall window; a live
+socket waiting only for work is not reset.
+
 A solved block is snapshotted before the authentication and template gates.
 If the socket is already gone, that worker-owned snapshot is kept for up to
-180 seconds. Payload construction and transmission wait until the replacement
-session can build them. The retry is one shot. A tip that is already known to
-have moved is discarded locally; otherwise a moved tip is the node's rejection
-to make.
+180 seconds. A dedicated timer clears it at that deadline even if the miner
+remains disconnected and receives no authentication or template callbacks.
+Replacing the snapshot replaces its timer; submitting, discarding, or stopping
+the miner cancels it. Payload construction and transmission wait until the
+replacement session can build them. The retry is one shot. A tip that is already
+known to have moved is discarded locally; otherwise a moved tip is the node's
+rejection to make.
 
 ## Local recovery phases vs authoritative session truth
 

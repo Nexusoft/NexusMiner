@@ -197,6 +197,8 @@ private:
     void handle_transport_lost(const char* reason);
     void accept_solved_block(std::unique_ptr<Block_data> block_data);
     bool transmit_prepared_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce);
+    void schedule_pending_submit_expiry();
+    void clear_pending_submit();
     void flush_pending_submit(const char* reason);
     void enter_terminal_degraded_mode_internal(int signal_number, const char* reason);
     void handle_node_shutdown(uint8_t reason);
@@ -426,6 +428,7 @@ private:
         std::chrono::steady_clock::time_point found_at{};
     };
     std::optional<PendingSubmit> m_pending_submit;
+    std::shared_ptr<asio::steady_timer> m_pending_submit_expiry_timer;
     static constexpr int64_t PENDING_SUBMIT_MAX_AGE_SECONDS = 180;
 
     // ── Three-tier mined-block confirmation cache ────────────────────────────
