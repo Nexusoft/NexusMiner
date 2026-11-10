@@ -92,7 +92,7 @@ namespace nexusminer
 	bool Miner::init(std::string const& miner_config_file)
 	{
 		// print header
-		std::cout << "NexusMiner Version " << NexusMiner_VERSION_MAJOR << "." << NexusMiner_VERSION_MINOR << "\n" << std::endl;
+		std::cout << "NexusMiner Version " << NexusMiner_VERSION << "\n" << std::endl;
 
 		if (!m_config.read_config(miner_config_file))
 		{

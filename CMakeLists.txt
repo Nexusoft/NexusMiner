@@ -3,7 +3,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/modules")
 
 set(CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/libs")
 
-project(NexusMiner VERSION 1.5 LANGUAGES CXX C)
+project(NexusMiner VERSION 1.5.1 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -230,6 +230,11 @@ set(MAIN_SOURCE_FILES src/main.cpp
                 src/liveness_watchdog.cpp)
 
 add_executable(NexusMiner ${MAIN_SOURCE_FILES})
+add_test(NAME nexusminer_version_test COMMAND NexusMiner --version)
+string(REPLACE "." "[.]" NEXUSMINER_VERSION_REGEX "${PROJECT_VERSION}")
+set_tests_properties(nexusminer_version_test PROPERTIES
+    PASS_REGULAR_EXPRESSION "^NexusMiner version: ${NEXUSMINER_VERSION_REGEX}(\n|$)"
+)
 if (WITH_GPU_AMD AND WITH_PRIME)
     # set(GPU_TARGETS "gfx1030" CACHE STRING "AMD GPU targets")  #this limits gpu hardware targets and can shorten compile time
     set(GPU_FILES 

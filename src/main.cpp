@@ -45,8 +45,7 @@ int main(int argc, char **argv)
         }
         else if ((arg == "-v") || (arg == "--version"))
         {
-            std::cout << "NexusMiner version: " << NexusMiner_VERSION_MAJOR << "."
-                << NexusMiner_VERSION_MINOR << std::endl;
+            std::cout << "NexusMiner version: " << NexusMiner_VERSION << std::endl;
             return 0;
         }
         else if (arg == "--create-keys")
