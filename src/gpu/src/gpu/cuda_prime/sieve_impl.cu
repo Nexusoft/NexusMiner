@@ -595,9 +595,9 @@ namespace nexusminer {
 
             blocks = Cuda_sieve::m_num_blocks / 2;
 
-            sort_large_primes <<<blocks, threads >>> (sieve_start_offset, d_large_primes+ Cuda_sieve::m_large_prime_count / split_denominator,
+            sort_large_primes <<<blocks, threads >>> (sieve_start_offset, d_large_primes.get() + Cuda_sieve::m_large_prime_count / split_denominator,
                 split_numerator *Cuda_sieve::m_large_prime_count/ split_denominator,
-                d_large_prime_starting_multiples + Cuda_sieve::m_large_prime_count / split_denominator, d_large_prime_buckets.get(), d_bucket_indices.get(),
+                d_large_prime_starting_multiples.get() + Cuda_sieve::m_large_prime_count / split_denominator, d_large_prime_buckets.get(), d_bucket_indices.get(),
                 m_sieve_properties);
 
             //one kernel block per sieve segment

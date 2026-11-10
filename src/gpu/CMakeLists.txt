@@ -29,7 +29,8 @@ if (WITH_GPU_CUDA)
     target_include_directories(gpu
         PUBLIC 
         $<INSTALL_INTERFACE:inc>    
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>)
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/inc>
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/gpu/cuda_prime)
 
     if(WITH_PRIME)
         target_include_directories(gpu PRIVATE ${CMAKE_SOURCE_DIR}/src/cpu/inc)

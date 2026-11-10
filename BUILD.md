@@ -194,3 +194,27 @@ For Falcon authentication setup (required for solo mining), see the main [README
 ```bash
 ./NexusMiner --create-falcon-config
 ```
+
+## Preparing release artifacts
+
+Run **Release artifacts** from the repository's Actions tab, selecting the
+branch or tag to build. The workflow also runs for relevant pull requests and
+version tags. It uploads separate CPU Prime archives for Linux x86-64, macOS
+ARM64, macOS x86-64, and Windows x86-64, and an NVIDIA CUDA Prime/hash archive
+for Linux x86-64. Each artifact includes a SHA-256 checksum, configuration
+examples, third-party notices, and the source commit. Prime builds also record
+the primesieve revision, which is currently fetched from its `master` branch.
+Artifacts are not automatically published as a GitHub release.
+
+Linux binaries are built on Ubuntu 24.04 and require compatible glibc,
+libstdc++, OpenSSL 3, and GMP libraries. The NVIDIA build uses CUDA 12.8 and
+targets architectures 61, 75, 80, 86, 89 and 90; it requires a compatible
+NVIDIA GPU and driver. macOS CPU archives statically link GMP and OpenSSL.
+Windows CPU archives include the vcpkg runtime DLLs and require the MSVC
+runtime. Check the runner OS version and architecture before distributing
+each archive.
+
+The workflow builds kernels and runs host tests, but has no GPU hardware and
+does not validate mining. Treat GPU builds as experimental until tested on
+the intended hardware and pool or node. AMD GPU and non-Linux GPU artifacts
+are not produced by this workflow.
