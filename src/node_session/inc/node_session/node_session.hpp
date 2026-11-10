@@ -197,6 +197,11 @@ public:
      */
     bool is_primary_connected() const;
 
+    /// True while connect() has stored a callback that has not yet completed.
+    /// A dropped socket during that window is delivered to the callback, not as
+    /// a second transport-lost notification.
+    bool has_pending_connect() const { return static_cast<bool>(m_pending_connect_callback); }
+
     /**
      * @brief Check if the secondary TCP connection is currently established
      * @return True if the secondary connection is up (may be authenticated or pending auth)
@@ -283,6 +288,16 @@ public:
      * @param handler Replacement-pending callback
      */
     void set_replacement_pending_handler(Replacement_pending_handler handler);
+
+    /**
+     * @brief Notified when an already-established primary socket drops.
+     *
+     * Initial connect failures still complete the connect() callback and do not
+     * invoke this handler. The callback is posted onto the session io_context so
+     * it cannot re-enter Connection::close() from the receive stack.
+     */
+    using Transport_lost_handler = std::function<void()>;
+    void set_transport_lost_handler(Transport_lost_handler handler);
 
     /**
      * @brief Set Falcon miner keys
@@ -505,6 +520,7 @@ private:
     Session_start_handler m_session_start_handler;
     Node_shutdown_handler m_node_shutdown_handler;
     Replacement_pending_handler m_replacement_pending_handler;
+    Transport_lost_handler m_transport_lost_handler;
     std::vector<uint8_t> m_miner_pubkey;
     std::vector<uint8_t> m_miner_privkey;
     std::string m_reward_address;

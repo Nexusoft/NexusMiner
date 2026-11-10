@@ -92,6 +92,47 @@ Template refresh / GET_BLOCK recovery is still valid while a session remains
 authenticated, but once the session is gone the miner must treat all previous
 session-bound work as stale.
 
+## Established transport loss
+
+A mid-session socket close is not `SESSION_EXPIRED`. The node is gone, so
+in-band login cannot succeed, and a push timestamp from before the interrupt
+is not evidence that the TCP session is still alive.
+
+`NodeSession::mark_lane_socket_failed()` therefore:
+
+1. clears that lane's RX accumulator so a partial frame cannot poison the next
+   connection
+2. ends the authoritative session when the primary socket was already up
+3. posts `transport_lost` unless `connect()` still owns the failure
+
+`Worker_manager` stops workers and force-reconnects. It does not consult the
+push-alive guard on that path. The transport-lost handler is registered from
+the first `connect()`, after shared ownership exists — a `weak_ptr` captured
+in the constructor is empty and would drop every notification. Duplicate
+notifications are ignored only while a retry timer or `connect()` attempt is
+actually outstanding. A socket that drops after the connect callback has
+completed, while the manager is still `RECONNECTING` and waiting for work,
+schedules a new reconnect immediately. The template health monitor repeats
+the same recovery if the socket is down and no retry is armed, because
+`get_active_protocol()` is null for the entire reconnect window and cannot be
+the only place stall detection runs.
+
+If reconnect remains stalled for more than 90 seconds, the health monitor resets
+the transport even when `connect()` still has a pending callback. This closes
+the old socket, fences its callbacks, and schedules one fresh retry with the
+normal backoff/failover policy. Each retry starts a new stall window; a live
+socket waiting only for work is not reset.
+
+A solved block is snapshotted before the authentication and template gates.
+If the socket is already gone, that worker-owned snapshot is kept for up to
+180 seconds. A dedicated timer clears it at that deadline even if the miner
+remains disconnected and receives no authentication or template callbacks.
+Replacing the snapshot replaces its timer; submitting, discarding, or stopping
+the miner cancels it. Payload construction and transmission wait until the
+replacement session can build them. The retry is one shot. A tip that is already
+known to have moved is discarded locally; otherwise a moved tip is the node's
+rejection to make.
+
 ## Local recovery phases vs authoritative session truth
 
 The local `Worker_manager` recovery phase and the authoritative

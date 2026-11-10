@@ -991,6 +991,111 @@ void test_transmit_returns_true_when_connection_accepts_payload()
     std::cout << "  ✓ transmit() returns true when connection accepts payload" << std::endl;
 }
 
+void test_established_primary_drop_posts_transport_lost()
+{
+    std::cout << "Test: established primary drop ends the session and posts transport-lost..." << std::endl;
+
+    auto io_context = std::make_shared<asio::io_context>();
+    config::Config config(make_logger("test_logger_transport_lost"));
+    config.set_mining_mode(config::Mining_mode::HASH);
+    config.set_enable_sim_link(false);
+
+    DualConnectionManager dcm;
+    auto socket = std::make_shared<MockSocket>(io_context);
+    auto node_session = make_node_session(io_context, config, socket, "TEST_TRANSPORT_LOST", &dcm);
+    configure_valid_auth(*node_session);
+
+    int transport_lost = 0;
+    node_session->set_transport_lost_handler([&transport_lost]() { ++transport_lost; });
+
+    bool connect_callback_invoked = false;
+    bool connect_success = false;
+    const bool connect_started = node_session->connect(
+        make_endpoint(ProtocolPorts::STATELESS_PORT),
+        [&connect_callback_invoked, &connect_success](bool success) {
+            connect_callback_invoked = true;
+            connect_success = success;
+        });
+    assert(connect_started);
+    pump_io(io_context);
+    socket->emit_receive(0, build_auth_result_packet(ProtocolLane::STATELESS, 0x01, 0x0A11C0DEu));
+    assert(connect_callback_invoked);
+    assert(connect_success);
+    assert(node_session->is_authenticated());
+    assert(node_session->is_primary_connected());
+    assert(dcm.is_stateless_alive());
+
+    // Drop during auth, before the connect callback is consumed, must not
+    // double-schedule recovery through transport-lost.
+    auto during_auth = make_node_session(io_context, config, socket, "TEST_TRANSPORT_LOST_DURING_AUTH", &dcm);
+    configure_valid_auth(*during_auth);
+    int during_auth_lost = 0;
+    bool during_auth_callback = false;
+    bool during_auth_success = true;
+    during_auth->set_transport_lost_handler([&during_auth_lost]() { ++during_auth_lost; });
+    assert(during_auth->connect(make_endpoint(ProtocolPorts::STATELESS_PORT),
+                                [&during_auth_callback, &during_auth_success](bool success) {
+                                    during_auth_callback = true;
+                                    during_auth_success = success;
+                                }));
+    pump_io(io_context);
+    assert(!during_auth_callback);
+    socket->emit_event(socket->connect_count() - 1, network::Result::connection_closed);
+    pump_io(io_context);
+    assert(during_auth_callback);
+    assert(!during_auth_success);
+    assert(during_auth_lost == 0);
+
+    socket->emit_event(0, network::Result::connection_closed);
+    assert(transport_lost == 0);
+    assert(!node_session->is_primary_connected());
+    assert(!node_session->is_authenticated());
+    assert(!dcm.is_stateless_alive());
+    assert(dcm.consume_bypass(ProtocolLane::STATELESS));
+
+    pump_io(io_context);
+    assert(transport_lost == 1);
+
+    socket->emit_event(0, network::Result::connection_aborted);
+    pump_io(io_context);
+    assert(transport_lost == 1);
+
+    std::cout << "  ✓ Established primary drop posts one transport-lost callback" << std::endl;
+}
+
+void test_connect_failure_does_not_post_transport_lost()
+{
+    std::cout << "Test: initial connect failure does not post transport-lost..." << std::endl;
+
+    auto io_context = std::make_shared<asio::io_context>();
+    config::Config config(make_logger("test_logger_connect_fail_no_lost"));
+    config.set_mining_mode(config::Mining_mode::HASH);
+    config.set_enable_sim_link(false);
+
+    auto socket = std::make_shared<MockSocket>(io_context);
+    socket->m_connect_result = network::Result::connection_error;
+    auto node_session = make_node_session(io_context, config, socket, "TEST_CONNECT_FAIL_NO_LOST");
+    configure_valid_auth(*node_session);
+
+    int transport_lost = 0;
+    bool callback_invoked = false;
+    bool callback_success = true;
+    node_session->set_transport_lost_handler([&transport_lost]() { ++transport_lost; });
+    assert(node_session->connect(make_endpoint(ProtocolPorts::STATELESS_PORT),
+                                 [&callback_invoked, &callback_success](bool success) {
+                                     callback_invoked = true;
+                                     callback_success = success;
+                                 }));
+    pump_io(io_context);
+
+    assert(callback_invoked);
+    assert(!callback_success);
+    assert(transport_lost == 0);
+    assert(!node_session->is_primary_connected());
+
+    std::cout << "  ✓ Initial connect failure stays on the connect() callback" << std::endl;
+}
+
 } // namespace
 
 int main()
@@ -1059,6 +1164,12 @@ int main()
         std::cout << std::endl;
 
         test_transmit_returns_true_when_connection_accepts_payload();
+        std::cout << std::endl;
+
+        test_established_primary_drop_posts_transport_lost();
+        std::cout << std::endl;
+
+        test_connect_failure_does_not_post_transport_lost();
         std::cout << std::endl;
 
         std::cout << "=== All NodeSession tests passed! ===\n" << std::endl;

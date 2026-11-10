@@ -24,6 +24,9 @@
 #include <mutex>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <optional>
+#include <vector>
 
 namespace asio { class io_context; }
 
@@ -32,6 +35,7 @@ namespace nexusminer
 namespace config { class Config; }
 namespace stats { class Collector; }
 namespace protocol { class Protocol; class Solo; }
+class Block_data;
 class Worker;
 class WorkerTemplateFeed;  // Stone 4: defined in worker/template_feed.hpp
 class ColinAgent;
@@ -187,6 +191,15 @@ private:
     void handle_recovery_confirmed(const char* reason);
 
     void retry_connect(network::Endpoint const& wallet_endpoint, bool force_transport_reset = false);
+    void schedule_connection_retry(std::uint16_t delay_seconds, network::Endpoint const& endpoint);
+    void ensure_transport_lost_handler();
+    bool transport_recovery_outstanding() const;
+    void handle_transport_lost(const char* reason);
+    void accept_solved_block(std::unique_ptr<Block_data> block_data);
+    bool transmit_prepared_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce);
+    void schedule_pending_submit_expiry();
+    void clear_pending_submit();
+    void flush_pending_submit(const char* reason);
     void enter_terminal_degraded_mode_internal(int signal_number, const char* reason);
     void handle_node_shutdown(uint8_t reason);
 
@@ -219,9 +232,6 @@ private:
     bool is_session_recovery()      const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::SESSION_RECOVERY; }
     bool is_reconnecting()          const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::RECONNECTING; }
     bool is_degraded_terminal()     const { return m_recovery.phase.load(std::memory_order_relaxed) == RecoveryPhase::DEGRADED_TERMINAL; }
-
-    /// Submit a found block via primary NodeSession (handles dual-lane submission internally).
-    void submit_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce);
 
 	std::shared_ptr<::asio::io_context> m_io_context;
     Config& m_config;
@@ -264,7 +274,10 @@ private:
     // Session health summary log: throttled to once per 60s
     std::chrono::steady_clock::time_point m_last_session_health_log{};
 
-    // Connection retry state for exponential backoff
+    // Connection retry state for exponential backoff.
+    // m_connection_retry_scheduled is true only while a retry timer is armed.
+    // An in-flight connect() is tracked separately by NodeSession::has_pending_connect().
+    bool m_connection_retry_scheduled{false};
     uint32_t m_connection_retry_count{0};
     util::ExponentialBackoffWithState m_connection_backoff{
         0,  // Base delay is set dynamically from config in retry_connect()
@@ -404,6 +417,19 @@ private:
     // Reset in stop_all_workers() and clear_recovery_state().
     bool m_recovery_workers_spawned{false};
     RecoveryCompletionKind m_pending_recovery_completion_kind{RecoveryCompletionKind::NONE};
+
+    // Worker-owned solved snapshot retained when the session cannot yet build
+    // or queue a payload. Captured before authentication and template gates so
+    // a callback that races a socket drop is not discarded. Payload construction
+    // and transmission wait until recovery. Io-thread only: solution callbacks
+    // are posted onto m_io_context.
+    struct PendingSubmit {
+        std::shared_ptr<Block_data> solved;
+        std::chrono::steady_clock::time_point found_at{};
+    };
+    std::optional<PendingSubmit> m_pending_submit;
+    std::shared_ptr<asio::steady_timer> m_pending_submit_expiry_timer;
+    static constexpr int64_t PENDING_SUBMIT_MAX_AGE_SECONDS = 180;
 
     // ── Three-tier mined-block confirmation cache ────────────────────────────
     // Tier 1: last 5 mined blocks (confirmation tracking active)
