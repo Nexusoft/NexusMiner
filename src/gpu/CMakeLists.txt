@@ -178,6 +178,20 @@ endif()
 #
 # Gated on WITH_PRIME because the GPU-prime stack (and therefore chain.hpp)
 # is meaningful only in prime builds.
+# Header-only.  Built for host-stubs and prime presets so the region-offset
+# formula can be checked without nvcc.
+add_executable(gpu_sieve_region_offset_test
+    sieve_region_offset_test.cpp)
+target_include_directories(gpu_sieve_region_offset_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_test(NAME gpu_sieve_region_offset_test COMMAND gpu_sieve_region_offset_test)
+
+add_executable(gpu_chain_slot_test chain_slot_test.cpp)
+target_include_directories(gpu_chain_slot_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(gpu_chain_slot_test PRIVATE Threads::Threads)
+add_test(NAME gpu_chain_slot_test COMMAND gpu_chain_slot_test)
+
 if(WITH_PRIME)
     add_executable(gpu_chain_test
         gpu_chain_test.cpp

@@ -4,6 +4,7 @@
 #include "find_chain.cuh"
 #include "sieve_lookup_tables.cuh"
 #include "cuda_chain.cuh"
+#include "chain_slot.cuh"
 #include "mining/prime_thresholds.hpp"
 
 #include <stdio.h>
@@ -18,7 +19,6 @@ namespace nexusminer {
         __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset, int target_length);
         __device__  bool is_there_still_hope(CudaChain& chain);
         __device__  void get_best_fermat_chain(const CudaChain& chain, uint64_t& base_offset, int& offset, int& best_length);
-
 
         //get the nth bit from the sieve.
         __device__ __forceinline__ bool get_bit(uint64_t bit_position, Cuda_sieve::sieve_word_t* sieve)
@@ -150,12 +150,13 @@ namespace nexusminer {
                 // (see top-of-kernel comment).
                 if (current_chain.m_offset_count >= nexusminer::mining::close_chain_min(target_T))
                 {
-                    //increment the chain list index
-                    uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
-                    //copy the current chain to the global list
-                    chains[chain_idx] = current_chain;
-                    //updated block level stats
-                    atomicInc(&chain_count_shared, 0xFFFFFFFF);
+                    uint32_t chain_idx = 0;
+                    if (claim_chain_slot(chain_index, Cuda_sieve::m_max_chains, chain_idx))
+                    {
+                        chains[chain_idx] = current_chain;
+                        // Dropped chains are not stored, so they are not counted.
+                        atomicInc(&chain_count_shared, 0xFFFFFFFF);
+                    }
                 }
             }
             //update global chain stats
@@ -173,12 +174,12 @@ namespace nexusminer {
             // sieve_properties.m_min_chain_length by the caller.
             if (chain.m_offset_count >= nexusminer::mining::close_chain_min(target_length))
             {
-                //increment the chain list index
-                uint32_t chain_idx = atomicInc(chain_index, Cuda_sieve::m_max_chains);
-                //copy the current chain to the global list
-                chains[chain_idx] = chain;
-                //updated block level stats
-                atomicInc(chain_count_shared, 0xFFFFFFFF);
+                uint32_t chain_idx = 0;
+                if (claim_chain_slot(chain_index, Cuda_sieve::m_max_chains, chain_idx))
+                {
+                    chains[chain_idx] = chain;
+                    atomicInc(chain_count_shared, 0xFFFFFFFF);
+                }
             }
         }
 
@@ -360,12 +361,9 @@ namespace nexusminer {
 
             if (index >= *chain_index)
                 return;
-            if (index == 0)
-            {
-                *surviving_chain_index = 0;
-            }
-            __syncthreads();
-            //printf("%" PRIu64 " %u\n", index, *chain_index);
+            // Survivor and long-chain counters are zeroed by the host before
+            // launch.  Resetting them here only reaches one thread of one
+            // block, so other blocks race the store.
             if (!is_there_still_hope(chains[index]))
             {
                 //this chain is busted.  check how long it is
@@ -383,17 +381,17 @@ namespace nexusminer {
                     //check for winners
                     if (chain_length >= chains[index].m_min_chain_report_length)
                     {
-                        //chain is long. save it. 
-                        uint32_t last_long_chain_index = atomicInc(long_chain_index, Cuda_sieve::m_max_long_chains);
-                        long_chains[last_long_chain_index] = chains[index];
+                        uint32_t last_long_chain_index = 0;
+                        if (claim_chain_slot(long_chain_index, Cuda_sieve::m_max_long_chains, last_long_chain_index))
+                            long_chains[last_long_chain_index] = chains[index];
                     }
                 }
             }
             else
             {
-                //copy chain to the survival list
-                uint32_t last_surviving_chain_index = atomicInc(surviving_chain_index, Cuda_sieve::m_max_chains);
-                surviving_chains[last_surviving_chain_index] = chains[index];
+                uint32_t last_surviving_chain_index = 0;
+                if (claim_chain_slot(surviving_chain_index, Cuda_sieve::m_max_chains, last_surviving_chain_index))
+                    surviving_chains[last_surviving_chain_index] = chains[index];
             }
         }
         

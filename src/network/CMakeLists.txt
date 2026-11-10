@@ -11,4 +11,4 @@ target_include_directories(network
         ${CMAKE_SOURCE_DIR}/src
 )
 
-target_link_libraries(network asio spdlog ${OPENSSL_LIBRARIES})
+target_link_libraries(network NexusMiner_platform asio spdlog ${OPENSSL_LIBRARIES})

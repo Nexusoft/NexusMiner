@@ -13,7 +13,7 @@ env:
 jobs:
   riscv-cross:
     name: RISC-V (qemu-riscv64)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -21,11 +21,21 @@ jobs:
 
       - name: Install RISC-V toolchain and dependencies
         run: |
+          sudo dpkg --add-architecture riscv64
+          sudo sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
+          sudo tee /etc/apt/sources.list.d/riscv64.sources >/dev/null <<'EOF'
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-security
+          Components: main universe
+          Architectures: riscv64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          EOF
           sudo apt-get update
           sudo apt-get install -y \
             gcc-riscv64-linux-gnu \
             g++-riscv64-linux-gnu \
-            libssl-dev-riscv64-cross \
+            libssl-dev:riscv64 \
             qemu-user-static \
             ninja-build
 
@@ -38,23 +48,16 @@ jobs:
             riscv-cpm-
 
       - name: Configure CMake for RISC-V
-        env:
-          CC: riscv64-linux-gnu-gcc
-          CXX: riscv64-linux-gnu-g++
-          CMAKE_PREFIX_PATH: /usr/riscv64-linux-gnu
-          OPENSSL_ROOT_DIR: /usr/riscv64-linux-gnu
-        run: cmake --preset riscv
+        run: |
+          cmake --preset riscv \
+            --toolchain cmake/toolchains/riscv64-linux-gnu.cmake \
+            -DCMAKE_CROSSCOMPILING_EMULATOR="qemu-riscv64-static;-L;/usr/riscv64-linux-gnu;-cpu;rv64,v=true,zbkb=true,zbkc=true"
 
       - name: Build RISC-V target
         run: cmake --build --preset riscv
 
       - name: Run tests with QEMU
-        run: |
-          # Set up QEMU to run RISC-V binaries
-          export QEMU_LD_PREFIX=/usr/riscv64-linux-gnu
-          # Run CTest with QEMU emulation
-          cd build/riscv
-          ctest --output-on-failure || echo "Tests completed (some may be architecture-specific)"
+        run: ctest --preset riscv --output-on-failure
 
       - name: Upload RISC-V build artifacts
         uses: actions/upload-artifact@v4

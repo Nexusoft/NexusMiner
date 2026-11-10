@@ -36,6 +36,14 @@ sudo apt-get install -y \
 > **Tip:** On Ubuntu 22.04 you may need the `crossbuild-essential-riscv64` meta-package
 > and the `ports.ubuntu.com` apt source for the `:riscv64` foreign-arch packages.
 
+The automated cross-build uses Ubuntu 24.04. Enable the `riscv64` foreign
+architecture with `sudo dpkg --add-architecture riscv64`, restrict the existing
+Ubuntu archive sources to `amd64`, and add a `riscv64`-only source for
+`http://ports.ubuntu.com/ubuntu-ports` (`noble`, `noble-updates`,
+`noble-security`). Install `libssl-dev:riscv64`; there is no
+`libssl-dev-riscv64-cross` package. See
+[the workflow](../../.github/workflows/riscv-cross.yml) for the complete setup.
+
 ### Fedora / RHEL
 
 ```bash
@@ -58,6 +66,21 @@ export PATH="/opt/riscv/bin:$PATH"
 ---
 
 ## 3. Cross-Compilation
+
+To reproduce the automated Ubuntu cross-build with the existing `riscv` preset:
+
+```bash
+cmake --preset riscv \
+    --toolchain cmake/toolchains/riscv64-linux-gnu.cmake \
+    -DCMAKE_CROSSCOMPILING_EMULATOR="qemu-riscv64-static;-L;/usr/riscv64-linux-gnu;-cpu;rv64,v=true,zbkb=true,zbkc=true"
+cmake --build --preset riscv
+ctest --preset riscv --output-on-failure
+```
+
+The toolchain sets the target system and compiler explicitly, preventing CMake
+from treating the cross-build as an x86 host build. CTest invokes each test
+through QEMU with RVV and the selected scalar crypto extensions enabled; test
+failures fail the workflow rather than being ignored.
 
 Use the `riscv64-cross` CMake preset (see [CMakePresets.json entry](#8-cmakepresetsj-son-entry)):
 

@@ -59,7 +59,7 @@ add_nexusminer_test(NAME chacha20_test
 
 add_nexusminer_test(NAME falcon_qtv_parity_test
     SOURCES     falcon_qtv_parity_test.cpp
-    LINK_LIBS   ${OPENSSL_LIBRARIES})
+    LINK_LIBS   OpenSSL::Crypto)
 
 # --- Serialization helpers ---
 add_nexusminer_test(NAME genesis_serialization_utils_test

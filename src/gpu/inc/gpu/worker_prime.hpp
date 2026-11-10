@@ -74,6 +74,10 @@ private:
     std::condition_variable m_cv;  // For persistent thread wake-up
     bool m_new_work = false;       // Flag to indicate new work is available
     bool m_shutdown = false;       // Flag to indicate worker should shut down
+    // Option D, matching cpu::Worker_prime.  Set after a valid submit so the
+    // mining loop stops grinding the same template until set_block delivers
+    // a new one.  Read and written under m_mtx.
+    bool m_template_consumed = false;
     std::uint64_t m_starting_nonce = 0;
     std::string m_log_leader;
 

@@ -16,7 +16,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/CPM.cmake)
 find_package(Threads REQUIRED)
 
 #spdlog
-CPMAddPackage(NAME spdlog GITHUB_REPOSITORY gabime/spdlog VERSION 1.14.1 OPTIONS "SPDLOG_BUILD_SHARED OFF")
+CPMAddPackage(NAME spdlog GITHUB_REPOSITORY gabime/spdlog VERSION 1.17.0 OPTIONS "SPDLOG_BUILD_SHARED OFF")
 
 #nlohmann json
 CPMAddPackage(NAME nlohmann_json GITHUB_REPOSITORY nlohmann/json  VERSION 3.11.3)

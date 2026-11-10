@@ -48,5 +48,5 @@ function(add_nexusminer_test)
 
     target_include_directories(${ARG_NAME} PRIVATE ${_inc_dirs})
 
-    add_test(NAME ${ARG_NAME} COMMAND $<TARGET_FILE:${ARG_NAME}>)
+    add_test(NAME ${ARG_NAME} COMMAND ${ARG_NAME})
 endfunction()

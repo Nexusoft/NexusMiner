@@ -305,11 +305,12 @@ void test5_self_induced_tagging()
 
     // Use a ringbuffer sink so we can inspect log output.
     auto ring_sink = std::make_shared<spdlog::sinks::ringbuffer_sink_mt>(128);
-    auto logger    = std::make_shared<spdlog::logger>("new_round_debounce_test_5", ring_sink);
-    spdlog::register_logger(logger);
-    // Temporarily override the default logger so Solo picks it up.
-    auto prev_default = spdlog::default_logger();
-    spdlog::set_default_logger(logger);
+    auto logger = spdlog::get("logger");
+    if (!logger) {
+        logger = spdlog::default_logger();
+    }
+    const auto original_sink_count = logger->sinks().size();
+    logger->sinks().push_back(ring_sink);
 
     {
         auto io = std::make_shared<asio::io_context>();
@@ -353,9 +354,7 @@ void test5_self_induced_tagging()
         print_test_result("NEW_ROUND at unrelated height annotated as 'external'", found_external);
     }
 
-    // Restore the previous default logger.
-    spdlog::set_default_logger(prev_default);
-    spdlog::drop("new_round_debounce_test_5");
+    logger->sinks().resize(original_sink_count);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

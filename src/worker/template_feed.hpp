@@ -14,7 +14,7 @@ namespace nexusminer {
 // ─────────────────────────────────────────────────────────────────────────────
 // Stone 4: Shared TemplateEpoch instead of N×set_block fanout
 // ─────────────────────────────────────────────────────────────────────────────
-// Each new template is published once into a shared, lock-free-readable slot
+// Each new template is published once into a shared, atomically-readable slot
 // instead of being pushed into N individual worker mutex/CV chains.  Workers
 // observe new work by loading the latest TemplateEpoch from this feed at the
 // natural rebind point in their mining loop (top of segment, end of nonce
@@ -28,8 +28,7 @@ namespace nexusminer {
 //     notify_all() on the shared CV so cold-start (waiting) workers wake up.
 //
 // Subscribe-side semantics:
-//   * Many-reader.  load() is wait-free (relaxed semantics suffice for a
-//     latest-wins handoff: the next load sees the next epoch).
+//   * Many-reader. load() acquires a coherent latest-wins snapshot.
 //   * wait_for_epoch_after(last_seen, predicate) blocks until either a newer
 //     epoch is published or predicate() returns true (used for shutdown
 //     wake-up by the worker).
@@ -71,7 +70,7 @@ struct TemplateEpoch
     // this one is the cross-worker / cross-epoch source of truth.
     //
     // mutable + atomic: the slot in WorkerTemplateFeed is held as
-    // shared_ptr<const TemplateEpoch> for wait-free reader access, but the
+    // shared_ptr<const TemplateEpoch> for atomic reader access, but the
     // consumed transition is one-way (false → true) and may be observed
     // racily by readers without breaking immutability of the work payload.
     mutable std::atomic<bool> consumed{false};
@@ -116,12 +115,7 @@ public:
         const std::uint64_t next_id = m_latest_epoch_id.load(std::memory_order_relaxed) + 1;
         epoch->epoch_id = next_id;
 
-        // C++20 std::atomic<std::shared_ptr<T>> gives us a wait-free
-        // single-publisher / many-reader handoff without any shared mutex
-        // and without the deprecated free-function atomic_store/load APIs
-        // (those were marked deprecated in C++20 and slated for removal).
-        m_slot.store(std::shared_ptr<const TemplateEpoch>(std::move(epoch)),
-                     std::memory_order_release);
+        store_epoch(std::shared_ptr<const TemplateEpoch>(std::move(epoch)));
         m_latest_epoch_id.store(next_id, std::memory_order_release);
 
         // Wake any worker waiting in wait_for_epoch_after().
@@ -144,14 +138,19 @@ public:
         return next_id;
     }
 
-    // Wait-free read of the latest published epoch.  Returns nullptr when
+    // Atomic read of the latest published epoch. Returns nullptr when
     // nothing has been published yet.
     std::shared_ptr<const TemplateEpoch> load() const
     {
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
         return m_slot.load(std::memory_order_acquire);
+#else
+        std::scoped_lock lock(m_slot_mtx);
+        return m_slot;
+#endif
     }
 
-    // Wait-free read of the latest published epoch IFF it has not yet been
+    // Atomic read of the latest published epoch IFF it has not yet been
     // marked consumed via TemplateEpoch::mark_consumed().  Returns nullptr
     // when nothing has been published yet OR when the latest epoch's
     // found-block handler has already fired.
@@ -163,7 +162,7 @@ public:
     // per-worker consumed flag and need not call this.
     std::shared_ptr<const TemplateEpoch> latest_unconsumed() const
     {
-        auto epoch = m_slot.load(std::memory_order_acquire);
+        auto epoch = load();
         if (!epoch || epoch->is_consumed()) {
             return nullptr;
         }
@@ -228,8 +227,7 @@ public:
     {
         {
             std::lock_guard<std::mutex> lock(m_wake_mtx);
-            m_slot.store(std::shared_ptr<const TemplateEpoch>{},
-                         std::memory_order_release);
+            store_epoch({});
             m_latest_epoch_id.store(0, std::memory_order_release);
         }
         m_wake_cv.notify_all();
@@ -252,10 +250,24 @@ public:
     }
 
 private:
-    // C++20 typed atomic shared_ptr — wait-free single-publisher / many-reader
-    // slot.  Replaces the C++17 free-function atomic_store/load APIs that
-    // were deprecated in C++20.
+    void store_epoch(std::shared_ptr<const TemplateEpoch> epoch)
+    {
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+        m_slot.store(std::move(epoch), std::memory_order_release);
+#else
+        std::scoped_lock lock(m_slot_mtx);
+        m_slot.swap(epoch);
+#endif
+    }
+
+    // libc++ versions without atomic<shared_ptr> use the same mutex fallback
+    // as stats::Atomic_snapshot.
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
     std::atomic<std::shared_ptr<const TemplateEpoch>> m_slot;
+#else
+    std::shared_ptr<const TemplateEpoch> m_slot;
+    mutable std::mutex m_slot_mtx;
+#endif
 
     // Mirrors m_slot->epoch_id for fast staleness checks without a shared_ptr
     // load.  Updated after the slot is stored so a reader that sees a newer
@@ -263,7 +275,7 @@ private:
     std::atomic<std::uint64_t> m_latest_epoch_id{0};
 
     // Cold-start / shutdown CV.  Hot-path readers do NOT touch this mutex —
-    // they call load() / latest_epoch_id() which are wait-free.
+    // they call load() / latest_epoch_id() instead.
     mutable std::mutex m_wake_mtx;
     std::condition_variable m_wake_cv;
 };

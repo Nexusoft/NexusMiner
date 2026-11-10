@@ -7,6 +7,7 @@
 #include "config/config.hpp"
 #include "config/worker_config.hpp"
 #include "stats/stats_collector.hpp"
+#include "LLP/block.hpp"
 
 #include <asio/io_context.hpp>
 #include <spdlog/sinks/null_sink.h>
@@ -86,6 +87,27 @@ void test_worker_prime_lifecycle_and_stats_collector_contract()
           "worker_prime host-stubs stats preserve histogram bucket contract");
 }
 
+void test_set_block_wakes_and_joins()
+{
+    install_null_logger();
+
+    auto io = std::make_shared<asio::io_context>();
+    auto worker_cfg = make_gpu_prime_worker_config();
+    auto worker = std::make_shared<nexusminer::gpu::Worker_prime>(io, worker_cfg);
+
+    LLP::CBlock block;
+    block.nChannel = 1;
+    block.nBits = 0x01000000;
+    worker->set_block(block, 50000000, [](std::uint16_t, std::unique_ptr<nexusminer::Block_data>) {});
+    check(worker->is_running(),
+          "set_block marks GPU prime worker running");
+
+    // Destructor must join the mining thread.  Host stubs never find a chain,
+    // so this only proves the wake/stop path does not deadlock.
+    worker.reset();
+    check(true, "GPU prime worker joins after set_block");
+}
+
 } // namespace
 
 int main()
@@ -93,6 +115,7 @@ int main()
     std::fprintf(stderr, "=== worker_prime_host_stubs_test ===\n");
 
     test_worker_prime_lifecycle_and_stats_collector_contract();
+    test_set_block_wakes_and_joins();
 
     if (g_failures != 0)
     {

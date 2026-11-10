@@ -1,5 +1,6 @@
 #include "cpu/thread_utils.hpp"
 #include <spdlog/spdlog.h>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -13,7 +14,11 @@
 #endif
 
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+#if defined(_MSC_VER)
+#include <intrin.h>
+#else
 #include <cpuid.h>
+#endif
 #endif
 
 namespace nexusminer
@@ -224,10 +229,8 @@ bool is_efficiency_core()
     // it executes. Due to thread migration in multithreaded environments, the thread
     // may move to a different core between calls. This function provides a snapshot
     // of the current core type but does not guarantee thread stays on that core.
-    std::uint32_t eax, ebx, ecx, edx;
-    
     // Check if CPUID leaf 0x1A is supported (hybrid information)
-    #ifdef _WIN32
+    #ifdef _MSC_VER
     int cpuid_info[4];
     __cpuid(cpuid_info, 0);
     if (cpuid_info[0] < 0x1A)
@@ -238,6 +241,7 @@ bool is_efficiency_core()
     __cpuid(cpuid_info, 0x1A);
     std::uint32_t core_type = (cpuid_info[0] >> 24) & 0xFF;
     #else
+    std::uint32_t eax, ebx, ecx, edx;
     __get_cpuid(0, &eax, &ebx, &ecx, &edx);
     if (eax < 0x1A)
     {

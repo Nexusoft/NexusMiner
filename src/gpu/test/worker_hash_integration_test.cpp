@@ -102,6 +102,13 @@ struct Worker_hash_test_access
         w.m_block.nNonce = nonce;
     }
 
+    static void clobber_canonical_header(Worker_hash& w, std::uint64_t nonce, unsigned int height)
+    {
+        std::scoped_lock<std::mutex> lck(w.m_mtx);
+        w.m_block.nNonce = nonce;
+        w.m_block.nHeight = height;
+    }
+
     // Call step_once() directly (bypasses the background thread).
     static bool step_once(Worker_hash& w,
                           Block_data& local_block,
@@ -328,6 +335,10 @@ void test_positive_winner_dispatch_and_stats()
     constexpr std::uint16_t kInvalidWorkerId = 0xFFFFu;
 
     nexusminer::Block_data local_block = make_block(starting_nonce);
+    constexpr unsigned int kHashedHeight = 42;
+    constexpr unsigned int kReplacedHeight = 999;
+    constexpr unsigned int kPostStepHeight = 777;
+    local_block.nHeight = kHashedHeight;
     uint1024_t local_target{};
 
     std::optional<nexusminer::Block_data> callback_block;
@@ -342,6 +353,9 @@ void test_positive_winner_dispatch_and_stats()
     TA::clear_stop(*worker);
     TA::set_running(*worker, true);
     TA::set_mismatch_count(*worker, 2);
+    // A concurrent set_block can replace the live header before the winner
+    // is posted.  The callback must still carry the hashed snapshot.
+    TA::clobber_canonical_header(*worker, 0, kReplacedHeight);
 
     bool stop = TA::step_once(*worker, local_block, local_target, T, tpb, dev);
     check(stop, "positive winner step_once returns true (stop)");
@@ -354,7 +368,7 @@ void test_positive_winner_dispatch_and_stats()
 
     // Regression guard for async dispatch: the posted callback must carry the
     // immutable winning block snapshot, not read later mutable m_block state.
-    TA::clobber_canonical_nonce(*worker, post_winner_sentinel_nonce);
+    TA::clobber_canonical_header(*worker, post_winner_sentinel_nonce, kPostStepHeight);
     io->run();
 
     check(callback_worker_id == 0,
@@ -364,6 +378,9 @@ void test_positive_winner_dispatch_and_stats()
     check(callback_block.has_value() &&
               callback_block->nNonce == expected_winner_nonce,
           "posted callback sees winning nonce snapshot, not later m_block");
+    check(callback_block.has_value() &&
+              callback_block->nHeight == kHashedHeight,
+          "posted callback keeps the hashed block header, not a later m_block");
 
     auto collector_config = make_collector_config(
         nexusminer::config::Mining_mode::HASH, 1);
