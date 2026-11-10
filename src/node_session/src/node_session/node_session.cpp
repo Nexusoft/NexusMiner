@@ -423,7 +423,12 @@ void NodeSession::mark_lane_socket_connected(LaneSlot slot)
 void NodeSession::mark_lane_socket_failed(LaneSlot slot)
 {
     auto descriptor = lane(slot);
-    descriptor.connected->store(false);
+    const bool was_connected = descriptor.connected->exchange(false);
+    if (slot == LaneSlot::Primary) {
+        m_primary_rx_accumulator.clear();
+    } else {
+        m_secondary_rx_accumulator.clear();
+    }
 
     auto lane_kind = resolve_lane(slot);
     if (m_dcm && lane_kind != ProtocolLane::UNKNOWN) {
@@ -432,8 +437,35 @@ void NodeSession::mark_lane_socket_failed(LaneSlot slot)
                        m_node_label, descriptor.label, lane_name(lane_kind));
     }
 
-    if (slot == LaneSlot::Primary) {
+    if (slot != LaneSlot::Primary) {
+        return;
+    }
+
+    // A connect() attempt still owns the failure. Completing that callback is
+    // what schedules the first retry; firing transport-lost as well would
+    // reconnect twice.
+    if (m_pending_connect_callback) {
         complete_pending_connect(false);
+        return;
+    }
+
+    if (!was_connected) {
+        return;
+    }
+
+    // The socket is gone. Leave the session unauthenticated immediately so
+    // submits and GET_BLOCK cannot treat a stale push timestamp as liveness.
+    if (m_session_context) {
+        m_session_context->end_session();
+    }
+
+    if (m_transport_lost_handler && m_io_context) {
+        auto handler = m_transport_lost_handler;
+        ::asio::post(*m_io_context, [handler = std::move(handler)]() {
+            if (handler) {
+                handler();
+            }
+        });
     }
 }
 
@@ -871,6 +903,11 @@ void NodeSession::set_replacement_pending_handler(Replacement_pending_handler ha
 {
     m_replacement_pending_handler = std::move(handler);
     rewire_protocol_handlers();
+}
+
+void NodeSession::set_transport_lost_handler(Transport_lost_handler handler)
+{
+    m_transport_lost_handler = std::move(handler);
 }
 
 void NodeSession::set_miner_keys(const std::vector<uint8_t>& pubkey, const std::vector<uint8_t>& privkey)

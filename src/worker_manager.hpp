@@ -24,6 +24,9 @@
 #include <mutex>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <optional>
+#include <vector>
 
 namespace asio { class io_context; }
 
@@ -187,6 +190,9 @@ private:
     void handle_recovery_confirmed(const char* reason);
 
     void retry_connect(network::Endpoint const& wallet_endpoint, bool force_transport_reset = false);
+    void handle_transport_lost(const char* reason);
+    bool transmit_prepared_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce);
+    void flush_pending_submit(const char* reason);
     void enter_terminal_degraded_mode_internal(int signal_number, const char* reason);
     void handle_node_shutdown(uint8_t reason);
 
@@ -404,6 +410,17 @@ private:
     // Reset in stop_all_workers() and clear_recovery_state().
     bool m_recovery_workers_spawned{false};
     RecoveryCompletionKind m_pending_recovery_completion_kind{RecoveryCompletionKind::NONE};
+
+    // Solved block that could not be queued because the socket dropped.
+    // Retried once the next authenticated session can build a fresh payload.
+    // Io-thread only: solution callbacks are posted onto m_io_context.
+    struct PendingSubmit {
+        std::vector<uint8_t> block_bytes;
+        uint64_t nonce{0};
+        std::chrono::steady_clock::time_point found_at{};
+    };
+    std::optional<PendingSubmit> m_pending_submit;
+    static constexpr int64_t PENDING_SUBMIT_MAX_AGE_SECONDS = 180;
 
     // ── Three-tier mined-block confirmation cache ────────────────────────────
     // Tier 1: last 5 mined blocks (confirmation tracking active)

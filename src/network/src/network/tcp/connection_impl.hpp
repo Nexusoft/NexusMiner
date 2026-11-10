@@ -50,10 +50,13 @@ public:
     void handle_accept(Connection::Handler connection_handler);
 
 private:
+    enum class EmptyReadAction { Closed, Rearm, Abort, DataAppeared };
+
     std::weak_ptr<Connection_impl<ProtocolDescriptionType>> get_weak_self();
     Result::Code initialise_socket();
     void transmit_trigger();
     void receive();
+    EmptyReadAction classify_empty_read();
     void change(Result::Code code);
     void close_internal(Result::Code code);
 
@@ -181,23 +184,57 @@ inline void Connection_impl<ProtocolDescriptionType>::receive()
             if (!error) 
             {
                 // read length of received message;
-                auto const length = self->m_asio_socket->available();
-                if (length == 0)
+                ::asio::error_code available_error;
+                auto length = self->m_asio_socket->available(available_error);
+                if (available_error)
                 {
                     if (self->m_logger)
                     {
-                        self->m_logger->warn("[LLP RECV] Connection closed by remote (EOF, no data available)");
+                        self->m_logger->error("[LLP RECV] available() failed: {}", available_error.message());
                     }
-                    self->change(Result::Code::connection_closed);
+                    self->change(Result::Code::connection_aborted);
                     return;
+                }
+                if (length == 0)
+                {
+                    // null_buffers readiness with available()==0 is not proof of
+                    // EOF. A spurious wakeup must re-arm; only a non-blocking
+                    // peek that returns 0/eof/reset is a real interrupt.
+                    switch (self->classify_empty_read())
+                    {
+                    case EmptyReadAction::Rearm:
+                        self->receive();
+                        return;
+                    case EmptyReadAction::DataAppeared:
+                        length = self->m_asio_socket->available(available_error);
+                        if (available_error || length == 0)
+                        {
+                            self->receive();
+                            return;
+                        }
+                        break;
+                    case EmptyReadAction::Closed:
+                        if (self->m_logger)
+                        {
+                            self->m_logger->warn("[LLP RECV] Connection closed by remote (EOF, no data available)");
+                        }
+                        self->change(Result::Code::connection_closed);
+                        return;
+                    case EmptyReadAction::Abort:
+                        self->change(Result::Code::connection_aborted);
+                        return;
+                    }
                 }
 
                 Shared_payload receive_buffer = std::make_shared<std::vector<std::uint8_t>>(length);
-                receive_buffer->resize(length);
-
-                self->m_asio_socket->receive(asio::buffer(*receive_buffer, receive_buffer->size()), 0, error);
-                if (!error)
+                const auto bytes_read = self->m_asio_socket->receive(
+                    asio::buffer(*receive_buffer, receive_buffer->size()), 0, error);
+                if (!error && bytes_read > 0)
                 {
+                    // available() can over-report across a connection interrupt.
+                    // Passing the unread tail would inject zero bytes into the
+                    // RX accumulator and look like a malformed frame.
+                    receive_buffer->resize(bytes_read);
                     // Log received LLP packets using lane-aware parsing
                     if (self->m_logger && receive_buffer && !receive_buffer->empty())
                     {
@@ -329,6 +366,19 @@ inline void Connection_impl<ProtocolDescriptionType>::receive()
                     }
                     self->receive();
                 }
+                else if (!error || error == ::asio::error::eof || error == ::asio::error::connection_reset)
+                {
+                    if (self->m_logger)
+                    {
+                        self->m_logger->warn("[LLP RECV] Connection closed by remote during read: {}",
+                                             error ? error.message() : "short read returned 0");
+                    }
+                    self->change(Result::Code::connection_closed);
+                }
+                else if (error == ::asio::error::would_block || error == ::asio::error::try_again)
+                {
+                    self->receive();
+                }
                 else
                 {
                     // established connection fails for any other reason
@@ -368,6 +418,50 @@ inline void Connection_impl<ProtocolDescriptionType>::receive()
             }
         }
     });
+}
+
+template<typename ProtocolDescriptionType>
+inline typename Connection_impl<ProtocolDescriptionType>::EmptyReadAction
+Connection_impl<ProtocolDescriptionType>::classify_empty_read()
+{
+    if (!m_asio_socket)
+    {
+        return EmptyReadAction::Abort;
+    }
+
+    ::asio::error_code mode_error;
+    const bool was_non_blocking = m_asio_socket->non_blocking();
+    m_asio_socket->non_blocking(true, mode_error);
+    if (mode_error)
+    {
+        return EmptyReadAction::Abort;
+    }
+
+    std::uint8_t peek_byte = 0;
+    ::asio::error_code peek_error;
+    const auto peeked = m_asio_socket->receive(
+        ::asio::buffer(&peek_byte, 1),
+        ::asio::socket_base::message_peek,
+        peek_error);
+
+    ::asio::error_code restore_error;
+    m_asio_socket->non_blocking(was_non_blocking, restore_error);
+
+    if (!peek_error && peeked > 0)
+    {
+        return EmptyReadAction::DataAppeared;
+    }
+    if (peek_error == ::asio::error::would_block || peek_error == ::asio::error::try_again)
+    {
+        return EmptyReadAction::Rearm;
+    }
+    if (!peek_error || peeked == 0 ||
+        peek_error == ::asio::error::eof ||
+        peek_error == ::asio::error::connection_reset)
+    {
+        return EmptyReadAction::Closed;
+    }
+    return EmptyReadAction::Abort;
 }
 
 template<typename ProtocolDescriptionType>

@@ -92,6 +92,28 @@ Template refresh / GET_BLOCK recovery is still valid while a session remains
 authenticated, but once the session is gone the miner must treat all previous
 session-bound work as stale.
 
+## Established transport loss
+
+A mid-session socket close is not `SESSION_EXPIRED`. The node is gone, so
+in-band login cannot succeed, and a push timestamp from before the interrupt
+is not evidence that the TCP session is still alive.
+
+`NodeSession::mark_lane_socket_failed()` therefore:
+
+1. clears that lane's RX accumulator so a partial frame cannot poison the next
+   connection
+2. ends the authoritative session when the primary socket was already up
+3. posts `transport_lost` unless `connect()` still owns the failure
+
+`Worker_manager` stops workers and force-reconnects. It does not consult the
+push-alive guard on that path. The template health monitor repeats the same
+recovery if the socket is down, because `get_active_protocol()` is null for the
+entire reconnect window and cannot be the only place stall detection runs.
+
+A solved block that could not be queued is stashed for up to 180 seconds and
+retried after the replacement session can build a payload. The retry is one
+shot; a moved tip is still the node's rejection to make.
+
 ## Local recovery phases vs authoritative session truth
 
 The local `Worker_manager` recovery phase and the authoritative

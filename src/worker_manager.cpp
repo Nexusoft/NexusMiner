@@ -596,6 +596,7 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
             if (m_node_shutdown_quarantine.exchange(false, std::memory_order_acq_rel)) {
                 m_logger->warn("[Worker_manager] NODE_SHUTDOWN quarantine cleared after fresh template distribution");
             }
+            flush_pending_submit("template_fed");
             clear_recovery_state();
 
             auto protocol = m_primary_node_session ? m_primary_node_session->get_active_protocol() : nullptr;
@@ -782,7 +783,9 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                             self->m_logger->warn("[Session] In-band re-auth failed (no active connection) — "
                                                   "scheduling TCP reconnect as fallback");
                             if (self->m_primary_endpoint.is_valid()) {
-                                self->retry_connect(self->m_primary_endpoint);
+                                // No socket to log in on. A push timestamp from the
+                                // dead session must not suppress the TCP reconnect.
+                                self->retry_connect(self->m_primary_endpoint, true);
                             } else {
                                 self->m_logger->error("[Session] No endpoint available for reconnect fallback");
                             }
@@ -792,6 +795,18 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
             }
         );
         m_logger->info("[Worker_manager] Session expired handler registered");
+
+        // Established socket loss is not SESSION_EXPIRED: the node is gone, so
+        // in-band re-auth cannot run. NodeSession posts this off the receive
+        // stack. weak_from_this() keeps a queued event safe if stop() wins the race.
+        m_primary_node_session->set_transport_lost_handler([weak_self = weak_from_this()]() {
+            auto self = weak_self.lock();
+            if (!self) {
+                return;
+            }
+            self->handle_transport_lost("primary_socket_closed");
+        });
+        m_logger->info("[Worker_manager] Transport-lost handler registered");
 
         /* ========== REGISTER RECOVERY-CONFIRMED HANDLER ========== */
         /* Called by Solo when the node re-serves BLOCK_DATA identical to the template   */
@@ -862,6 +877,7 @@ Worker_manager::Worker_manager(std::shared_ptr<asio::io_context> io_context, Con
                 }
 
                 // Successful authentication: reset session auth failure counter
+                flush_pending_submit("session_authenticated");
                 m_session_auth_fail_count = 0;
                 ++m_session_generation;  // New session — invalidate stale timer dispatches
                 if (m_session_auth_retry_timer) {
@@ -1955,22 +1971,114 @@ bool Worker_manager::connect(network::Endpoint const& wallet_endpoint)
 }
 
 
-void Worker_manager::submit_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce)
+bool Worker_manager::transmit_prepared_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce)
 {
-    // Use NodeSession to submit block (handles SIM Link dual-lane submission internally)
-    if (m_primary_node_session && m_primary_node_session->is_authenticated())
+    if (!m_primary_node_session ||
+        !m_primary_node_session->is_primary_connected() ||
+        !m_primary_node_session->is_authenticated())
     {
-        auto packet = m_primary_node_session->submit_block(full_block_bytes, nNonce);
-        if (packet && !packet->empty())
-        {
-            if (!m_primary_node_session->transmit(packet)) {
-                m_logger->error("[Worker_manager] Block submission failed — payload was not queued");
-            }
-            return;
-        }
+        m_logger->error("[Worker_manager] Block submission failed — transport or session is not usable "
+                        "(connected={}, authenticated={})",
+                        m_primary_node_session && m_primary_node_session->is_primary_connected(),
+                        m_primary_node_session && m_primary_node_session->is_authenticated());
+        return false;
     }
 
-    m_logger->error("[Worker_manager] Block submission failed — NodeSession not authenticated!");
+    auto packet = m_primary_node_session->submit_block(full_block_bytes, nNonce);
+    if (!packet || packet->empty())
+    {
+        m_logger->error("[Worker_manager] Block submission failed — protocol did not build a payload");
+        return false;
+    }
+    if (!m_primary_node_session->transmit(packet))
+    {
+        m_logger->error("[Worker_manager] Block submission failed — payload was not queued");
+        return false;
+    }
+    return true;
+}
+
+void Worker_manager::flush_pending_submit(const char* reason)
+{
+    if (!m_pending_submit)
+    {
+        return;
+    }
+
+    const auto age_s = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - m_pending_submit->found_at).count();
+    if (age_s > PENDING_SUBMIT_MAX_AGE_SECONDS)
+    {
+        m_logger->error("[Worker_manager] Dropping solved block stashed during transport loss "
+                        "(age {}s > {}s)",
+                        age_s, PENDING_SUBMIT_MAX_AGE_SECONDS);
+        m_pending_submit.reset();
+        return;
+    }
+
+    if (!m_primary_node_session ||
+        !m_primary_node_session->is_primary_connected() ||
+        !m_primary_node_session->is_authenticated())
+    {
+        return;
+    }
+
+    const auto pending = *m_pending_submit;
+    if (!transmit_prepared_solution(pending.block_bytes, pending.nonce))
+    {
+        m_logger->warn("[Worker_manager] Solved block still queued after {} (age {}s)",
+                       reason ? reason : "recovery", age_s);
+        return;
+    }
+
+    m_logger->info("[Worker_manager] Retried solved block after transport recovery ({}, age {}s)",
+                   reason ? reason : "recovery", age_s);
+    m_pending_submit.reset();
+}
+
+void Worker_manager::submit_solution(const std::vector<uint8_t>& full_block_bytes, uint64_t nNonce)
+{
+    if (transmit_prepared_solution(full_block_bytes, nNonce))
+    {
+        m_pending_submit.reset();
+        return;
+    }
+
+    m_pending_submit = PendingSubmit{
+        full_block_bytes,
+        nNonce,
+        std::chrono::steady_clock::now()
+    };
+    m_logger->error("[Worker_manager] Block submission not queued — stashing solved block "
+                    "for one retry after the session is usable again");
+}
+
+void Worker_manager::handle_transport_lost(const char* reason)
+{
+    if (m_terminal_stop_requested.load(std::memory_order_acquire) || is_degraded_terminal())
+    {
+        return;
+    }
+    if (is_reconnecting())
+    {
+        m_logger->debug("[Worker_manager] Transport lost ({}) ignored — reconnect already in progress",
+                        reason ? reason : "unknown");
+        return;
+    }
+    if (!m_primary_endpoint.is_valid())
+    {
+        m_logger->error("[Worker_manager] Transport lost ({}) but no endpoint is available for reconnect",
+                        reason ? reason : "unknown");
+        return;
+    }
+
+    m_logger->error("[Worker_manager] Primary transport lost ({}) — stopping workers and reconnecting",
+                    reason ? reason : "unknown");
+    stop_all_workers();
+    m_pending_recovery_completion_kind = RecoveryCompletionKind::TRANSPORT_RECONNECT;
+    // force_transport_reset: a recent push timestamp must not suppress TCP
+    // reconnect or attempt in-band login on the socket that just died.
+    retry_connect(m_primary_endpoint, true);
 }
 
 void Worker_manager::log_lane_health()
@@ -2880,8 +2988,48 @@ void Worker_manager::check_template_health()
     if (m_terminal_stop_requested.load(std::memory_order_acquire)) {
         return;
     }
+    if (!m_primary_node_session) {
+        return;
+    }
 
-    auto solo_protocol = m_primary_node_session ? m_primary_node_session->get_active_protocol() : nullptr;
+    // get_active_protocol() is null whenever the primary socket is down, including
+    // the entire RECONNECTING window. Stall detection and transport-loss recovery
+    // must run before that lookup or a dropped connection is invisible here.
+    if (is_reconnecting()) {
+        if (m_recovery.reconnect_started_at == std::chrono::steady_clock::time_point{}) {
+            m_logger->warn("[Worker_manager] RECONNECTING but reconnect_started_at unset — "
+                           "logic error detected; stamping now to allow timeout guard");
+            m_recovery.reconnect_started_at = std::chrono::steady_clock::now();
+        }
+        auto reconnect_age_s = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::steady_clock::now() - m_recovery.reconnect_started_at).count();
+        // Extended from 60s to 90s to avoid racing exponential backoff retries
+        // that may have a scheduled attempt at 60-65s.
+        constexpr int64_t MAX_RECONNECT_WAIT_SECONDS = 90;
+        if (reconnect_age_s <= MAX_RECONNECT_WAIT_SECONDS) {
+            return;
+        }
+        if (!m_primary_node_session->is_primary_connected()) {
+            m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s with no socket — "
+                           "forcing a fresh TCP reconnect",
+                           reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
+            transition_to(RecoveryPhase::WAITING_TEMPLATE, "reconnect_timeout");
+            handle_transport_lost("reconnect_stall");
+            return;
+        }
+        // The socket came back. Leave RECONNECTING so the template ladder below
+        // can request work instead of tearing down a live session.
+        m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s — clearing RECONNECTING phase",
+                       reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
+        transition_to(RecoveryPhase::WAITING_TEMPLATE, "reconnect_timeout");
+    }
+
+    if (!m_primary_node_session->is_primary_connected()) {
+        handle_transport_lost("health_primary_disconnected");
+        return;
+    }
+
+    auto solo_protocol = m_primary_node_session->get_active_protocol();
     if (!solo_protocol) {
         return;
     }
@@ -2919,30 +3067,8 @@ void Worker_manager::check_template_health()
         }
     }
 
-    // Guard against a stalled reconnect. If RECONNECTING phase has been active for
-    // more than 60 seconds, the TCP connect attempt itself has likely failed silently.
-    // Transition back to WAITING_TEMPLATE so the escape ladder is not indefinitely suppressed.
-    if (is_reconnecting()) {
-        if (m_recovery.reconnect_started_at == std::chrono::steady_clock::time_point{}) {
-            m_logger->warn("[Worker_manager] RECONNECTING but reconnect_started_at unset — "
-                           "logic error detected; stamping now to allow timeout guard");
-            m_recovery.reconnect_started_at = std::chrono::steady_clock::now();
-        }
-        auto reconnect_age_s = std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::steady_clock::now() - m_recovery.reconnect_started_at).count();
-        // Bug 6 fix: Extended from 60s to 90s to avoid racing exponential backoff
-        // retries that may have a scheduled attempt at 60-65s.  The extra 30s margin
-        // ensures the stall guard only fires when retries have genuinely stalled.
-        constexpr int64_t MAX_RECONNECT_WAIT_SECONDS = 90;
-        if (reconnect_age_s > MAX_RECONNECT_WAIT_SECONDS) {
-            m_logger->warn("[Worker_manager] Reconnect stalled for {}s > {}s — clearing RECONNECTING phase",
-                           reconnect_age_s, MAX_RECONNECT_WAIT_SECONDS);
-            transition_to(RecoveryPhase::WAITING_TEMPLATE, "reconnect_timeout");
-        }
-    }
-
-    // A node-requested wait is not a template outage. Transport failures still
-    // use their normal recovery paths, including the reconnect stall guard above.
+    // A node-requested wait is not a template outage. A down socket is handled
+    // before this function looks up the active protocol.
     const bool node_retry_deferred = !is_reconnecting() &&
         m_primary_node_session->is_primary_connected() &&
         solo_protocol->is_authenticated() &&

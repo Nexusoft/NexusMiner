@@ -285,6 +285,16 @@ public:
     void set_replacement_pending_handler(Replacement_pending_handler handler);
 
     /**
+     * @brief Notified when an already-established primary socket drops.
+     *
+     * Initial connect failures still complete the connect() callback and do not
+     * invoke this handler. The callback is posted onto the session io_context so
+     * it cannot re-enter Connection::close() from the receive stack.
+     */
+    using Transport_lost_handler = std::function<void()>;
+    void set_transport_lost_handler(Transport_lost_handler handler);
+
+    /**
      * @brief Set Falcon miner keys
      * @param pubkey Public key
      * @param privkey Private key
@@ -505,6 +515,7 @@ private:
     Session_start_handler m_session_start_handler;
     Node_shutdown_handler m_node_shutdown_handler;
     Replacement_pending_handler m_replacement_pending_handler;
+    Transport_lost_handler m_transport_lost_handler;
     std::vector<uint8_t> m_miner_pubkey;
     std::vector<uint8_t> m_miner_privkey;
     std::string m_reward_address;
