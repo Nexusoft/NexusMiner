@@ -16,6 +16,9 @@ sudo apt-get install -y libboost-all-dev libgmp-dev
 
 # Required for CUDA (Nvidia GPU mining)
 # Install CUDA Toolkit from https://developer.nvidia.com/cuda-downloads
+
+# Required for AMD GPU Prime mining
+# Install the ROCm/HIP development toolkit
 ```
 
 ### Windows
@@ -48,6 +51,29 @@ The following CMake options control which features are built:
 | `WITH_GPU_CUDA` | OFF | Nvidia GPU mining (requires CUDA Toolkit) |
 | `WITH_GPU_AMD` | OFF | AMD GPU mining (requires HIP + ROCm) |
 | `NEXUSMINER_STATIC_OPENSSL` | ON (OFF on macOS) | Link OpenSSL statically |
+
+### Building GPU support without a GPU
+
+A Linux build machine does not need a GPU or a loaded NVIDIA/AMD GPU driver
+to compile GPU code. It does need the development toolkit for each backend
+being built: CUDA Toolkit (including `nvcc`) for NVIDIA, or ROCm/HIP (including
+the ROCm Clang compiler) for AMD. Install toolkit/development packages rather
+than driver-bundling metapackages if the machine has no GPU.
+
+On a GPU-less NVIDIA build host, specify an architecture at configure time so
+CMake does not need to detect a GPU, for example
+`-DCMAKE_CUDA_ARCHITECTURES=75`. The `gpu` target currently builds for CUDA
+architectures 61, 75, 80, 86, 89 and 90 regardless of that setting, so the
+installed CUDA toolkit must support all of them. AMD builds may likewise need
+an explicit target architecture supported by the installed ROCm compiler.
+AMD Prime support remains experimental; AMD hash mining is not supported.
+
+Compilation and host-only tests do **not** demonstrate GPU mining works. To
+verify a Linux GPU release, run it on a machine with a supported GPU, a
+compatible driver and runtime libraries, and test the intended mining channel
+against a node or pool. Toolkit/driver compatibility and the recipient's GPU
+architecture also matter. The `gpu-host-stubs` preset does not build real
+GPU kernels and is not a GPU-mining release.
 
 ## Build Commands
 
@@ -153,7 +179,7 @@ cmake -DOPENSSL_ROOT_DIR=/usr \
 ## Requirements
 
 * **CMake**: 3.21 or later
-* **C++17 compiler**: GCC 7+, Clang 5+, or MSVC 2017+
+* **C++20 compiler**
 * **OpenSSL**: 1.1.1 or 3.0+ (auto-detected)
 * **CUDA Toolkit** (optional, for Nvidia GPU mining)
 * **ROCm/HIP** (optional, for AMD GPU mining)
