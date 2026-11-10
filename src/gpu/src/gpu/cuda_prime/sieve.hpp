@@ -79,7 +79,12 @@ namespace nexusminer {
 
 			static constexpr int m_estimated_chains_per_million = 4;
 			static constexpr uint32_t m_max_chains = 2 * Cuda_sieve::m_estimated_chains_per_million * Cuda_sieve::m_sieve_max_range / 1e6;
-			static constexpr uint32_t m_max_long_chains = 32;
+			// Testnet difficulty produces far more reportable chains per batch than
+			// mainnet.  32 overflowed the long-chain buffer (atomicInc then wrote
+			// one past the end and wrapped onto slot 0).  Overflow is now dropped
+			// instead of wrapping; 4096 keeps low-difficulty batches from silently
+			// discarding winners.  ~1 MiB at CudaChain size.
+			static constexpr uint32_t m_max_long_chains = 4096;
 			// Per-session target Cunningham chain length.  This was previously a
 			// fixed `static constexpr int = 9`, which silently dropped length-7/8
 			// winners at pool difficulty < 9 (the GPU "ignores difficulty" bug).
@@ -102,7 +107,10 @@ namespace nexusminer {
 			static constexpr int m_large_prime_count = 32 * GPU_LARGE_PRIME_COUNT;
 			static constexpr int m_trial_division_prime_count = 0;
 
-			static constexpr int chain_histogram_max = 10;  
+			// Bucket count is chain_histogram_max+1 and must match
+			// stats::kPrimeHistogramBuckets (12).  A max of 10 dropped length-11
+			// chains from the GPU stats path after the CPU histogram was widened.
+			static constexpr int chain_histogram_max = 11;  
 			//static const uint64_t m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
 			//static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
 			

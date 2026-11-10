@@ -11,7 +11,8 @@
 #include <cmath>
 #include <cstring>
 #include <stdexcept>
-#include <sstream> 
+#include <sstream>
+#include <iomanip>
 #include <boost/random.hpp>
 
 namespace nexusminer
@@ -26,6 +27,9 @@ using nexusminer::prime::kPrimeOffsetFractionBytes;
 using nexusminer::prime::kMinSerializedPrimeOffsets;
 using nexusminer::prime::kMaxSerializedPrimeOffsets;
 using nexusminer::prime::is_well_formed_prime_offsets;
+
+static_assert(Cuda_sieve::chain_histogram_max + 1 == stats::kPrimeHistogramBuckets,
+    "GPU chain histogram must cover every stats bucket");
 
 constexpr std::size_t kBoostUint1kLimbBytes = sizeof(boost::multiprecision::limb_type);
 }
@@ -104,6 +108,7 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 		m_stop = true;
 		m_new_work = true;
 		m_running = true;
+		m_template_consumed = false;  // Option D: fresh template, allow mining again
 	}
 
 	// Wake up the worker thread
@@ -151,6 +156,7 @@ void Worker_prime::set_block(std::shared_ptr<WorkPackage> work_package, Worker::
 		m_stop = true;
 		m_new_work = true;
 		m_running = true;
+		m_template_consumed = false;  // Option D: fresh template, allow mining again
 	}
 
 	// Wake up the worker thread
@@ -262,10 +268,13 @@ void Worker_prime::run()
 
 		while (!m_stop)
 	{
-		// Check for new work at the top of the loop
+		// Check for new work at the top of the loop.
+		// Option D: also exit when this template already produced a submit.
+		// Otherwise GPU prime keeps grinding the same base hash after a find,
+		// unlike the CPU prime path that is known to mine on testnet.
 		{
 			std::unique_lock<std::mutex> lck(m_mtx);
-			if (m_new_work)
+			if (m_new_work || m_template_consumed)
 			{
 				break;
 			}
@@ -329,7 +338,7 @@ void Worker_prime::run()
 				actual_difficulty);
 
 			m_segmented_sieve->m_best_chain = std::max(actual_difficulty, m_segmented_sieve->m_best_chain);
-			m_logger->info("Actual difficulty {} required {}", actual_difficulty, required_difficulty);
+			m_logger->debug("Actual difficulty {} required {}", actual_difficulty, required_difficulty);
 			if (is_valid)
 			{
 				assert(is_well_formed_prime_offsets(offsets) &&
@@ -344,6 +353,9 @@ void Worker_prime::run()
 					continue;
 				}
 
+				m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "✓ FOUND VALID PRIME BLOCK! Difficulty: {:.6f} (required: {:.6f}), offsets: {}"),
+					actual_difficulty, required_difficulty, offsets.size());
+
 				//we found a valid chain.  submit it.
 				if (m_found_nonce_callback)
 				{
@@ -357,6 +369,13 @@ void Worker_prime::run()
 						self->m_found_nonce_callback(self->m_config.m_internal_id,
 							std::move(bd));
 					});
+					// Option D: stop grinding this template.  Do not set the
+					// flag when the callback is null — that matches CPU prime
+					// and avoids idling a worker that never submitted.
+					{
+						std::scoped_lock<std::mutex> lck(m_mtx);
+						m_template_consumed = true;
+					}
 				}
 				else
 				{

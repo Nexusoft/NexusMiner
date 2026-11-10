@@ -35,7 +35,9 @@ public:
 
     // Sets a new block (nexus data type) for the miner worker. The miner worker must reset the current work.
     // When  the worker finds a new block, the BlockFoundHandler has to be called with the found BlockData
-    void set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result) override;
+    // ::LLP, not LLP.  worker_manager includes miner_opcodes.hpp first, which
+    // opens nexusminer::LLP and would hide the block type.
+    void set_block(::LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result) override;
 
     // Optimized version: accepts shared WorkPackage to eliminate repeated block data construction
     void set_block(std::shared_ptr<WorkPackage> work_package, Worker::Block_found_handler result) override;

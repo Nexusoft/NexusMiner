@@ -5,6 +5,7 @@
 #include "sieve_small_prime_constants.cuh"
 #include "sieve_lookup_tables.cuh"
 #include "mining/prime_thresholds.hpp"
+#include "../prime/sieve_utils.hpp"
 #include <algorithm>
 #include <stdio.h>
 #include <math.h>
@@ -259,24 +260,11 @@ namespace nexusminer {
                     //get aligned to this region
                     if (s == 0)
                     {
-                        j = starting_multiples[i];
-                        //the first time through we need to calculate the starting offsets
-                        if (start_offset > 0)
-                        {
-                            uint64_t x = start_offset - j;
-                            //offset to the first integer multiple of the prime above the starting offset
-                            uint32_t m = k - (x % k);
-                            //find the next integer multiple of the prime that is not divisible by 2,3 or 5
-                            m += (m % 2 == 0) ? k : 0;
-                            m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
-                            m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
-                            j = m;
-                            //this does the same thing as above - it gets the next multiple using prime inverse mod 30 and a lookup table. 
-                            //prime_mod_inv = prime_mod30_inverse[k % 30];
-                            //j = m + k * next_multiple_mod30_offset[((m % 30) * prime_mod_inv) % 30];
-                        }
-                        //else
-                            //j -= start_offset;
+                        // Do not subtract start_offset from the starting multiple
+                        // unconditionally: if the first wheel hit is still ahead of
+                        // this region, that unsigned subtract wraps and the sieve
+                        // crosses off the wrong residues.
+                        j = region_wheel_multiple_offset(start_offset, starting_multiples[i], k);
                     }
                     else
                     {
@@ -389,25 +377,10 @@ namespace nexusminer {
                 for (uint32_t i = warp_id; i < Cuda_sieve::m_medium_small_prime_count; i += stride/32)
                 {
                     k = sieving_primes[i];
-                    j = starting_multiples[i];
-
-                    //the first time through we need to calculate the starting offsets
-                    if (start_offset > 0)
-                    {
-                        uint64_t x = start_offset - j;
-                        //offset to the first integer multiple of the prime above the starting offset
-                        uint32_t m = k - (x % k);
-                        //find the next integer multiple of the prime that is not divisible by 2,3 or 5
-                        m += (m % 2 == 0) ? k : 0;
-                        m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
-                        m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
-                        j = m;
-                        //this does the same thing as above - it gets the next multiple using prime inverse mod 30 and a lookup table. 
-                        //prime_mod_inv = prime_mod30_inverse_shared[k % 30];
-                        //j = m + k * next_multiple_mod30_offset_shared[((m % 30) * prime_mod_inv) % 30];
-                    }
-                    //else
-                    //    j -= start_offset;
+                    // Same region alignment as the large-prime kernel.  The old
+                    // `start_offset - j` path wrapped when the first multiple was
+                    // still ahead of the region.
+                    j = region_wheel_multiple_offset(start_offset, starting_multiples[i], k);
                    
                     prime_mod_inv = prime_mod30_inverse_shared[k % 30];
                     unsigned int full_wheels = lane_id / 8;
@@ -538,22 +511,9 @@ namespace nexusminer {
             //for (uint32_t i = index; i < Cuda_sieve::m_large_prime_count; i += stride)
             {
                 uint32_t k = large_primes[i];
-                uint32_t j = starting_multiples[i];
-
-                //calculate the starting offsets for this block
-                if (start_offset >= j)
-                {
-                    uint64_t x = start_offset - j;
-                    //offset to the first integer multiple of the prime above the starting offset
-                    uint32_t m = k - (x % k);
-                    //find the next integer multiple of the prime that is not divisible by 2,3 or 5
-                    m += (m % 2 == 0) ? k : 0;
-                    m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
-                    m += (m % 3 == 0 || m % 5 == 0) ? 2 * k : 0;
-                    j = m;
-                }
-                else
-                    j -= start_offset;
+                // Shared with the medium kernels so a region that starts before
+                // the first wheel multiple cannot wrap the offset.
+                uint32_t j = region_wheel_multiple_offset(start_offset, starting_multiples[i], k);
                 
                 uint8_t prime_mod_inv = prime_mod30_inverse_shared[k % 30];
                 uint8_t wheel_index = sieve30_index_shared[(prime_mod_inv * j) % 30];
@@ -725,6 +685,10 @@ namespace nexusminer {
         void Cuda_sieve_impl::get_chains(CudaChain chains[], uint32_t& chain_count)
         {
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_last_chain_index.get(), sizeof(*d_last_chain_index.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            if (chain_count > Cuda_sieve::m_max_chains)
+                chain_count = Cuda_sieve::m_max_chains;
+            if (chain_count == 0)
+                return;
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(chains, d_chains.get(), chain_count * sizeof(*d_chains.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
         }
 
@@ -744,31 +708,58 @@ namespace nexusminer {
         void Cuda_sieve_impl::clean_chains()
         {
             const int threads = 256;
-            uint32_t chain_count;
+            uint32_t chain_count = 0;
             get_chain_count(chain_count);
-            int blocks = (chain_count + threads - 1) / threads;
-            //copy surviving chains to a temporary location. 
+            // A wrapped device counter must not launch past the chain buffer
+            // or copy an uninitialized survivor index back.
+            if (chain_count > Cuda_sieve::m_max_chains)
+                chain_count = Cuda_sieve::m_max_chains;
+
+            // The filter used to zero these from one thread of one block.
+            // That does not synchronize across blocks, so a multi-block clean
+            // races the reset.  The host owns both counters.
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_good_chain_index.get(), 0, sizeof(uint32_t)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_long_chain_index.get(), 0, sizeof(uint32_t)));
+
+            if (chain_count == 0)
+            {
+                checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_last_chain_index.get(), &chain_count, sizeof(chain_count), NEXUSMINER_GPU_MemcpyHostToDevice));
+                return;
+            }
+
+            const int blocks = (chain_count + threads - 1) / threads;
+            //copy surviving chains to a temporary location.
             filter_busted_chains <<<blocks, threads>>> (d_chains.get(), d_last_chain_index.get(), d_good_chains.get(), d_good_chain_index.get(),
                 d_long_chains.get(), d_last_long_chain_index.get(), d_chain_histogram.get());
-            uint32_t good_chain_count;
+            uint32_t good_chain_count = 0;
             //get the count of good chains from device memory
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&good_chain_count, d_good_chain_index.get(), sizeof(*d_good_chain_index.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
-            //copy the temporary good chain list back to the chain list
-            checkGPUErrors(NEXUSMINER_GPU_MemcpyAsync(d_chains.get(), d_good_chains.get(), good_chain_count*sizeof(*d_chains.get()), NEXUSMINER_GPU_MemcpyDeviceToDevice));
-            //update the chain count
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_last_chain_index.get(), d_good_chain_index.get(), sizeof(*d_last_chain_index.get()), NEXUSMINER_GPU_MemcpyDeviceToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&good_chain_count, d_good_chain_index.get(), sizeof(good_chain_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            if (good_chain_count > Cuda_sieve::m_max_chains)
+                good_chain_count = Cuda_sieve::m_max_chains;
+            if (good_chain_count > 0)
+            {
+                //copy the temporary good chain list back to the chain list
+                checkGPUErrors(NEXUSMINER_GPU_MemcpyAsync(d_chains.get(), d_good_chains.get(), good_chain_count*sizeof(*d_chains.get()), NEXUSMINER_GPU_MemcpyDeviceToDevice));
+            }
+            // Write the clamped host count.  Copying the device counter would
+            // republish a wrapped value and the next get_chains() would read
+            // past the buffer.
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_last_chain_index.get(), &good_chain_count, sizeof(good_chain_count), NEXUSMINER_GPU_MemcpyHostToDevice));
 
         }
 
         void Cuda_sieve_impl::get_long_chains(CudaChain chains[], uint32_t& chain_count)
         {
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_last_long_chain_index.get(), sizeof(*d_last_long_chain_index.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            if (chain_count > Cuda_sieve::m_max_long_chains)
+                chain_count = Cuda_sieve::m_max_long_chains;
             if (chain_count > 0)
             {
                 checkGPUErrors(NEXUSMINER_GPU_Memcpy(chains, d_long_chains.get(), chain_count * sizeof(*d_long_chains.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
-                //clear the long chain list
-                checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_long_chain_index.get(), 0, sizeof(*d_last_long_chain_index.get())));
             }
+            // Always clear, including the zero-count path.  Leaving a stale
+            // index makes the next filter append onto garbage.
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_last_long_chain_index.get(), 0, sizeof(*d_last_long_chain_index.get())));
         }
 
         //read the histogram
@@ -943,7 +934,10 @@ namespace nexusminer {
             d_good_chain_index.reset(raw_ptr);
             raw_ptr = nullptr;
             
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_chain, Cuda_sieve::m_max_chains/2 * sizeof(CudaChain)));
+            // Survivor list must be the same size as the source list.  A half-size
+            // buffer overflows when most chains still have a Fermat candidate,
+            // which is the common case on a low-difficulty prime testnet.
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_chain, Cuda_sieve::m_max_chains * sizeof(CudaChain)));
             d_good_chains.reset(raw_ptr_chain);
             raw_ptr_chain = nullptr;
             

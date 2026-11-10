@@ -130,7 +130,7 @@ Worker_hash::~Worker_hash()
     }
 }
 
-void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
+void Worker_hash::set_block(::LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
     // Update work data atomically and signal worker thread
     {
@@ -454,8 +454,13 @@ bool Worker_hash::step_once(Block_data& local_block,
         // and TheNonce now aliases local_block.nNonce.
         {
             std::scoped_lock<std::mutex> lck(m_mtx);
-            m_block.nNonce = local_block.nNonce;
-            found_block = m_block;
+            // Submit the block that was hashed.  Copying m_block here races
+            // set_block(): the callback would post a new template with the
+            // old nonce.  Only publish the winning nonce into the live
+            // template when that template has not already been replaced.
+            if (!m_new_work)
+                m_block.nNonce = local_block.nNonce;
+            found_block = local_block;
             found_nonce_callback = m_found_nonce_callback;
         }
         // Calculate the number of leading zero-bits (use the local
