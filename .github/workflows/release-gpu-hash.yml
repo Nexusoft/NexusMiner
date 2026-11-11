@@ -92,6 +92,22 @@ jobs:
           cuda: '12.8.0'
           method: network
           sub-packages: '["nvcc", "cudart", "visual_studio_integration", "cuobjdump"]'
+      - name: Install CUDA profiler API headers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $redist = 'https://developer.download.nvidia.com/compute/cuda/redist'
+          $manifest = Invoke-RestMethod "$redist/redistrib_12.8.0.json"
+          $package = $manifest.cuda_profiler_api.'windows-x86_64'
+          if (-not $package.relative_path -or -not $package.sha256) { throw 'CUDA profiler package is missing from the manifest' }
+          $archive = "$env:RUNNER_TEMP\cuda-profiler-api.zip"
+          Invoke-WebRequest "$redist/$($package.relative_path)" -OutFile $archive
+          if ((Get-FileHash -Algorithm SHA256 $archive).Hash -ne $package.sha256) { throw 'CUDA profiler API checksum mismatch' }
+          $extracted = "$env:RUNNER_TEMP\cuda-profiler-api"
+          Expand-Archive -Path $archive -DestinationPath $extracted
+          $headers = @(Get-ChildItem $extracted -Recurse -Filter cuda_profiler_api.h)
+          if ($headers.Count -ne 1) { throw 'CUDA profiler API header is missing or ambiguous' }
+          Copy-Item $headers[0].FullName "$env:CUDA_PATH\include\cuda_profiler_api.h"
       - name: Install vcpkg
         shell: pwsh
         run: |
