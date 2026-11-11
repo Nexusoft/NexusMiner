@@ -17,9 +17,11 @@ build does not establish that it mines correctly.
 
 1. Start a synchronized Nexus node with mining enabled and the mining wallet
    unlocked. These examples use `127.0.0.1:8323`, the default legacy mining
-   lane, for **both channels**. If your node uses a different mining port,
-   change `[wallet] port` to match it. `9323` is the stateless lane when your
-   node supports it; ports are protocol lanes, not channel numbers.
+   lane, for **both channels**. The miner selects legacy framing only for port
+   `8323`; every other port selects stateless framing. Use `9323` (or another
+   port) only for a stateless node endpoint. A relocated legacy endpoint or
+   tunnel must remain reachable by the miner on port `8323`. Ports select
+   protocol lanes, not mining channels.
 2. In your wallet, run `system/get/info` and copy the 64-character `genesis`
    hash. Use that value for both `genesis` and `reward_address` to receive
    rewards on the same Tritium sigchain. The reward address here is a genesis
