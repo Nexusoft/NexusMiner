@@ -212,7 +212,7 @@ including CPU Prime. They can be used with `configs/gpu-hash-solo.config`
 and require an NVIDIA GPU and compatible driver.
 
 Linux binaries are built on Ubuntu 24.04 and require compatible glibc,
-libstdc++, OpenSSL 3, and GMP libraries. The NVIDIA build uses CUDA 12.8 and
+libstdc++, and OpenSSL 3; Prime builds also require GMP. The NVIDIA builds use CUDA 12.8 and
 targets architectures 61, 75, 80, 86, 89 and 90; it requires a compatible
 NVIDIA GPU and driver. macOS CPU archives include the GMP dynamic library and
 statically link OpenSSL.
