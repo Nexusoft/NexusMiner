@@ -188,12 +188,9 @@ cmake -DOPENSSL_ROOT_DIR=/usr \
 
 ## After Building
 
-Before running `NexusMiner`, copy `example.miner.config` to the build folder (renaming it to `miner.conf`) and edit it with your settings. See the [Configuration Reference](docs/reference/nexus.conf.md) for details on configuring the miner.
-
-For Falcon authentication setup (required for solo mining), see the main [README.md](README.md) or run:
-```bash
-./NexusMiner --create-falcon-config
-```
+Follow the [mining setup guide](configs/README.md) to choose a CPU Prime or
+NVIDIA Hash config, configure your node and keys, and start the miner. Keep
+the `.config` extension: `miner.conf` is interpreted as JSON.
 
 ## Preparing release artifacts
 

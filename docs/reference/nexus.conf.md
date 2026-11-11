@@ -1,4 +1,4 @@
-# NexusMiner Configuration Reference (nexus.conf)
+# NexusMiner Configuration Reference
 
 Complete reference for all configuration options in NexusMiner.
 
@@ -32,14 +32,14 @@ channel = 1
 ```
 
 **Example Files:**
-- `docs/reference/config-examples/master-reference.config` - Complete TOML documentation
-- `docs/reference/config-examples/solo-mining-prime.conf` - Prime mining template
-- `docs/reference/config-examples/solo-mining-hash.conf` - Hash mining template
+- [configs/cpu-prime-solo.config](../../configs/cpu-prime-solo.config) - CPU Prime starter
+- [configs/gpu-hash-solo.config](../../configs/gpu-hash-solo.config) - NVIDIA GPU Hash starter
+- [configs/MASTER-REFERENCE.config](../../configs/MASTER-REFERENCE.config) - Options reference
 
 See [docs/reference/toml-format.md](toml-format.md) for complete TOML guide.
 
 ### JSON Format (.conf) - Legacy
-Traditional JSON format, backward compatible.
+Filenames not ending in `.config`, including `.conf` and `.toml`, use the JSON parser.
 ```json
 {
     "wallet_ip": "127.0.0.1",
@@ -109,16 +109,13 @@ port = 9323
 
 ### `miner_falcon_pubkey` / `[falcon] pubkey`
 **Type:** String (Hex)  
-**Length:** 897 bytes (Falcon-512) or 1793 bytes (Falcon-1024)  
+**Length:** 897 bytes (Falcon-512) or 1793 bytes (Falcon-1024), encoded as hex
 **Description:** Falcon public key for miner authentication.
 
 **Generation:**
 ```bash
-# Generate Falcon-1024 keys (recommended)
+# Generate keys; copy the public and private hex strings into [falcon]
 ./NexusMiner --create-keys
-
-# Generate Falcon-512 keys
-./falcon-keygen --falcon512 -o miner.conf
 ```
 
 **Security:**
@@ -138,7 +135,7 @@ pubkey = "0123456789abcdef..."  # 897 or 1793 bytes hex
 
 ### `miner_falcon_privkey` / `[falcon] privkey`
 **Type:** String (Hex)  
-**Length:** 2305 bytes (Falcon-512) or 4609 bytes (Falcon-1024)  
+**Length:** depends on the Falcon key type; store the complete hex output from the key generator.
 **Description:** Falcon private key for signing authentication.
 
 **Security:**
@@ -287,9 +284,12 @@ count = 96  # For Threadripper 128-core (leave some for OS)
 
 **GPU (Hash Channel):**
 ```toml
-# One worker per GPU
+# One worker per GPU; device indices are consecutive from [gpu] device.
 [workers]
-count = 4  # For 4 GPUs
+count = 4
+hardware = "gpu"
+[gpu]
+device = 0  # Uses devices 0, 1, 2, and 3
 ```
 
 **Hybrid (CPU + GPU):**
@@ -357,6 +357,9 @@ efficiency_cores = true
 
 ### GPU Power Controls
 
+**Not enforced:** the current workers do not apply the GPU power, clock, fan,
+or target-hashrate fields below. The `.config` GPU parser accepts only `device`.
+
 #### `power_limit_percent`
 **Type:** Integer  
 **Valid Range:** 50-100  
@@ -375,11 +378,6 @@ efficiency_cores = true
     }
 }
 ```
-
-**Impact:**
-- 100%: Maximum performance, highest power consumption
-- 80%: Good balance (20% less power, ~10% less hashrate)
-- 50%: Minimum performance, lowest power consumption
 
 ---
 
@@ -465,7 +463,7 @@ efficiency_cores = true
 **Type:** Integer  
 **Valid Range:** 50-100  
 **Default:** 100  
-**Description:** CPU power limit as percentage.
+**Description:** Parsed but not enforced by the current CPU workers.
 
 ---
 
@@ -498,11 +496,12 @@ efficiency_cores = true
 **Values:**
 - `"127.0.0.1"`: Bind to localhost only — **use this for same-machine node**
 - `"0.0.0.0"`: Bind to all interfaces — **use this for remote or VPN nodes** (default)
-- `"auto"`: Auto-detect outbound IP via DNS lookup to `google.com` — ⚠️ **NOT recommended for localhost or VPN setups**: requires working internet DNS. Will fall back to `127.0.0.1` on failure.
+- `"auto"`: Bind to `127.0.0.1` for localhost nodes, otherwise bind to
+  `0.0.0.0` and let the OS choose the source address; no internet DNS lookup
+  is needed for this choice.
 
-> **⚠️ Localhost / VPN Warning:** If your node is on the same machine (`wallet_ip = "127.0.0.1"`) or on a VPN without internet DNS, set `local_ip = "127.0.0.1"` explicitly. Using `"auto"` will attempt to resolve `google.com` and fail with a DNS error.
-> 
-> **Note:** While the default is `"0.0.0.0"`, all provided TOML configuration templates explicitly set `"127.0.0.1"` for localhost mining, which is the most common use case.
+> **Note:** Local starter templates explicitly use `127.0.0.1`. For a remote
+> node, use `0.0.0.0` or `auto` rather than binding to localhost.
 
 **Example (localhost mining):**
 ```toml
@@ -547,10 +546,14 @@ keepalive_interval = 1
 
 ### TLS/SSL Settings
 
+**Not active for mining connections:** these fields are parsed but are not
+used by the current mining connection. Use a secure tunnel for remote mining;
+setting `enable_tls` does not encrypt the connection.
+
 #### `enable_tls`
 **Type:** Boolean  
-**Default:** `false` (auto-enabled for remote connections)  
-**Description:** Enable TLS/SSL encrypted connections.
+**Default:** `false`
+**Description:** Reserved setting; currently does not enable TLS.
 
 **Example:**
 ```json
@@ -560,7 +563,7 @@ keepalive_interval = 1
 }
 ```
 
-**See:** [docs/current/security/tls-https.md](../current/security/tls-https.md)
+**Historical design:** [docs/current/security/tls-https.md](../current/security/tls-https.md)
 
 ---
 
@@ -727,21 +730,13 @@ ChaCha20-Poly1305 encryption is always enabled for:
 
 ### Remote Mining
 
-**TLS Recommended:**
-```json
-{
-    "wallet_ip": "remote-node.example.com",
-    "enable_tls": true,
-    "tls_verify_peer": true
-}
-```
+Use a secure tunnel between the miner and node. The TLS configuration fields
+are not connected to the mining socket and do not encrypt it.
 
 **Falcon Authentication:**
 - Always use Falcon-1024 for remote mining
 - Verify node authenticity
 - Use ChaCha20 encryption for public key transmission
-
-**See:** [docs/reference/config-examples/remote_tls_mining.conf](config-examples/remote_tls_mining.conf)
 
 ---
 
@@ -760,12 +755,9 @@ ls -l miner.conf
 
 ## Example Configurations
 
-See `docs/reference/config-examples/` for complete examples:
-
-### TOML Examples
-- `master-reference.config` - Complete TOML documentation
-- `solo-mining-prime.conf` - CPU Prime mining
-- `solo-mining-hash.conf` - GPU Hash mining
+See the [mining setup guide](../../configs/README.md) for the recommended
+CPU Prime and NVIDIA GPU Hash examples. Retained JSON examples are under
+`docs/reference/config-examples/`.
 
 ### JSON Examples
 - `MASTER_REFERENCE.conf` - Complete JSON documentation
@@ -773,7 +765,7 @@ See `docs/reference/config-examples/` for complete examples:
 - `hybrid_cpu_gpu.conf` - Combined CPU+GPU
 - `multi_gpu_hash.conf` - Multi-GPU with power controls
 - `threadripper_128core_prime.conf` - High-core-count CPU
-- `remote_tls_mining.conf` - Secure remote mining
+- `remote_tls_mining.conf` - Historical TLS example (not active in mining connections)
 
 ---
 
@@ -809,13 +801,6 @@ For common issues and solutions:
 
 ## Quick Start Checklist
 
-1. ✅ Generate Falcon keys: `./NexusMiner --create-keys`
-2. ✅ Get your genesis hash from Nexus wallet
-3. ✅ Get your reward address from Nexus wallet
-4. ✅ Configure `miner.conf` with your keys and addresses
-5. ✅ Set mining channel (1=Prime, 2=Hash)
-6. ✅ Configure worker count for your hardware
-7. ✅ Set file permissions: `chmod 600 miner.conf`
-8. ✅ Start mining: `./NexusMiner miner.conf`
-
-**For detailed setup:** See README.md and [docs/current/authentication/falcon-integration.md](../current/authentication/falcon-integration.md)
+Follow [mining setup](../../configs/README.md) for the current steps and
+matching binary and config. Do not use the JSON-only `-c` check for `.config`
+files; a successful check also starts mining.

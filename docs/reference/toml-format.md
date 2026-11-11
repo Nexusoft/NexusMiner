@@ -7,7 +7,7 @@ NexusMiner now supports TOML-style `.config` files as a simpler, more readable a
 ## File Format Detection
 
 - Files ending in `.config` are parsed as TOML
-- Files ending in `.conf` are parsed as JSON (backward compatible)
+- Other filenames, including `.conf` and `.toml`, are parsed as JSON
 - All existing `.conf` files continue to work without modification
 
 ## TOML Configuration Format
@@ -92,10 +92,11 @@ CPU mining settings (for Prime channel):
 threads = 1                    # Threads per worker (default: 1)
 efficiency_cores = true        # Use E-cores on hybrid CPUs (default: true)
 priority = 2                   # Thread priority: 0=low, 1=below_normal, 2=normal, 3=above_normal, 4=high
-power_limit_percent = 100      # Power limit: 50-100% (default: 100)
 hyperthreading = true          # Use hyperthreading/SMT (default: true)
-target_hashrate = 0            # Target hashrate: 0=max (default: 0)
 ```
+
+`power_limit_percent` and `target_hashrate` are parsed but not enforced by
+the current workers.
 
 #### [gpu]
 GPU mining settings (for Hash channel):
@@ -108,99 +109,20 @@ device = 0                     # GPU device index (default: 0)
 Statistics output configuration:
 ```toml
 [stats]
-mode = "console"               # Output mode: "console" or "file"
+mode = "console"               # File stats mode is not implemented for TOML
 ```
 
 #### [logging]
 Logging configuration:
 ```toml
 [logging]
-level = 2                      # 0=off, 1=error, 2=info, 3=debug
-```
-
-## Example Configurations
-
-### Solo Prime Mining
-```toml
-# miner-solo-prime.config
-[wallet]
-ip = "127.0.0.1"
-port = 8323
-
-[mining]
-channel = 1
-genesis = "YOUR_GENESIS_HASH_HERE"
-reward_address = "YOUR_GENESIS_HASH_HERE" # 64-char hex genesis hash from system/get/info (same as genesis above; NOT a Base58 account address)
-
-[workers]
-count = 8
-
-[cpu]
-threads = 1
-efficiency_cores = true
-priority = 2
-power_limit_percent = 100
-hyperthreading = true
-target_hashrate = 0
-
-[stats]
-mode = "console"
-
-[logging]
-level = 2
-```
-
-### Solo Hash Mining
-```toml
-# miner-solo-hash.config
-[wallet]
-ip = "127.0.0.1"
-port = 8323
-
-[mining]
-channel = 2
-genesis = "YOUR_GENESIS_HASH_HERE"
-reward_address = "YOUR_GENESIS_HASH_HERE" # 64-char hex genesis hash from system/get/info (same as genesis above; NOT a Base58 account address)
-
-[workers]
-count = 1
-
-[gpu]
-device = 0
-
-[stats]
-mode = "console"
-
-[logging]
-level = 2
+level = 2                      # 0=trace, 1=debug, 2=info, 3=warning
 ```
 
 ## Getting Started
 
-1. **Copy an example config:**
-   ```bash
-   cp miner-solo-prime.config miner.config
-   ```
-
-2. **Get your genesis hash:**
-   - In your Nexus wallet, run: `system/get/info`
-   - Copy the `genesis` value (64 hex characters)
-
-3. **Get your reward address:**
-   - Use the same 64-char genesis hash from step 2.
-   - Advanced: run `system/get/info` on a different sigchain to route rewards there.
-
-4. **Edit the config:**
-   ```toml
-   [mining]
-   genesis = "your_64_character_genesis_hash"
-   reward_address = "your_64_character_genesis_hash" # same as genesis unless routing to separate sigchain
-   ```
-
-5. **Run the miner:**
-   ```bash
-   ./NexusMiner miner.config
-   ```
+Follow the [mining setup guide](../../configs/README.md) to choose a real
+template, configure the genesis and Falcon keys, and start the miner.
 
 ## Features and Benefits
 
@@ -231,8 +153,11 @@ port = 8323
 [network]
 local_ip = "0.0.0.0"      # Bind to all interfaces
                           # For localhost: use 127.0.0.1
-                          # Do NOT use "auto" for localhost/VPN (requires internet DNS)
+                          # Or use "auto" to select the local bind address
 ```
+
+The current mining connection does not use the configured TLS settings.
+Use a secure tunnel for remote mining.
 
 ### Multi-threaded Workers
 ```toml
@@ -246,7 +171,7 @@ threads = 2               # 2 threads each = 8 total threads
 ### Debug Logging
 ```toml
 [logging]
-level = 3                 # Maximum verbosity
+level = 1                 # Debug verbosity (0 = trace)
 ```
 
 ## Comparison: JSON vs TOML
@@ -291,20 +216,22 @@ The TOML parser currently supports a subset of TOML features focused on mining c
 - Strings (quoted), integers, and booleans
 - Comments with `#`
 
-Most common mining configurations are supported including CPU power controls, GPU workers, and stats output.
+Common mining configurations support CPU workers, GPU workers, and console
+stats output. The GPU section currently parses only `device`.
 
-**GPU Configuration**: The TOML `[gpu]` section supports single GPU configuration only. For advanced worker configurations (multiple GPUs with individual settings, custom affinity masks), use JSON `.conf` files.
+**GPU Configuration**: `[workers] count` creates GPU workers on consecutive
+indices starting at `[gpu] device`. For individual nonconsecutive indices or
+mixed CPU/GPU workers in one instance, use JSON `.conf` files.
 
 ## Reference Files
 
-- `miner-solo-prime.config` - Prime mining example
-- `miner-solo-hash.config` - Hash mining example  
-- `MASTER-REFERENCE.config` - Complete reference with all options
-- `miner.conf.example` - JSON format example (backward compatible)
+- [CPU Prime](../../configs/cpu-prime-solo.config) and
+  [GPU Hash](../../configs/gpu-hash-solo.config) starter configs
+- [MASTER-REFERENCE.config](../../configs/MASTER-REFERENCE.config) - options reference
 
 ## Support
 
 For questions or issues:
-1. Check `MASTER-REFERENCE.config` for complete documentation
+1. Check the [mining setup guide](../../configs/README.md) and options reference
 2. See `example_configs/` for more examples
 3. Refer to the README.md for general miner documentation
