@@ -54,8 +54,8 @@ namespace nexusminer {
 
             int blocks = (m_offset_count + instances_per_block - 1) / instances_per_block;
 
-             kernel_fermat <<<blocks, threads_per_block>>> (d_offsets, d_offset_count, d_base_int,
-                 d_results, d_fermat_test_count, d_fermat_pass_count);
+             kernel_fermat <<<blocks, threads_per_block>>> (d_offsets.get(), d_offset_count.get(), d_base_int.get(),
+                 d_results.get(), d_fermat_test_count.get(), d_fermat_pass_count.get());
 
              checkGPUErrors(NEXUSMINER_GPU_PeekAtLastError());
              checkGPUErrors(NEXUSMINER_GPU_DeviceSynchronize());
@@ -107,8 +107,8 @@ namespace nexusminer {
             //printf("chain count %i\n", chain_count);
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
             
-            fermat_test_chains <<<blocks, threads_per_block>>> (d_chains, d_chain_count, d_base_int,
-                d_results, d_fermat_test_count, d_fermat_pass_count);
+            fermat_test_chains <<<blocks, threads_per_block>>> (d_chains, d_chain_count, d_base_int.get(),
+                d_results.get(), d_fermat_test_count.get(), d_fermat_pass_count.get());
 
             checkGPUErrors(NEXUSMINER_GPU_PeekAtLastError());
             checkGPUErrors(NEXUSMINER_GPU_DeviceSynchronize());
@@ -121,32 +121,58 @@ namespace nexusminer {
             m_device = device;
 
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(device));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_base_int, sizeof(*d_base_int)));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_offsets, sizeof(*d_offsets) * batch_size));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_results, sizeof(*d_results) * batch_size));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_offset_count, sizeof(*d_offset_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_fermat_test_count, sizeof(*d_fermat_test_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_fermat_pass_count, sizeof(*d_fermat_pass_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_trial_division_test_count, sizeof(*d_trial_division_test_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_trial_division_composite_count, sizeof(*d_trial_division_composite_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_test_count, 0, sizeof(*d_trial_division_test_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_composite_count, 0, sizeof(*d_trial_division_composite_count)));
+            
+            // Allocate memory using RAII wrappers
+            Cump<1024>* raw_ptr_cump = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_cump, sizeof(Cump<1024>)));
+            d_base_int.reset(raw_ptr_cump);
+            
+            uint64_t* raw_ptr_u64 = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_u64, sizeof(uint64_t) * batch_size));
+            d_offsets.reset(raw_ptr_u64);
+            
+            uint8_t* raw_ptr_u8 = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_u8, sizeof(uint8_t) * batch_size));
+            d_results.reset(raw_ptr_u8);
+            
+            raw_ptr_u64 = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_u64, sizeof(uint64_t)));
+            d_offset_count.reset(raw_ptr_u64);
+            
+            unsigned long long* raw_ptr_ull = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_ull, sizeof(unsigned long long)));
+            d_fermat_test_count.reset(raw_ptr_ull);
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_test_count.get(), 0, sizeof(unsigned long long)));
+            
+            raw_ptr_ull = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_ull, sizeof(unsigned long long)));
+            d_fermat_pass_count.reset(raw_ptr_ull);
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_pass_count.get(), 0, sizeof(unsigned long long)));
+            
+            raw_ptr_ull = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_ull, sizeof(unsigned long long)));
+            d_trial_division_test_count.reset(raw_ptr_ull);
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_test_count.get(), 0, sizeof(unsigned long long)));
+            
+            raw_ptr_ull = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_ull, sizeof(unsigned long long)));
+            d_trial_division_composite_count.reset(raw_ptr_ull);
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_composite_count.get(), 0, sizeof(unsigned long long)));
 
         }
 
         void Fermat_prime_impl::fermat_free()
         {
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_base_int));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_offsets));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_results));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_offset_count));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_fermat_test_count));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_fermat_pass_count));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_trial_division_test_count));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_trial_division_composite_count));
+            // Smart pointers automatically free memory when reset
+            d_base_int.reset();
+            d_offsets.reset();
+            d_results.reset();
+            d_offset_count.reset();
+            d_fermat_test_count.reset();
+            d_fermat_pass_count.reset();
+            d_trial_division_test_count.reset();
+            d_trial_division_composite_count.reset();
         }
 
         void Fermat_prime_impl::set_base_int(mpz_t base_big_int)
@@ -154,37 +180,37 @@ namespace nexusminer {
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
             Cump<1024> cuda_base_big_int;
             cuda_base_big_int.from_mpz(base_big_int);
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_base_int, &cuda_base_big_int, sizeof(cuda_base_big_int), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_base_int.get(), &cuda_base_big_int, sizeof(cuda_base_big_int), NEXUSMINER_GPU_MemcpyHostToDevice));
             mpz_set(m_base_int, base_big_int);
         }
 
         void Fermat_prime_impl::set_offsets(uint64_t offsets[], uint64_t offset_count)
         {
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_offsets, offsets, sizeof(*offsets) * offset_count, NEXUSMINER_GPU_MemcpyHostToDevice));
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_offset_count, &offset_count, sizeof(offset_count), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_offsets.get(), offsets, sizeof(*offsets) * offset_count, NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_offset_count.get(), &offset_count, sizeof(offset_count), NEXUSMINER_GPU_MemcpyHostToDevice));
             m_offset_count = offset_count;
         }
 
         void Fermat_prime_impl::get_results(uint8_t results[])
         {
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(results, d_results, sizeof(uint8_t) * m_offset_count, NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(results, d_results.get(), sizeof(uint8_t) * m_offset_count, NEXUSMINER_GPU_MemcpyDeviceToHost));
         }
 
         void Fermat_prime_impl::get_stats(uint64_t& fermat_tests, uint64_t& fermat_passes,
             uint64_t& trial_division_tests, uint64_t& trial_division_composites)
         {
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&fermat_tests, d_fermat_test_count, sizeof(*d_fermat_test_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&fermat_passes, d_fermat_pass_count, sizeof(*d_fermat_pass_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&trial_division_tests, d_trial_division_test_count, sizeof(*d_trial_division_test_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&trial_division_composites, d_trial_division_composite_count, sizeof(*d_trial_division_composite_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&fermat_tests, d_fermat_test_count.get(), sizeof(*d_fermat_test_count.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&fermat_passes, d_fermat_pass_count.get(), sizeof(*d_fermat_pass_count.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&trial_division_tests, d_trial_division_test_count.get(), sizeof(*d_trial_division_test_count.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(&trial_division_composites, d_trial_division_composite_count.get(), sizeof(*d_trial_division_composite_count.get()), NEXUSMINER_GPU_MemcpyDeviceToHost));
         }
 
         void Fermat_prime_impl::reset_stats()
         {
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_test_count, 0, sizeof(*d_fermat_test_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_pass_count, 0, sizeof(*d_fermat_pass_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_test_count, 0, sizeof(*d_trial_division_test_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_composite_count, 0, sizeof(*d_trial_division_composite_count)));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_test_count.get(), 0, sizeof(*d_fermat_test_count.get())));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_fermat_pass_count.get(), 0, sizeof(*d_fermat_pass_count.get())));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_test_count.get(), 0, sizeof(*d_trial_division_test_count.get())));
+            checkGPUErrors(NEXUSMINER_GPU_Memset(d_trial_division_composite_count.get(), 0, sizeof(*d_trial_division_composite_count.get())));
         }
 
         void Fermat_prime_impl::set_chain_ptr(CudaChain* chains, uint32_t* chain_count)
@@ -257,8 +283,8 @@ namespace nexusminer {
             checkGPUErrors(NEXUSMINER_GPU_Memcpy(&chain_count, d_chain_count, sizeof(*d_chain_count), NEXUSMINER_GPU_MemcpyDeviceToHost));
 
             int blocks = (chain_count + instances_per_block - 1) / instances_per_block;
-            trial_division_chains<<<blocks, threads_per_block>>> (d_chains, d_chain_count, d_trial_divisors, 
-                d_trial_divisor_count, d_trial_division_test_count, d_trial_division_composite_count);
+            trial_division_chains<<<blocks, threads_per_block>>> (d_chains, d_chain_count, d_trial_divisors.get(), 
+                d_trial_divisor_count.get(), d_trial_division_test_count.get(), d_trial_division_composite_count.get());
 
             checkGPUErrors(NEXUSMINER_GPU_PeekAtLastError());
             checkGPUErrors(NEXUSMINER_GPU_DeviceSynchronize());
@@ -268,19 +294,26 @@ namespace nexusminer {
             int device)
         {
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(device));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_trial_divisor_count, sizeof(*d_trial_divisor_count)));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_trial_divisors, trial_divisor_count * sizeof(*d_trial_divisors)));
             
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_trial_divisors, trial_divisors, trial_divisor_count * sizeof(*d_trial_divisors), NEXUSMINER_GPU_MemcpyHostToDevice));
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_trial_divisor_count, &trial_divisor_count, sizeof(*d_trial_divisor_count), NEXUSMINER_GPU_MemcpyHostToDevice));
+            uint32_t* raw_ptr_u32 = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_u32, sizeof(uint32_t)));
+            d_trial_divisor_count.reset(raw_ptr_u32);
+            
+            trial_divisors_uint32_t* raw_ptr_div = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_div, trial_divisor_count * sizeof(trial_divisors_uint32_t)));
+            d_trial_divisors.reset(raw_ptr_div);
+            
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_trial_divisors.get(), trial_divisors, trial_divisor_count * sizeof(trial_divisors_uint32_t), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_trial_divisor_count.get(), &trial_divisor_count, sizeof(uint32_t), NEXUSMINER_GPU_MemcpyHostToDevice));
 
         }
 
         void Fermat_prime_impl::trial_division_free()
         {
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_trial_divisor_count));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_trial_divisors));
+            // Smart pointers automatically free memory
+            d_trial_divisor_count.reset();
+            d_trial_divisors.reset();
             
 
         }
@@ -289,20 +322,33 @@ namespace nexusminer {
         {
             m_device = device;
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(device));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_test_a, sizeof(*d_test_a) * batch_size));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_test_b, sizeof(*d_test_b) * batch_size));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_test_results, sizeof(*d_test_results) * batch_size));
-            checkGPUErrors(NEXUSMINER_GPU_Malloc(&d_test_vector_size, sizeof(*d_test_vector_size)));
+            
+            Cump<1024>* raw_ptr_cump = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_cump, sizeof(Cump<1024>) * batch_size));
+            d_test_a.reset(raw_ptr_cump);
+            
+            raw_ptr_cump = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_cump, sizeof(Cump<1024>) * batch_size));
+            d_test_b.reset(raw_ptr_cump);
+            
+            raw_ptr_cump = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_cump, sizeof(Cump<1024>) * batch_size));
+            d_test_results.reset(raw_ptr_cump);
+            
+            uint64_t* raw_ptr_u64 = nullptr;
+            checkGPUErrors(NEXUSMINER_GPU_Malloc(&raw_ptr_u64, sizeof(uint64_t)));
+            d_test_vector_size.reset(raw_ptr_u64);
 
         }
 
         void Fermat_prime_impl::test_free()
         {
             checkGPUErrors(NEXUSMINER_GPU_SetDevice(m_device));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_test_a));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_test_b));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_test_results));
-            checkGPUErrors(NEXUSMINER_GPU_Free(d_test_vector_size));
+            // Smart pointers automatically free memory
+            d_test_a.reset();
+            d_test_b.reset();
+            d_test_results.reset();
+            d_test_vector_size.reset();
 
         }
 
@@ -314,8 +360,8 @@ namespace nexusminer {
             {
                 vector_a[i].from_mpz(a[i]);
             }
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_a, vector_a, sizeof(*vector_a) * count, NEXUSMINER_GPU_MemcpyHostToDevice));
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_vector_size, &count, sizeof(count), NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_a.get(), vector_a, sizeof(*vector_a) * count, NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_vector_size.get(), &count, sizeof(count), NEXUSMINER_GPU_MemcpyHostToDevice));
             delete[] vector_a;
         }
 
@@ -327,7 +373,7 @@ namespace nexusminer {
             {
                 vector_b[i].from_mpz(b[i]);
             }
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_b, vector_b, sizeof(*vector_b) * count, NEXUSMINER_GPU_MemcpyHostToDevice));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(d_test_b.get(), vector_b, sizeof(*vector_b) * count, NEXUSMINER_GPU_MemcpyHostToDevice));
             delete[] vector_b;
         }
 
@@ -336,7 +382,7 @@ namespace nexusminer {
         void Fermat_prime_impl::get_test_results(mpz_t* test_results)
         {
             Cump<1024>* results = new Cump<1024>[m_test_vector_a_size];
-            checkGPUErrors(NEXUSMINER_GPU_Memcpy(results, d_test_results, sizeof(*d_test_results) * m_test_vector_a_size, NEXUSMINER_GPU_MemcpyDeviceToHost));
+            checkGPUErrors(NEXUSMINER_GPU_Memcpy(results, d_test_results.get(), sizeof(*d_test_results.get()) * m_test_vector_a_size, NEXUSMINER_GPU_MemcpyDeviceToHost));
             for (auto i = 0; i < m_test_vector_a_size; i++)
             {
                 //mpz_init(test_results[i]);
@@ -385,7 +431,7 @@ namespace nexusminer {
             const int32_t instances_per_block = threads_per_block / threads_per_instance;
 
             int blocks = (m_test_vector_a_size + instances_per_block - 1) / instances_per_block;
-            logic_test_kernel <<<blocks, threads_per_block>>> (d_test_a, d_test_b, d_test_results, d_test_vector_size);
+            logic_test_kernel <<<blocks, threads_per_block>>> (d_test_a.get(), d_test_b.get(), d_test_results.get(), d_test_vector_size.get());
             checkGPUErrors(NEXUSMINER_GPU_PeekAtLastError());
             checkGPUErrors(NEXUSMINER_GPU_DeviceSynchronize());
         }

@@ -1,0 +1,222 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug build with compile commands export",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Release build with optimizations",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "gpu-cuda",
+      "displayName": "GPU CUDA",
+      "description": "Release build with CUDA GPU support",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gpu-cuda",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "WITH_GPU_CUDA": "ON"
+      }
+    },
+    {
+      "name": "gpu-cuda-prime",
+      "displayName": "GPU CUDA + PRIME",
+      "description": "Release build with CUDA GPU and PRIME support",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gpu-cuda-prime",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "WITH_GPU_CUDA": "ON",
+        "WITH_PRIME": "ON"
+      }
+    },
+    {
+      "name": "gpu-host-stubs",
+      "displayName": "GPU host-side code (stubbed kernel, no CUDA toolchain required)",
+      "description": "Builds the host portions of GPU hash and prime workers against stub CUDA boundaries so contributors without nvcc can validate snapshot/contract/static_assert changes",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gpu-host-stubs",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "WITH_GPU_CUDA": "OFF",
+        "WITH_GPU_HOST_STUBS": "ON",
+        "WITH_PRIME": "OFF"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "ThreadSanitizer",
+      "description": "Debug build with ThreadSanitizer",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/tsan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -g",
+        "CMAKE_C_FLAGS": "-fsanitize=thread -g",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=thread"
+      }
+    },
+    {
+      "name": "windows-msvc",
+      "displayName": "Windows MSVC",
+      "description": "Windows build with MSVC",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/windows-msvc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-mingw-cross",
+      "displayName": "Windows MinGW Cross (Linux host)",
+      "description": "Linux-hosted cross-compilation for Windows with MinGW-w64",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-mingw-cross",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw-w64-x86_64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "WITH_PRIME": "ON",
+        "NEXUSMINER_STATIC_OPENSSL": "OFF"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "macos",
+      "displayName": "macOS",
+      "description": "macOS build with dynamic OpenSSL",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/macos",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NEXUSMINER_STATIC_OPENSSL": "OFF"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
+      "name": "riscv",
+      "displayName": "RISC-V",
+      "description": "RISC-V build with Zbkb/Zbkc (ChaCha20) and RVV (SHA-256) support",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/riscv",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS": "-march=rv64gcv_zbkb_zbkc",
+        "CMAKE_CXX_FLAGS": "-march=rv64gcv_zbkb_zbkc"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "gpu-cuda",
+      "configurePreset": "gpu-cuda"
+    },
+    {
+      "name": "gpu-cuda-prime",
+      "configurePreset": "gpu-cuda-prime"
+    },
+    {
+      "name": "gpu-host-stubs",
+      "configurePreset": "gpu-host-stubs"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    },
+    {
+      "name": "windows-msvc",
+      "configurePreset": "windows-msvc",
+      "configuration": "Release"
+    },
+    {
+      "name": "windows-mingw-cross",
+      "configurePreset": "windows-mingw-cross"
+    },
+    {
+      "name": "macos",
+      "configurePreset": "macos"
+    },
+    {
+      "name": "riscv",
+      "configurePreset": "riscv"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gpu-cuda-prime",
+      "configurePreset": "gpu-cuda-prime",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gpu-host-stubs",
+      "configurePreset": "gpu-host-stubs",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "riscv",
+      "configurePreset": "riscv",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

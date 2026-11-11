@@ -16,6 +16,7 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
 	, m_best_leading_zeros{ 0 }
 	, m_met_difficulty_count{ 0 }
 	, m_hash_error_count{ 0 }
+	, m_consecutive_read_errors{ 0 }
 	, m_pool_nbits{0}
 {
 	auto& worker_config_fpga = std::get<config::Worker_config_fpga>(m_config.m_worker_mode);
@@ -32,7 +33,7 @@ Worker_hash::Worker_hash(std::shared_ptr<asio::io_context> io_context, Worker_co
 	}
 	catch (asio::system_error& e)
 	{
-		m_logger->debug(e.what());
+		m_logger->error("Failed to open serial port '{}': {}", m_serial_port_path, e.what());
 	}
 }
 
@@ -62,7 +63,34 @@ void Worker_hash::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Bloc
 	}
 
 	send_block_to_fpga();
-    
+
+}
+
+void Worker_hash::set_block(std::shared_ptr<WorkPackage> work_package, Worker::Block_found_handler result)
+{
+	//send new block info to the device
+	std::scoped_lock<std::mutex> lck(m_mtx);
+	//cancel any outstanding serial port async read
+	m_serial.cancel();
+
+	m_found_nonce_callback = result;
+
+	// Use precomputed data from WorkPackage
+	const auto& block = work_package->get_block();
+	m_block = Block_data{ block };
+
+	m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
+	m_block.nNonce = m_starting_nonce;
+
+	std::uint32_t nbits = work_package->get_nbits();
+	if(nbits != 0)
+	{
+		// take nbits provided by pool
+		m_pool_nbits = nbits;
+	}
+
+	send_block_to_fpga();
+
 }
 
 void Worker_hash::send_block_to_fpga()
@@ -108,16 +136,17 @@ void Worker_hash::handle_read(const asio::error_code& error_code, std::size_t by
 {
 	if (!error_code && bytes_transferred == m_receive_nonce_buffer.size())
 	{
+		m_consecutive_read_errors = 0;
 		uint64_t nonce = bytesToInt<uint64_t>(m_receive_nonce_buffer);
 		if (m_starting_nonce - nonce == 1)
 		{
 			//the fpga MAY respond with starting nonce - 1 to acknowledge receipt of the work package.
-			m_logger->info(m_log_leader + "New block receipt acknowledged by FPGA.");
+			m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "New block receipt acknowledged by FPGA."));
 		}
 		else
 		{
 			++m_nonce_candidates_recieved;
-			//m_logger->info(m_log_leader + "found a nonce candidate {}", nonce);
+			//m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "found a nonce candidate {}"), nonce);
 			m_skein.setNonce(nonce);
 			//verify the difficulty
 			if (difficulty_check())
@@ -129,14 +158,16 @@ void Worker_hash::handle_read(const asio::error_code& error_code, std::size_t by
 					std::scoped_lock<std::mutex> lck(m_mtx);
 					if (m_found_nonce_callback)
 					{
-						::asio::post([self = shared_from_this()]()
+						m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "💎 Block found! Posting to main io_context..."));
+						::asio::post(*m_io_context, [self = shared_from_this()]()
 						{
-							self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
+							self->m_found_nonce_callback(self->m_config.m_internal_id, 
+								std::make_unique<Block_data>(self->m_block));
 						});
 					}
 					else
 					{
-						m_logger->debug(m_log_leader + "Miner callback function not set.");
+						m_logger->debug(spdlog::fmt_lib::runtime(m_log_leader + "Miner callback function not set."));
 					}
 				}
 			}
@@ -150,11 +181,24 @@ void Worker_hash::handle_read(const asio::error_code& error_code, std::size_t by
 		{
 			if (error_code)
 			{
-				m_logger->error(m_log_leader + "ASIO Error {} " + error_code.message(), error_code.value());
+				m_logger->error(spdlog::fmt_lib::runtime(m_log_leader + "ASIO Error {} " + error_code.message()), error_code.value());
 			}
 			else
 			{
-				m_logger->error(m_log_leader + "Received unexpected number of bytes on serial port.  Expected {} received {}.", m_receive_nonce_buffer.size(), bytes_transferred);
+				m_logger->error(spdlog::fmt_lib::runtime(m_log_leader + "Received unexpected number of bytes on serial port.  Expected {} received {}."), m_receive_nonce_buffer.size(), bytes_transferred);
+			}
+
+			++m_consecutive_read_errors;
+			if (m_consecutive_read_errors < max_consecutive_read_errors)
+			{
+				m_logger->warn(spdlog::fmt_lib::runtime(m_log_leader + "Re-arming serial read after error ({}/{})."),
+					m_consecutive_read_errors, max_consecutive_read_errors);
+				start_read();
+			}
+			else
+			{
+				m_logger->critical(spdlog::fmt_lib::runtime(m_log_leader + "Serial read loop stopped after {} consecutive errors. "
+					"Waiting for next set_block() to restart."), max_consecutive_read_errors);
 			}
 		}
 	}
@@ -165,14 +209,16 @@ void Worker_hash::update_statistics(stats::Collector& stats_collector)
 {
 	std::scoped_lock<std::mutex> lck(m_mtx);
 
-	auto hash_stats = std::get<stats::Hash>(stats_collector.get_worker_stats(m_config.m_internal_id));
+	// Issue 3A: typed downcast (mode is invariant by construction).
+	auto& typed = stats::as_typed<stats::Hash>(stats_collector);
+	auto hash_stats = typed.get_worker_stats(m_config.m_internal_id);
 	hash_stats.m_hash_count = (m_nonce_candidates_recieved - m_hash_error_count) * nonce_difficulty_filter;
 	hash_stats.m_best_leading_zeros = m_best_leading_zeros;
 	hash_stats.m_met_difficulty_count = m_met_difficulty_count;
 	hash_stats.m_nonce_candidates_recieved = m_nonce_candidates_recieved;
 	hash_stats.m_hash_error_count = m_hash_error_count;
 
-	stats_collector.update_worker_stats(m_config.m_internal_id, hash_stats);
+	typed.update_worker_stats(m_config.m_internal_id, hash_stats);
 }
 
 bool Worker_hash::difficulty_check()
@@ -189,7 +235,7 @@ bool Worker_hash::difficulty_check()
 	keccak.calculateHash();
 	uint64_t keccakHash = keccak.getResult();
 	int hashActualLeadingZeros = 63 - findMSB(keccakHash);
-	m_logger->info(m_log_leader + "Found a candidate with {} leading zeros, {} required.", hashActualLeadingZeros, leadingZerosRequired);
+	m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Found a candidate with {} leading zeros, {} required."), hashActualLeadingZeros, leadingZerosRequired);
 	if (hashActualLeadingZeros > m_best_leading_zeros)
 	{
 		m_best_leading_zeros = hashActualLeadingZeros;
@@ -197,17 +243,17 @@ bool Worker_hash::difficulty_check()
 	//check the hash result is less than the difficulty.  We truncate to just use the upper 64 bits for easier calculation.
 	if (keccakHash <= difficultyTest64)
 	{
-		m_logger->info(m_log_leader + "Nonce passes difficulty check.");
+		m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Nonce passes difficulty check."));
 		return true;
 	}
 	else
 	{
-		//m_logger->warn(m_log_leader + "Nonce fails difficulty check.");
+		//m_logger->warn(spdlog::fmt_lib::runtime(m_log_leader + "Nonce fails difficulty check."));
 		//check if the hash is less than the fixed difficulty.  This indicates a possible bad hash (hardware error) from the fpga.
 		if (hashActualLeadingZeros < fpga_leading_zero_threshold)
 		{
 			m_hash_error_count++;
-			m_logger->info(m_log_leader + "FPGA hash error detected.  Got {} leading zeros.  Expected {}.",hashActualLeadingZeros, fpga_leading_zero_threshold);
+			m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "FPGA hash error detected.  Got {} leading zeros.  Expected {}."),hashActualLeadingZeros, fpga_leading_zero_threshold);
 			//something is not right.  try resending the block header to the fpga
 			send_block_to_fpga();
 			

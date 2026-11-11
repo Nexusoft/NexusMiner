@@ -1,0 +1,25 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ 09. FALCON QUANTUM TUNNEL VECTOR — 4-BUCKET SWAP ENGINE                    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  FALCON-1024 PRIVKEY PAYLOAD (2305 bytes)                                   ║
+║        │                                                                    ║
+║        ├──── Bucket 1 ─── 577 B ── SHA-512 tag ─┐                           ║
+║        ├──── Bucket 2 ─── 576 B ── SHA-512 tag ─┼──► Seeded permutation      ║
+║        ├──── Bucket 3 ─── 576 B ── SHA-512 tag ─┤    (MersenneTwister)       ║
+║        └──── Bucket 4 ─── 576 B ── SHA-512 tag ─┘                           ║
+║                                                     │                        ║
+║                                                     ▼                        ║
+║                                       Slot order: [s1 s2 s3 s4]             ║
+║                                                     │                        ║
+║                                  swap_bucket!(slot) │                        ║
+║                                                     ▼                        ║
+║                 Active bucket payload XOR chained SHA-512 keystream          ║
+║                                                     │                        ║
+║                                                     ▼                        ║
+║                            WORKING VECTOR / QUANTUM TUNNEL FRAME             ║
+║                                                     │                        ║
+║                                                     ▼                        ║
+║                      Append-only swap log: (epoch, slot, bucket_id, tag)     ║
+║                                                                              ║
+║  reconstruct_payload(build_qtv(privkey)) == privkey is the round-trip guard. ║
+╚══════════════════════════════════════════════════════════════════════════════╝

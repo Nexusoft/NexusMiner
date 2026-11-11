@@ -1,14 +1,36 @@
 //interface to the cuda sieve implementation
 #include "sieve.hpp"
 #include <stdint.h>
+#include <algorithm>
 #include "sieve_impl.cuh"
+#include "mining/prime_thresholds.hpp"
 
 namespace nexusminer {
     namespace gpu {
 
 
-        Cuda_sieve::Cuda_sieve() : m_impl(std::make_unique<Cuda_sieve_impl>()) {}
+        Cuda_sieve::Cuda_sieve() : m_impl(std::make_unique<Cuda_sieve_impl>())
+        {
+            // Initialise the per-session target T inside m_sieve_properties so
+            // that any kernel launch that reads m_sieve_properties.m_min_chain_length
+            // before set_target_length() is ever called still sees a sensible
+            // value (= mining::MIN_CHAIN_LENGTH, mirroring m_min_chain_length's
+            // default).  Other m_sieve_properties fields are populated later by
+            // Cuda_sieve_impl::init_sieve_size(), which preserves this field.
+            m_sieve_properties.m_min_chain_length = m_min_chain_length;
+        }
         Cuda_sieve::~Cuda_sieve() = default;
+
+        void Cuda_sieve::set_target_length(int target_length)
+        {
+            const int clamped =
+                std::max(target_length, nexusminer::mining::kMinTargetChainLength);
+            m_min_chain_length = clamped;
+            m_sieve_properties.m_min_chain_length = clamped;
+            // Forward to the impl so its mirrored properties (used as the
+            // kernel argument in find_chains()/sieve dispatchers) stay in sync.
+            m_impl->set_target_length(clamped);
+        }
 
         void Cuda_sieve::run_sieve(uint64_t sieve_start_offset)
         {

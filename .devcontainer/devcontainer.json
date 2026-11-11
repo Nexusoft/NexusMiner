@@ -1,0 +1,13 @@
+{
+  "name": "NexusMiner",
+  "image": "mcr.microsoft.com/devcontainers/cpp:ubuntu-24.04",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools"
+      ]
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y ninja-build libssl-dev && cmake --preset debug"
+}

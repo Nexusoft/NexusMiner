@@ -1,19 +1,39 @@
 #include "gpu/worker_prime.hpp"
+#include "cpu/prime_validation.hpp"
 #include "config/config.hpp"
 #include "stats/stats_collector.hpp"
+#include "mining/prime_thresholds.hpp"
 #include "prime/prime.hpp"
 #include "prime/sieve.hpp"
-#include "prime/prime_tests.hpp"
 #include "block.hpp"
 #include <asio.hpp>
-#include <primesieve.hpp>
-#include <sstream> 
+#include <cassert>
+#include <cmath>
+#include <cstring>
+#include <stdexcept>
+#include <sstream>
+#include <iomanip>
 #include <boost/random.hpp>
 
 namespace nexusminer
 {
 namespace gpu
 {
+namespace
+{
+// Re-export the canonical constants from prime_validation.hpp.  See
+// cpu/worker_prime.cpp for the rationale (single source of truth, no drift).
+using nexusminer::prime::kPrimeOffsetFractionBytes;
+using nexusminer::prime::kMinSerializedPrimeOffsets;
+using nexusminer::prime::kMaxSerializedPrimeOffsets;
+using nexusminer::prime::is_well_formed_prime_offsets;
+
+static_assert(Cuda_sieve::chain_histogram_max + 1 == stats::kPrimeHistogramBuckets,
+    "GPU chain histogram must cover every stats bucket");
+
+constexpr std::size_t kBoostUint1kLimbBytes = sizeof(boost::multiprecision::limb_type);
+}
+
 Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config::Worker_config& config)
 	: m_io_context{ std::move(io_context) }
 	, m_logger{ spdlog::get("logger") }
@@ -28,24 +48,33 @@ Worker_prime::Worker_prime(std::shared_ptr<asio::io_context> io_context, config:
 	, m_pool_nbits{ 0 }
 	, m_gpu_initialized{false}
 {
-	
-	auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
-	PrimeTests prime_test(worker_config_gpu.m_device);
-	//prime_test.math_test();
-	prime_test.sieve_performance_test();
-	prime_test.fermat_performance_test();
+
 	m_segmented_sieve->generate_sieving_primes();
 	m_segmented_sieve->generate_small_prime_tables();
 	m_segmented_sieve->generate_trial_divisors();
 
+	// Start persistent thread
+	m_shutdown = false;
+	m_run_thread = std::thread(&Worker_prime::run, this);
+	m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Persistent worker thread started"));
 }
 
 Worker_prime::~Worker_prime() noexcept
 {
-	//make sure the run thread exits the loop
-	m_stop = true;
+	m_stop = true;  // Interrupt mining loops before competing for m_mtx during shutdown
+
+	// Signal shutdown and wake up the worker thread
+	{
+		std::lock_guard<std::mutex> lock(m_mtx);
+		m_shutdown = true;
+		m_running = false;
+	}
+	m_cv.notify_all();
+
+	// Wait for thread to finish
 	if (m_run_thread.joinable())
 		m_run_thread.join();
+
 	//free gpu memory
 	if (m_gpu_initialized)
 	{
@@ -56,13 +85,7 @@ Worker_prime::~Worker_prime() noexcept
 
 void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Block_found_handler result)
 {
-	//stop the existing mining loop if it is running
-	m_stop = true;
-	if (m_run_thread.joinable())
-	{
-		m_run_thread.join();
-	}
-
+	// Update work data atomically and signal worker thread
 	{
 		std::scoped_lock<std::mutex> lck(m_mtx);
 		m_found_nonce_callback = result;
@@ -72,80 +95,197 @@ void Worker_prime::set_block(LLP::CBlock block, std::uint32_t nbits, Worker::Blo
 			m_pool_nbits = nbits;
 		}
 
-		m_difficulty = m_pool_nbits != 0 ? m_pool_nbits : m_block.nBits;
-		bool excludeNonce = true;  //prime block hash excludes the nonce
-		std::vector<unsigned char> headerB = m_block.GetHeaderBytes(excludeNonce);
-		//calculate the block hash
-		NexusSkein skein;
-		skein.setMessage(headerB);
-		skein.calculateHash();
-		NexusSkein::stateType hash = skein.getHash();
-
-		//keccak
-		NexusKeccak keccak(hash);
-		keccak.calculateHash();
-		NexusKeccak::k_1024 keccakFullHash_i = keccak.getHashResult();
-		keccakFullHash_i.isBigInt = true;
-		uint1k keccakFullHash("0x" + keccakFullHash_i.toHexString(true));
-		m_base_hash = keccakFullHash;
-		//Now we have the hash of the block header.  We use this to feed the miner. 
+		m_difficulty.store(effective_nbits_locked(),
+		                   std::memory_order_relaxed);
+		m_base_hash = m_block.GetPrimeBaseHash();
+		//Now we have the hash of the block header.  We use this to feed the miner.
 
 		//set the starting nonce for each worker to something different that won't overlap with the others
 		m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
 		m_nonce = m_starting_nonce;
 
-		//set the sieve start range
-		uint1k startprime = m_base_hash + m_nonce;
-		m_segmented_sieve->set_sieve_start(startprime);
-		//update the starting nonce to reflect the actual sieve start used
-		m_nonce = static_cast<uint64_t>(m_segmented_sieve->get_sieve_start() - m_base_hash);
-		//m_logger->debug("starting nonce: {}", m_nonce);
-		//clear out any old chains from the last block
-		m_segmented_sieve->clear_chains();
+		// Signal new work is available
+		m_stop = true;
+		m_new_work = true;
+		m_running = true;
+		m_template_consumed = false;  // Option D: fresh template, allow mining again
 	}
-	//restart the mining loop
-	m_stop = false;
-	//The first time prior to running allocate memory on the gpu
-	
-	if (!m_gpu_initialized)
+
+	// Wake up the worker thread
+	m_cv.notify_one();
+}
+
+void Worker_prime::set_block(std::shared_ptr<WorkPackage> work_package, Worker::Block_found_handler result)
+{
+	// Update work data atomically and signal worker thread
 	{
-		auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
-		m_segmented_sieve->gpu_sieve_load(worker_config_gpu.m_device);
-		m_segmented_sieve->gpu_fermat_test_init(worker_config_gpu.m_device);
-		m_gpu_initialized = true;
+		std::scoped_lock<std::mutex> lck(m_mtx);
+		m_found_nonce_callback = result;
+
+		// Use precomputed data from WorkPackage
+		const auto& block = work_package->get_block();
+		m_block = Block_data{ block };
+
+		std::uint32_t nbits = work_package->get_nbits();
+		if (nbits != 0)	// take nBits provided from pool
+		{
+			m_pool_nbits = nbits;
+		}
+
+		m_difficulty.store(effective_nbits_locked(),
+		                   std::memory_order_relaxed);
+
+		// Optimization: Use precomputed base hash from WorkPackage if available
+		const auto& precomputed_hash = work_package->get_prime_base_hash();
+		if (precomputed_hash.has_value()) {
+			// Use shared precomputed hash (computed once in Worker_manager)
+			m_base_hash = precomputed_hash.value();
+			m_logger->debug("GPU Worker_prime: Using precomputed base hash from WorkPackage");
+		} else {
+			// Fallback: Compute hash locally (backward compatibility)
+			m_logger->debug("GPU Worker_prime: Computing base hash locally (no precomputed hash)");
+			m_base_hash = m_block.GetPrimeBaseHash();
+		}
+		//Now we have the hash of the block header.  We use this to feed the miner.
+
+		//set the starting nonce for each worker to something different that won't overlap with the others
+		m_starting_nonce = static_cast<uint64_t>(m_config.m_internal_id) << 48;
+		m_nonce = m_starting_nonce;
+
+		// Signal new work is available
+		m_stop = true;
+		m_new_work = true;
+		m_running = true;
+		m_template_consumed = false;  // Option D: fresh template, allow mining again
 	}
-	m_run_thread = std::thread(&Worker_prime::run, this);
+
+	// Wake up the worker thread
+	m_cv.notify_one();
 }
 
 void Worker_prime::run()
 {
-	m_segmented_sieve->calculate_starting_multiples();
-	//copy starting multiples to the sieve
-	m_segmented_sieve->gpu_sieve_init();
-	m_segmented_sieve->gpu_fermat_test_set_base_int(m_segmented_sieve->get_sieve_start());
-	uint64_t sieve_batch_range = m_segmented_sieve->m_sieve_range;
-	uint64_t find_chains_ms = 0;
-	uint64_t sieving_ms = 0;
-	uint64_t test_chains_ms = 0;
-	uint64_t clean_chains_ms = 0;
-	uint64_t elapsed_ms = 0;
-	uint64_t low = 0;
-	uint64_t range_searched_this_cycle = 0;
-	uint64_t fermat_tests_this_cycle_start;
-	uint64_t fermat_passes_this_cycle_start;
-	uint64_t trial_division_tests, trial_division_composites;
-	m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start,
-		trial_division_tests, trial_division_composites);
+	m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Persistent worker thread ready, waiting for work..."));
 
-	//Setting debug to true can impact performance.  we will set it to true if the log level is set to debug or more verbose.
-	//setting debug to true is required to measure individual kernel run time
-	bool debug = m_logger->level() <= spdlog::level::level_enum::debug;
-	auto start = std::chrono::steady_clock::now();
-	auto interval_start = std::chrono::steady_clock::now();
-	while (!m_stop)
+	// Persistent thread loop - runs until shutdown
+	while (true) {
+		// Wait for new work or shutdown signal
+		{
+			std::unique_lock<std::mutex> lock(m_mtx);
+			m_cv.wait(lock, [this] { return m_new_work || m_shutdown; });
+
+			// Check for shutdown
+			if (m_shutdown) {
+				m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Worker thread shutting down"));
+				break;
+			}
+
+			// Clear new work flag
+			m_new_work = false;
+			// Reset stop flag so the inner mining loop can run
+			m_stop = false;
+
+			// Initialize GPU if needed (first time)
+			if (!m_gpu_initialized)
+			{
+				auto& worker_config_gpu = std::get<config::Worker_config_gpu>(m_config.m_worker_mode);
+				m_segmented_sieve->gpu_sieve_load(worker_config_gpu.m_device);
+				m_segmented_sieve->gpu_fermat_test_init(worker_config_gpu.m_device);
+				m_gpu_initialized = true;
+				m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "GPU memory initialized"));
+			}
+		}
+
+		// Start mining with the new work
+		m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Starting GPU mining"));
+
+		// Make local copies of block data to avoid race conditions
+		// These copies are made once per work unit and remain stable during mining
+		Block_data local_block;
+		uint1k local_base_hash;
+		uint64_t local_nonce;
+		{
+			std::scoped_lock<std::mutex> lck(m_mtx);
+			local_block = m_block;
+			local_base_hash = m_base_hash;
+			local_nonce = m_nonce;
+
+			// Stone — per-session target Cunningham chain length T.  Mirrors
+			// the CPU PrimeMiningEngine derivation (prime_mining_engine.cpp:
+			// target_length = ceil(nbits / 1e7), clamped to >= 2).  Pushed
+			// into the GPU sieve BEFORE clear_chains/calculate_starting_multiples
+			// so the next find_chains() launch sees the new T via the
+			// Cuda_sieve_properties kernel argument.  Without this plumbing
+			// the GPU sieve was permanently gated at the prior compile-time
+			// Cuda_sieve::m_min_chain_length=9 — silently dropping length-7/8
+			// winners at pool difficulty < 9.
+			const std::uint32_t nbits_for_target = effective_nbits_locked();
+			int target_length = nexusminer::mining::derive_target_length(nbits_for_target);
+			const int previous_target_length = m_segmented_sieve->get_target_length();
+			if (previous_target_length != target_length)
+			{
+				m_logger->info(spdlog::fmt_lib::runtime(m_log_leader +
+					"target_length " + std::to_string(previous_target_length) +
+					" -> " + std::to_string(target_length) +
+					" (nbits=" + std::to_string(nbits_for_target) +
+					", popcount_floor=" +
+					std::to_string(nexusminer::mining::popcount_window_floor(target_length)) +
+					", close_chain_min=" +
+					std::to_string(nexusminer::mining::close_chain_min(target_length)) +
+					")"));
+			}
+			m_segmented_sieve->set_target_length(target_length);
+
+			uint1k startprime = local_base_hash + local_nonce;
+			m_segmented_sieve->set_sieve_start(startprime);
+			local_nonce = static_cast<uint64_t>(m_segmented_sieve->get_sieve_start() - local_base_hash);
+			m_segmented_sieve->clear_chains();
+			m_segmented_sieve->calculate_starting_multiples();
+		}
+		//copy starting multiples to the sieve
+		m_segmented_sieve->gpu_sieve_init();
+		m_segmented_sieve->gpu_fermat_test_set_base_int(m_segmented_sieve->get_sieve_start());
+		publish_statistics_snapshot();
+		uint64_t sieve_batch_range = m_segmented_sieve->m_sieve_range;
+		uint64_t find_chains_ms = 0;
+		uint64_t sieving_ms = 0;
+		uint64_t test_chains_ms = 0;
+		uint64_t clean_chains_ms = 0;
+		uint64_t elapsed_ms = 0;
+		uint64_t low = 0;
+		uint64_t range_searched_this_cycle = 0;
+		uint64_t fermat_tests_this_cycle_start;
+		uint64_t fermat_passes_this_cycle_start;
+		uint64_t trial_division_tests, trial_division_composites;
+		m_segmented_sieve->gpu_get_fermat_stats(fermat_tests_this_cycle_start, fermat_passes_this_cycle_start,
+			trial_division_tests, trial_division_composites);
+
+		//Setting debug to true can impact performance.  we will set it to true if the log level is set to debug or more verbose.
+		//setting debug to true is required to measure individual kernel run time
+		bool debug = m_logger->level() <= spdlog::level::level_enum::debug;
+		auto start = std::chrono::steady_clock::now();
+		auto interval_start = std::chrono::steady_clock::now();
+
+		while (!m_stop)
 	{
+		// Check for new work at the top of the loop.
+		// Option D: also exit when this template already produced a submit.
+		// Otherwise GPU prime keeps grinding the same base hash after a find,
+		// unlike the CPU prime path that is known to mine on testnet.
+		{
+			std::unique_lock<std::mutex> lck(m_mtx);
+			if (m_new_work || m_template_consumed)
+			{
+				break;
+			}
+		}
+
 		m_range_searched += sieve_batch_range;
 		range_searched_this_cycle += sieve_batch_range;
+		// Guard against set_block() arriving between the m_new_work check and the first GPU kernel.
+		// Without this, set_sieve_start() + clear_chains() in set_block() could mutate the sieve
+		// concurrently while the GPU kernels below are starting to read it.
+		if (m_stop) break;
 
 		auto sieve_start = std::chrono::steady_clock::now();
 		m_segmented_sieve->gpu_sieve_small_primes(low);
@@ -181,31 +321,71 @@ void Worker_prime::run()
 		if (m_stop) break;
 		//check for winners
 		m_segmented_sieve->get_long_chains();
+		const double required_difficulty = getNetworkDifficulty();
 		//check difficulty of any chains that passed through the filter
 		for (auto x : m_segmented_sieve->m_long_chain_starts)
 		{
-			m_block.nNonce = m_nonce + x;
-			uint1k chain_start = m_base_hash + m_block.nNonce;
-			double difficulty = getDifficulty(chain_start);
-			m_segmented_sieve->m_best_chain = std::max(difficulty, m_segmented_sieve->m_best_chain);
-			m_logger->info("Actual difficulty {} required {}", difficulty, getNetworkDifficulty());
-			if (difficulty_check(chain_start))
+			local_block.nNonce = local_nonce + x;
+			uint1k chain_start = local_base_hash + local_block.nNonce;
+			uint1024_t hashPrime = boost_uint1024_t_to_uint1024_t(chain_start);
+			std::vector<uint8_t> offsets;
+			double actual_difficulty = 0.0;
+
+			bool is_valid = nexusminer::prime::ValidatePrimeCandidate(
+				hashPrime,
+				required_difficulty,
+				offsets,
+				actual_difficulty);
+
+			m_segmented_sieve->m_best_chain = std::max(actual_difficulty, m_segmented_sieve->m_best_chain);
+			m_logger->debug("Actual difficulty {} required {}", actual_difficulty, required_difficulty);
+			if (is_valid)
 			{
-				//we found a valid chain.  submit it. 
+				assert(is_well_formed_prime_offsets(offsets) &&
+					"Expected vOffsets size in [kMin..kMax] (gap bytes + 4-byte LE fraction)");
+				if (!is_well_formed_prime_offsets(offsets))
+				{
+					m_logger->error(spdlog::fmt_lib::runtime(m_log_leader + "Rejecting prime candidate with malformed serialized offsets ({} bytes, expected size in [{}..{}] = (chain_length - 1) gap bytes + {}-byte LE fraction)"),
+						offsets.size(),
+						kMinSerializedPrimeOffsets,
+						kMaxSerializedPrimeOffsets,
+						kPrimeOffsetFractionBytes);
+					continue;
+				}
+
+				m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "✓ FOUND VALID PRIME BLOCK! Difficulty: {:.6f} (required: {:.6f}), offsets: {}"),
+					actual_difficulty, required_difficulty, offsets.size());
+
+				//we found a valid chain.  submit it.
 				if (m_found_nonce_callback)
 				{
-					::asio::post([self = shared_from_this()]()
+					m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "💎 Block found! Posting to main io_context..."));
+					auto captured_offsets = std::move(offsets);
+					auto block_copy = local_block;
+					::asio::post(*m_io_context, [self = shared_from_this(), block_copy, captured_offsets = std::move(captured_offsets)]()
 					{
-						self->m_found_nonce_callback(self->m_config.m_internal_id, std::make_unique<Block_data>(self->m_block));
+						auto bd = std::make_unique<Block_data>(block_copy);
+						bd->vOffsets = captured_offsets;
+						self->m_found_nonce_callback(self->m_config.m_internal_id,
+							std::move(bd));
 					});
+					// Option D: stop grinding this template.  Do not set the
+					// flag when the callback is null — that matches CPU prime
+					// and avoids idling a worker that never submitted.
+					{
+						std::scoped_lock<std::mutex> lck(m_mtx);
+						if (!m_new_work)
+							m_template_consumed = true;
+					}
 				}
 				else
 				{
-					m_logger->debug(m_log_leader + "Miner callback function not set.");
+					m_logger->debug(spdlog::fmt_lib::runtime(m_log_leader + "Miner callback function not set."));
 				}
 			}
 		}
 		m_segmented_sieve->gpu_get_stats();
+		publish_statistics_snapshot();
 		m_segmented_sieve->m_long_chain_starts = {};
 		low += sieve_batch_range;
 		if (m_stop) break;
@@ -243,29 +423,37 @@ void Worker_prime::run()
 			m_logger->debug(ss.str());
 		}
 	}
-	
+
+		m_logger->info(spdlog::fmt_lib::runtime(m_log_leader + "Mining stopped, waiting for new work..."));
+	}  // End of persistent thread loop
 }
 
-double Worker_prime::getDifficulty(uint1k p)
+double Worker_prime::getDifficulty(const uint1k& p)
 {
-	std::vector<unsigned int> offsets_to_test;
-	LLC::CBigNum prime_to_test = boost_uint1024_t_to_CBignum(p);
-	double difficulty = m_prime_helper->GetPrimeDifficulty(prime_to_test, 1, offsets_to_test);
+	std::vector<uint8_t> offsets_to_test;
+	double difficulty = 0.0;
+	// Pass a zero threshold when we only need the canonical LLL-TAO difficulty
+	// calculation and serialized offsets, not submission gating.
+	nexusminer::prime::ValidatePrimeCandidate(
+		boost_uint1024_t_to_uint1024_t(p),
+		0.0,
+		offsets_to_test,
+		difficulty);
 	return difficulty;
 }
 
 double Worker_prime::getNetworkDifficulty()
 {
-	return m_difficulty / 10000000.0;
+	return m_difficulty.load(std::memory_order_relaxed) / 10000000.0;
 }
 
-bool Worker_prime::difficulty_check(uint1k p)
+bool Worker_prime::difficulty_check(const uint1k& p)
 {
 	return getDifficulty(p) >= getNetworkDifficulty();
 }
 
 
-LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
+LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(const uint1k& p)
 {
 	std::stringstream ss;
 	ss << std::hex << p;
@@ -275,19 +463,46 @@ LLC::CBigNum Worker_prime::boost_uint1024_t_to_CBignum(uint1k p)
 	return p_CBignum;
 }
 
+uint1024_t Worker_prime::boost_uint1024_t_to_uint1024_t(const uint1k& p)
+{
+	uint1024_t result{};
+	const auto limb_bytes = p.backend().size() * kBoostUint1kLimbBytes;
+	if (limb_bytes > sizeof(result))
+	{
+		throw std::runtime_error("Boost uint1024 limb storage exceeds LLC uint1024_t size");
+	}
+
+	// Both boost::uint1024_t and LLC::uint1024_t store little-endian limbs in the
+	// active numeric payload. prime_validation_test verifies this limb copy matches
+	// the legacy hex round-trip used previously.
+	std::memcpy(&result, p.backend().limbs(), limb_bytes);
+	return result;
+}
+
 void Worker_prime::update_statistics(stats::Collector& stats_collector)
 {
-	auto prime_stats = std::get<stats::Prime>(stats_collector.get_worker_stats(m_config.m_internal_id));
-	prime_stats.m_primes = m_segmented_sieve->m_fermat_prime_count;
-	prime_stats.m_chains = m_segmented_sieve->m_chain_count;
-	prime_stats.m_difficulty = m_difficulty;
-	prime_stats.m_chain_histogram = m_segmented_sieve->m_chain_histogram;
+	// Issue 3A: typed downcast (mode is invariant by construction).
+	auto& typed = stats::as_typed<stats::Prime>(stats_collector);
+	typed.update_worker_stats(m_config.m_internal_id, *m_published_stats.load());
+}
+
+void Worker_prime::publish_statistics_snapshot()
+{
+	stats::Prime prime_stats;
+	prime_stats.m_primes = stats::saturating_prime_stat(m_segmented_sieve->m_fermat_prime_count);
+	prime_stats.m_chains = stats::saturating_prime_stat(m_segmented_sieve->m_chain_count);
+	prime_stats.m_chain_histogram = stats::copy_prime_histogram(m_segmented_sieve->m_chain_histogram);
 	prime_stats.m_range_searched = m_range_searched;
 	prime_stats.m_most_difficult_chain = m_segmented_sieve->m_best_chain;
-	stats_collector.update_worker_stats(m_config.m_internal_id, prime_stats);
-
-	m_primes = 0;
-	m_chains = 0;
+	{
+		// Snapshot m_difficulty under the lock for ordering with the
+		// matching m_block snapshot in run() — even though the load
+		// itself is now atomic, we keep the lock so the two values
+		// (difficulty + most-recent block) stay session-consistent.
+		std::scoped_lock<std::mutex> lck(m_mtx);
+		prime_stats.m_difficulty = m_difficulty.load(std::memory_order_relaxed);
+	}
+	m_published_stats.store(std::move(prime_stats));
 }
 
 

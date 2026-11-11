@@ -1,5 +1,6 @@
 #include "sieve.hpp"
 #include "chain.hpp"
+#include "mining/prime_thresholds.hpp"
 #include <primesieve.hpp>
 #include <vector>
 #include <queue>
@@ -400,6 +401,11 @@ namespace nexusminer {
                 }
                 chain.m_untested_count = m_cuda_chains[i].m_untested_count;
                 chain.m_prime_count = m_cuda_chains[i].m_prime_count;
+                // Stone — propagate per-chain T from the GPU chain so the
+                // host-side fallback path's is_there_still_hope/clean_chains
+                // gates use the same per-session T as the GPU pipeline.
+                chain.m_min_chain_length = m_cuda_chains[i].m_min_chain_length;
+                chain.m_min_chain_report_length = m_cuda_chains[i].m_min_chain_report_length;
                 m_chain_candidate_max_length = std::max(chain.length(), m_chain_candidate_max_length);
                 m_chain_candidate_total_length += chain.length();
                 m_chain.push_back(chain);
@@ -438,6 +444,9 @@ namespace nexusminer {
                 }
                 chain.m_untested_count = m_cuda_chains[i].m_untested_count;
                 chain.m_prime_count = m_cuda_chains[i].m_prime_count;
+                // Propagate per-session T (see get_chains() above).
+                chain.m_min_chain_length = m_cuda_chains[i].m_min_chain_length;
+                chain.m_min_chain_report_length = m_cuda_chains[i].m_min_chain_report_length;
                 uint64_t base_offset;
                 int offset, length;
                 chain.get_best_fermat_chain(base_offset, offset, length);
@@ -696,6 +705,19 @@ namespace nexusminer {
         Cuda_sieve::Cuda_sieve_properties Sieve::get_sieve_properties()
         {
             return m_cuda_sieve.m_sieve_properties;
+        }
+
+        // Stone — per-session SSOT plumbing.  Forward T to Cuda_sieve so the
+        // kernels see it on the next find_chains() launch, and mirror locally
+        // so host-side helpers (expected_chain_density and the gpu::Chain
+        // host-side fallback path's m_min_chain_length set in get_chains/
+        // get_long_chains below) read the same value.
+        void Sieve::set_target_length(int target_length)
+        {
+            const int clamped =
+                std::max(target_length, nexusminer::mining::kMinTargetChainLength);
+            m_min_chain_length = clamped;
+            m_cuda_sieve.set_target_length(clamped);
         }
 
         void Sieve::generate_trial_divisors()

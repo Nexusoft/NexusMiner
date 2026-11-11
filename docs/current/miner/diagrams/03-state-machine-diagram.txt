@@ -1,0 +1,16 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 03. STRONGER STATE MACHINES / ENUMS                                 ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ AuthState:          DISCONNECTED → AUTHENTICATING → AUTHENTICATED   ║
+║ RewardBindingState: EMPTY → CONFIGURED → BINDING → BOUND            ║
+║ ReconnectState:     LIVE → LOST_LINK → RESYNCING → LIVE             ║
+║ LaneState:          UNKNOWN → LEGACY or STATELESS                   ║
+║                                                                      ║
+║                 ╔══════════════════════════════╗                    ║
+║                 ║   Illegal combinations?      ║                    ║
+║                 ║   Reject at compile/runtime  ║                    ║
+║                 ╚══════════════════════════════╝                    ║
+║                                                                      ║
+║ Goal: replace ad hoc boolean clusters with named transitions and    ║
+║ fewer impossible states.                                            ║
+╚══════════════════════════════════════════════════════════════════════╝

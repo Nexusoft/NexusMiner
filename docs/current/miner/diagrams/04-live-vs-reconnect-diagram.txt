@@ -1,0 +1,17 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 04. LIVE SESSION CONTAINER VS RECONNECT SNAPSHOT                    ║
+╠══════════════════════════════════════════════════════════════════════╣
+║     LIVE RUNTIME                              LOCAL RECONNECT COPY   ║
+║ ╔════════════════════════════╗          ╔══════════════════════════╗ ║
+║ ║ Authoritative container    ║          ║ Solo cached fields       ║ ║
+║ ║ session_id                 ║          ║ m_authenticated          ║ ║
+║ ║ reward_bound               ║          ║ m_session_id             ║ ║
+║ ║ active_lane                ║          ║ m_reward_bound           ║ ║
+║ ║ crypto context             ║          ║ m_protocol_lane          ║ ║
+║ ╚════════════════════════════╝          ╚══════════════════════════╝ ║
+║                │                                     │               ║
+║                └───────── refresh_cached_session_state() ───────────┘║
+║                                                                      ║
+║ Rule: after reconnect, the live container wins and the local copy    ║
+║ resyncs.  The local copy must never invent a second truth.          ║
+╚══════════════════════════════════════════════════════════════════════╝

@@ -1,0 +1,13 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 15. STRONG SEMANTIC ID WRAPPER TYPES                                ║
+╠══════════════════════════════════════════════════════════════════════╣
+║   SessionGenesisHash   ≠   RewardHash   ≠   FalconHashKeyId         ║
+║   SessionFingerprint   ≠   SessionId                                 ║
+║                                                                      ║
+║       ╔══════════════════╗   compile-time distinction   ╔══════════╗ ║
+║       ║ raw bytes / ints ║ ───────────────────────────► ║ wrappers  ║ ║
+║       ╚══════════════════╝                              ╚══════════╝ ║
+║                                                                      ║
+║ Result: fewer accidental API mix-ups and clearer ownership in        ║
+║ reconnect, reward, diagnostics, and submit code.                    ║
+╚══════════════════════════════════════════════════════════════════════╝

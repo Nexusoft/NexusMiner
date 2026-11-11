@@ -1,0 +1,16 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 05. IDENTITY OWNERSHIP MODEL ON MINER                               ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ Genesis owner        ══► Session Genesis / reconnect-safe crypto     ║
+║ Reward payout owner  ══► Reward address string + RewardHash          ║
+║ Session identity     ══► SessionId + active lane                     ║
+║ Submit-key owner     ══► Falcon identity + session-scoped authority  ║
+║                                                                      ║
+║                  ╔══════════════════════════════╗                    ║
+║                  ║  Keep these identities       ║                    ║
+║                  ║  separate but coordinated    ║                    ║
+║                  ╚══════════════════════════════╝                    ║
+║                                                                      ║
+║ No single shortcut value should collapse these distinct ownership    ║
+║ domains into one ambiguous “session-ish” blob.                      ║
+╚══════════════════════════════════════════════════════════════════════╝

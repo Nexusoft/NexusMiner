@@ -29,7 +29,7 @@ network::Shared_payload Pool_base::get_work()
     m_logger->info("Get new block");
 
     // get new block from wallet
-    Packet packet{ Packet::GET_BLOCK };
+    Packet packet{ static_cast<uint8_t>(Packet::GET_BLOCK) };
     return packet.get_bytes();
 }
 

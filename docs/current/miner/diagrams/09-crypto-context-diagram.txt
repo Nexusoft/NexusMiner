@@ -1,0 +1,17 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 09. CANONICAL CRYPTO CONTEXT ACCESSOR                               ║
+╠══════════════════════════════════════════════════════════════════════╣
+║            ╔════════════════════════════════════╗                    ║
+║            ║ Authoritative CryptoContext        ║                    ║
+║            ╠════════════════════════════════════╣                    ║
+║            ║ SessionGenesisHash                 ║                    ║
+║            ║ FalconHashKeyId                    ║                    ║
+║            ║ SessionFingerprint                 ║                    ║
+║            ║ ChaCha20SessionKey                 ║                    ║
+║            ╚════════════════════════════════════╝                    ║
+║                    ▲                           ▲                     ║
+║                    │                           │                     ║
+║             MINER_SET_REWARD             SUBMIT_BLOCK               ║
+║                                                                      ║
+║ Reward send and block submit must read the same crypto/session view. ║
+╚══════════════════════════════════════════════════════════════════════╝

@@ -1,0 +1,13 @@
+name: nexusminer-codeql
+
+paths:
+  - src
+
+paths-ignore:
+  - docs
+  - build
+  - .devcontainer
+  - .github
+
+queries:
+  - uses: security-and-quality

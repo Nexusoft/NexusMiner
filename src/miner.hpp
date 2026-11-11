@@ -6,6 +6,7 @@
 
 #include "config/config.hpp"
 #include "network/endpoint.hpp"
+#include "liveness_watchdog.hpp"
 #include <spdlog/spdlog.h>
 #include <asio/signal_set.hpp>
 
@@ -39,6 +40,7 @@ private:
 	std::unique_ptr<network::Component> m_network_component;
 	std::shared_ptr<Worker_manager> m_worker_manager;
 	std::shared_ptr<spdlog::logger> m_logger;
+	std::unique_ptr<LivenessWatchdog> m_liveness_watchdog;
 
 	config::Config m_config;
 };

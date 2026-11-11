@@ -1,5 +1,6 @@
 #include "gpu_helper.hpp"
 #include "cuda_chain.cuh"
+#include "mining/prime_thresholds.hpp"
 
 //#include "device_launch_parameters.h"
 #include <stdio.h>
@@ -20,7 +21,7 @@ namespace nexusminer {
             }
         }
        
-        __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset)
+        __device__ void cuda_chain_open(CudaChain& chain, uint64_t base_offset, int target_length)
         {
             chain.m_base_offset = base_offset;
             chain.m_offsets[0] = 0; //the first offset is always zero
@@ -28,6 +29,30 @@ namespace nexusminer {
             chain.m_untested_count = 1;
             chain.m_offset_count = 1;
             chain.m_prime_count = 0;
+
+            // Stone — per-session SSOT plumbing.  Both gates were previously
+            // baked into CudaChain's default member initializers
+            // (m_min_chain_length=8, m_min_chain_report_length=5).  filter_busted_chains
+            // and is_there_still_hope read these per-chain fields, so writing
+            // them once at chain creation propagates the per-session T to the
+            // entire downstream pipeline (Fermat scheduling, busted-chain
+            // detection, long-chain reporting) with no other API changes.
+            //
+            // Both fields collapse to the same per-session T:
+            //   * m_min_chain_length = T          — drives is_there_still_hope's
+            //                                       early-abort threshold and
+            //                                       get_next_fermat_candidate's
+            //                                       extra-link weak-link analysis.
+            //   * m_min_chain_report_length = T   — gates the long-chain dispatch
+            //                                       in filter_busted_chains.
+            // Clamp at kMinTargetChainLength so a degenerate caller passing 0/1
+            // can never set both gates to a meaningless value.
+            const int clamped =
+                target_length < nexusminer::mining::kMinTargetChainLength
+                    ? nexusminer::mining::kMinTargetChainLength
+                    : target_length;
+            chain.m_min_chain_length = clamped;
+            chain.m_min_chain_report_length = clamped;
         }
        
 

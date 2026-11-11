@@ -1,0 +1,180 @@
+# PR #681 follow-up §1 — AWS g4dn.xlarge spot bring-up for the self-hosted
+# CUDA runner consumed by `.github/workflows/cuda.yml`.
+#
+# Use this as the user-data for an EC2 launch template, or `cloud-init` for
+# any Ubuntu 22.04 LTS host (own hardware works the same, you just skip the
+# AWS-specific bits).
+#
+# What you need to fill in BEFORE launching
+# -----------------------------------------
+# 1. RUNNER_REGISTRATION_TOKEN — short-lived (1h), generated via
+#    GitHub UI → repo Settings → Actions → Runners → New self-hosted runner
+#    OR via the `POST /repos/{owner}/{repo}/actions/runners/registration-token`
+#    REST API (requires `repo` scope).  For long-lived bring-ups, prefer
+#    runner groups + a JIT registration token fetched at boot via an IAM-
+#    role-scoped Lambda; that pattern is out of scope for this minimal
+#    config.
+# 2. RUNNER_REPO_URL — `https://github.com/<owner>/<repo>` (this repo).
+# 3. RUNNER_NAME — defaults to the EC2 instance ID below; override if you
+#    are bringing up a non-EC2 host.
+#
+# What this script does
+# ---------------------
+# 1. Installs the NVIDIA datacenter driver + CUDA 12.x toolkit (matches the
+#    `gpu-cuda-prime` preset's nvcc-driven build).
+# 2. Installs Ninja, OpenSSL dev headers, build-essential, libboost-all-dev,
+#    libgmp-dev — everything the `gpu-cuda-prime` preset needs.  Mirror of
+#    what `cmake-build.yml` installs on hosted runners, plus CUDA + Boost +
+#    GMP (the WITH_PRIME=ON dependencies).
+# 3. Installs and configures the GitHub Actions runner under
+#    /opt/actions-runner with the labels expected by `cuda.yml`:
+#       [self-hosted, linux, x64, gpu, cuda]
+# 4. Sets up a systemd unit so the runner survives reboots and de-registers
+#    cleanly on shutdown (important for spot-interruption: an orphaned
+#    runner shows up as "offline" in the UI for ~24h otherwise).
+# 5. Installs a CloudWatch-friendly health check that terminates the
+#    instance if it is up for >2h with no active job.  This is the
+#    last-line-of-defence against a stuck runner draining the budget.
+#
+# Cost expectation
+# ----------------
+# g4dn.xlarge spot is ~$0.16/hr at us-east-1 baseline.  At ~30 PRs/month
+# averaging ~20 min of CUDA build/test each, that is ~10 hours/month →
+# ~$1.60/mo of compute + ~$3-5/mo of EBS/Network → ~$5/mo total.
+# Override INSTANCE_TYPE to `g5.xlarge` (A10G, sm_86) for ~2× speed at
+# ~3× cost if you want faster iteration.
+
+#cloud-config
+package_update: true
+package_upgrade: false  # speeds up boot; security patches handled at AMI bake time
+
+packages:
+  - build-essential
+  - cmake
+  - ninja-build
+  - git
+  - curl
+  - jq
+  - libssl-dev
+  - libboost-all-dev
+  - libgmp-dev
+  - pkg-config
+  - python3
+  - python3-pip
+  - awscli
+
+write_files:
+  # TODO: Clean de-registration on shutdown — proper fix requires a PAT
+  # (or JIT token via GitHub remove-token API) stored in AWS Secrets Manager
+  # / SSM Parameter Store so the runner can call `config.sh remove --token`
+  # with a live credential.  See PR #682 review for the full design sketch.
+  # The broken `actions-runner-shutdown.service` that used a placeholder token
+  # has been removed: `config.sh remove --token placeholder` always fails and
+  # left "offline" ghost runners in the UI for ~24h after every spot
+  # interruption.  The `runner-budget-guard` cron covers the real cost concern.
+
+  - path: /usr/local/sbin/runner-budget-guard
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # PR #681 follow-up §1 — terminate this instance if it is up for
+      # >2h with no active GitHub Actions job.  Run from cron every 5 min.
+      # Belt-and-suspenders against a stuck runner draining the budget.
+      #
+      # IMDSv2: all metadata fetches use a short-lived token to defend
+      # against SSRF attacks from PR code running on this runner.
+      set -euo pipefail
+      UPTIME_SEC=$(awk '{print int($1)}' /proc/uptime)
+      MIN_UPTIME=$((2 * 3600))
+      if [ "$UPTIME_SEC" -lt "$MIN_UPTIME" ]; then exit 0; fi
+      # If the runner is currently executing a job, the
+      # `Runner.Worker` process exists.  pgrep returns non-zero if no
+      # match, which we treat as "idle for too long → terminate".
+      if pgrep -f Runner.Worker > /dev/null; then exit 0; fi
+      logger -t runner-budget-guard "idle >2h, terminating instance"
+      # IMDSv2: obtain a short-lived token (TTL=60s) before querying metadata.
+      TOKEN=$(curl -fsSL -X PUT \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+        http://169.254.169.254/latest/api/token 2>/dev/null || true)
+      if [ -n "$TOKEN" ]; then
+        INSTANCE_ID=$(curl -fsSL \
+          -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+          http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || true)
+        REGION=$(curl -fsSL \
+          -H "X-aws-ec2-metadata-token: ${TOKEN}" \
+          http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || true)
+      fi
+      if [ -n "${INSTANCE_ID:-}" ] && [ -n "${REGION:-}" ]; then
+        aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID" || true
+      else
+        # Fallback for non-AWS hosts: just power off; bring-up is manual.
+        shutdown -h now
+      fi
+
+  - path: /etc/cron.d/runner-budget-guard
+    permissions: '0644'
+    content: |
+      */5 * * * * root /usr/local/sbin/runner-budget-guard
+
+runcmd:
+  # ---- 1. NVIDIA driver + CUDA toolkit ---------------------------------
+  - |
+    set -euo pipefail
+    DEBIAN_FRONTEND=noninteractive apt-get update
+    # Pull NVIDIA's pinned apt repo for Ubuntu 22.04.
+    wget -qO /tmp/cuda-keyring.deb \
+      https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+    dpkg -i /tmp/cuda-keyring.deb
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      cuda-toolkit-12-4 \
+      nvidia-driver-550 \
+      nvidia-utils-550
+    echo 'export PATH=/usr/local/cuda/bin:$PATH' > /etc/profile.d/cuda.sh
+    echo 'export CUDA_HOME=/usr/local/cuda' >> /etc/profile.d/cuda.sh
+
+  # ---- 2. GitHub Actions runner ----------------------------------------
+  - |
+    set -euo pipefail
+    : "${RUNNER_VERSION:=2.319.1}"
+    # ^ Pin a known-good runner version.  Bump from time to time — latest
+    # releases are at https://github.com/actions/runner/releases (this is
+    # the version GitHub will eventually force on us anyway, since old
+    # runners are auto-deprecated; keeping it in env makes the bump a
+    # one-line cloud-init edit instead of an AMI rebake).
+    : "${RUNNER_REPO_URL:?Set RUNNER_REPO_URL via instance user-data env}"
+    : "${RUNNER_REGISTRATION_TOKEN:?Set RUNNER_REGISTRATION_TOKEN via instance user-data env}"
+    # IMDSv2: obtain a short-lived token before querying instance metadata.
+    IMDS_TOKEN=$(curl -fsSL -X PUT \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+      http://169.254.169.254/latest/api/token 2>/dev/null || true)
+    if [ -n "$IMDS_TOKEN" ]; then
+      INSTANCE_ID=$(curl -fsSL \
+        -H "X-aws-ec2-metadata-token: ${IMDS_TOKEN}" \
+        http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || hostname)
+    else
+      INSTANCE_ID=$(hostname)
+    fi
+    : "${RUNNER_NAME:=nexusminer-cuda-${INSTANCE_ID}}"
+    mkdir -p /opt/actions-runner
+    cd /opt/actions-runner
+    curl -fsSL -o runner.tar.gz \
+      "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+    tar xzf runner.tar.gz
+    rm -f runner.tar.gz
+    # Run the runner as an unprivileged user (the install scripts handle
+    # permissions; we just need the directory to be writable).
+    useradd -m -s /bin/bash runner || true
+    chown -R runner:runner /opt/actions-runner
+    sudo -u runner ./config.sh \
+      --url "${RUNNER_REPO_URL}" \
+      --token "${RUNNER_REGISTRATION_TOKEN}" \
+      --name "${RUNNER_NAME}" \
+      --labels "self-hosted,linux,x64,gpu,cuda" \
+      --unattended \
+      --replace
+    ./svc.sh install runner
+    ./svc.sh start
+
+  # ---- 3. Enable budget guard (shutdown de-register service removed) -----
+  - systemctl daemon-reload

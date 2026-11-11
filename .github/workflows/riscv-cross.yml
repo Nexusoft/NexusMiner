@@ -1,0 +1,68 @@
+name: RISC-V Cross Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop, MINER ]
+  pull_request:
+    branches: [ main, develop, MINER ]
+
+env:
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+
+jobs:
+  riscv-cross:
+    name: RISC-V (qemu-riscv64)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install RISC-V toolchain and dependencies
+        run: |
+          sudo dpkg --add-architecture riscv64
+          sudo sed -i '/^Types:/a Architectures: amd64' /etc/apt/sources.list.d/ubuntu.sources
+          sudo tee /etc/apt/sources.list.d/riscv64.sources >/dev/null <<'EOF'
+          Types: deb
+          URIs: http://ports.ubuntu.com/ubuntu-ports
+          Suites: noble noble-updates noble-security
+          Components: main universe
+          Architectures: riscv64
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          EOF
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-riscv64-linux-gnu \
+            g++-riscv64-linux-gnu \
+            libssl-dev:riscv64 \
+            qemu-user-static \
+            ninja-build
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CPM_SOURCE_CACHE }}
+          key: riscv-cpm-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            riscv-cpm-
+
+      - name: Configure CMake for RISC-V
+        run: |
+          cmake --preset riscv \
+            --toolchain cmake/toolchains/riscv64-linux-gnu.cmake \
+            -DCMAKE_CROSSCOMPILING_EMULATOR="qemu-riscv64-static;-L;/usr/riscv64-linux-gnu;-cpu;rv64,v=true,zbkb=true,zbkc=true"
+
+      - name: Build RISC-V target
+        run: cmake --build --preset riscv
+
+      - name: Run tests with QEMU
+        run: ctest --preset riscv --output-on-failure
+
+      - name: Upload RISC-V build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexusMiner-RISCV
+          path: |
+            build/riscv/NexusMiner*
+            !build/**/*.o

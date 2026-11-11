@@ -1,0 +1,250 @@
+name: Release artifacts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [MINER]
+    paths:
+      - '.github/workflows/release-artifacts.yml'
+      - 'BUILD.md'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'COPYING'
+      - 'README.md'
+      - 'cmake/**'
+      - 'src/**'
+      - 'include/**'
+      - 'configs/**'
+      - 'example.miner.config'
+      - 'third-party-licenses/**'
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  unix-cpu:
+    name: CPU Prime (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+          - os: macos-latest
+            platform: macos-arm64
+          - os: macos-15-intel
+            platform: macos-x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ninja-build libssl-dev libboost-dev libgmp-dev
+          else
+            brew install ninja openssl@3 boost gmp
+          fi
+      - name: Configure
+        shell: bash
+        run: |
+          set -euxo pipefail
+          args=(-DCMAKE_BUILD_TYPE=Release -DWITH_PRIME=ON)
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            args+=(-DNEXUSMINER_STATIC_OPENSSL=OFF)
+          else
+            args+=(-DNEXUSMINER_STATIC_OPENSSL=ON
+              "-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)"
+              "-DGMP_INCLUDES=$(brew --prefix gmp)/include"
+              "-DGMP_LIBRARIES=$(brew --prefix gmp)/lib/libgmp.dylib")
+          fi
+          cmake -S . -B build/release-artifacts -G Ninja "${args[@]}" 2>&1 | tee configure.log
+          grep -q 'PRIME big integer backend:' configure.log
+      - name: Build and test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --build build/release-artifacts --parallel 2
+          ctest --test-dir build/release-artifacts --output-on-failure --timeout 120
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          version=$(build/release-artifacts/NexusMiner --version | sed -n 's/^NexusMiner version: //p')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          name="NexusMiner-$version-${{ matrix.platform }}-cpu-prime"
+          mkdir -p "dist/$name/third-party-licenses"
+          cp build/release-artifacts/NexusMiner README.md BUILD.md COPYING example.miner.config "dist/$name/"
+          cp -R configs "dist/$name/"
+          cp build/release-artifacts/_deps/spdlog-src/LICENSE "dist/$name/third-party-licenses/spdlog.txt"
+          cp build/release-artifacts/_deps/nlohmann_json-src/LICENSE.MIT "dist/$name/third-party-licenses/nlohmann-json.txt"
+          cp build/release-artifacts/_deps/asio-src/asio/COPYING "dist/$name/third-party-licenses/asio.txt"
+          cp build/release-artifacts/_deps/asio-src/asio/LICENSE_1_0.txt "dist/$name/third-party-licenses/boost.txt"
+          cp build/release-artifacts/_deps/primesieve-src/COPYING "dist/$name/third-party-licenses/primesieve.txt"
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            cp "$(brew --prefix openssl@3)/LICENSE.txt" "dist/$name/third-party-licenses/openssl.txt"
+            cp third-party-licenses/LGPL-3.0.txt "dist/$name/third-party-licenses/gmp-lgpl-3.0.txt"
+            cp COPYING "dist/$name/third-party-licenses/gmp-gpl-3.0.txt"
+            gmp_path=$(otool -L "dist/$name/NexusMiner" | awk '/libgmp[.]/ {print $1; exit}')
+            test -n "$gmp_path"
+            cp -L "$gmp_path" "dist/$name/libgmp.dylib"
+            chmod u+w "dist/$name/NexusMiner"
+            install_name_tool -change "$gmp_path" '@executable_path/libgmp.dylib' "dist/$name/NexusMiner"
+            codesign --force --sign - "dist/$name/NexusMiner"
+            "dist/$name/NexusMiner" --version
+            otool -L "dist/$name/NexusMiner"
+          fi
+          git rev-parse HEAD > "dist/$name/SOURCE_COMMIT.txt"
+          git -C build/release-artifacts/_deps/primesieve-src rev-parse HEAD > "dist/$name/PRIMESIEVE_COMMIT.txt"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          (cd dist && shasum -a 256 "$name.tar.gz" > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-prime-${{ matrix.platform }}
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  windows-cpu:
+    name: CPU Prime (windows-x86_64)
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone https://github.com/microsoft/vcpkg.git "$env:GITHUB_WORKSPACE\vcpkg"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C "$env:GITHUB_WORKSPACE\vcpkg" checkout c4c072aa5c128adf3f63715e03ba707f81b5b8e5
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/cache@v4
+        with:
+          path: vcpkg/installed
+          key: windows-2022-vcpkg-c4c072aa-x64-windows-openssl-gmp-boost
+      - name: Install release libraries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe" install --triplet x64-windows openssl gmp boost-integer boost-multiprecision
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Configure
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake --preset windows-msvc "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows -DWITH_PRIME=ON -DNEXUSMINER_STATIC_OPENSSL=OFF "-DGMP_INCLUDES=$env:GITHUB_WORKSPACE/vcpkg/installed/x64-windows/include" "-DGMP_LIBRARIES=$env:GITHUB_WORKSPACE/vcpkg/installed/x64-windows/lib/gmp.lib" 2>&1 | Tee-Object -FilePath configure.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Select-String -Quiet -Path configure.log -Pattern 'PRIME big integer backend:')) { throw 'Prime support is missing' }
+      - name: Build and test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake --build --preset windows-msvc --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:PATH = "$env:GITHUB_WORKSPACE\vcpkg\installed\x64-windows\bin;$env:PATH"
+          ctest --test-dir build/windows-msvc -C Release --output-on-failure --timeout 120
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:PATH = "$env:GITHUB_WORKSPACE\vcpkg\installed\x64-windows\bin;$env:PATH"
+          $version = (& build/windows-msvc/Release/NexusMiner.exe --version)
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^NexusMiner version: (\d+\.\d+\.\d+)$') { throw "Unexpected version: $version" }
+          $name = "NexusMiner-$($Matches[1])-windows-x86_64-cpu-prime"
+          New-Item -ItemType Directory -Force "dist\$name\third-party-licenses" | Out-Null
+          Copy-Item build/windows-msvc/Release/NexusMiner.exe, README.md, BUILD.md, COPYING, example.miner.config "dist\$name"
+          Copy-Item configs "dist\$name\configs" -Recurse
+          Copy-Item vcpkg/installed/x64-windows/bin/*.dll "dist\$name"
+          Copy-Item build/windows-msvc/_deps/spdlog-src/LICENSE "dist\$name\third-party-licenses\spdlog.txt"
+          Copy-Item build/windows-msvc/_deps/nlohmann_json-src/LICENSE.MIT "dist\$name\third-party-licenses\nlohmann-json.txt"
+          Copy-Item build/windows-msvc/_deps/asio-src/asio/COPYING "dist\$name\third-party-licenses\asio.txt"
+          Copy-Item build/windows-msvc/_deps/asio-src/asio/LICENSE_1_0.txt "dist\$name\third-party-licenses\boost.txt"
+          Copy-Item build/windows-msvc/_deps/primesieve-src/COPYING "dist\$name\third-party-licenses\primesieve.txt"
+          Copy-Item vcpkg/installed/x64-windows/share/gmp/copyright "dist\$name\third-party-licenses\gmp.txt"
+          Copy-Item vcpkg/installed/x64-windows/share/openssl/copyright "dist\$name\third-party-licenses\openssl.txt"
+          git rev-parse HEAD | Set-Content -Encoding ascii "dist\$name\SOURCE_COMMIT.txt"
+          git -C build/windows-msvc/_deps/primesieve-src rev-parse HEAD | Set-Content -Encoding ascii "dist\$name\PRIMESIEVE_COMMIT.txt"
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $stagedVersion = (& "dist\$name\NexusMiner.exe" --version)
+          if ($LASTEXITCODE -ne 0 -or $stagedVersion -ne $version) { throw "Staged executable failed: $stagedVersion" }
+          Compress-Archive -Path "dist\$name" -DestinationPath "dist\$name.zip"
+          $hash = (Get-FileHash -Algorithm SHA256 "dist\$name.zip").Hash.ToLower()
+          "$hash  $name.zip" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-prime-windows-x86_64
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  linux-cuda:
+    name: NVIDIA CUDA Prime and hash (linux-x86_64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CUDA toolkit and dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i cuda-keyring_1.1-1_all.deb
+          sudo apt-get update -qq
+          sudo apt-get install -y ninja-build libssl-dev libboost-dev libgmp-dev cuda-nvcc-12-8 cuda-cudart-dev-12-8 cuda-profiler-api-12-8 cuda-cuobjdump-12-8
+      - name: Configure
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake -S . -B build/release-artifacts -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DWITH_PRIME=ON -DWITH_GPU_CUDA=ON -DNEXUSMINER_STATIC_OPENSSL=OFF \
+            -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc \
+            '-DCMAKE_CUDA_ARCHITECTURES=61;75;80;86;89;90' 2>&1 | tee configure.log
+          grep -q 'PRIME big integer backend:' configure.log
+          grep -q 'CUDA compiler identification is NVIDIA' configure.log
+      - name: Build and host tests
+        run: |
+          set -euxo pipefail
+          cmake --build build/release-artifacts --parallel 2
+          /usr/local/cuda-12.8/bin/cuobjdump --list-elf build/release-artifacts/NexusMiner | tee cuda-architectures.log
+          for arch in 61 75 80 86 89 90; do
+            grep -q "sm_$arch" cuda-architectures.log
+          done
+          ctest --test-dir build/release-artifacts --output-on-failure --timeout 120
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          version=$(build/release-artifacts/NexusMiner --version | sed -n 's/^NexusMiner version: //p')
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          name="NexusMiner-$version-linux-x86_64-nvidia-cuda-prime"
+          mkdir -p "dist/$name/third-party-licenses"
+          cp build/release-artifacts/NexusMiner README.md BUILD.md COPYING example.miner.config "dist/$name/"
+          cp -R configs "dist/$name/"
+          cp build/release-artifacts/_deps/spdlog-src/LICENSE "dist/$name/third-party-licenses/spdlog.txt"
+          cp build/release-artifacts/_deps/nlohmann_json-src/LICENSE.MIT "dist/$name/third-party-licenses/nlohmann-json.txt"
+          cp build/release-artifacts/_deps/asio-src/asio/COPYING "dist/$name/third-party-licenses/asio.txt"
+          cp build/release-artifacts/_deps/asio-src/asio/LICENSE_1_0.txt "dist/$name/third-party-licenses/boost.txt"
+          cp build/release-artifacts/_deps/primesieve-src/COPYING "dist/$name/third-party-licenses/primesieve.txt"
+          curl -fsSL https://docs.nvidia.com/cuda/archive/12.8.0/eula/index.html > "dist/$name/third-party-licenses/nvidia-cuda-eula.html"
+          git rev-parse HEAD > "dist/$name/SOURCE_COMMIT.txt"
+          git -C build/release-artifacts/_deps/primesieve-src rev-parse HEAD > "dist/$name/PRIMESIEVE_COMMIT.txt"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          (cd dist && sha256sum "$name.tar.gz" > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nvidia-cuda-prime-linux-x86_64
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          if-no-files-found: error

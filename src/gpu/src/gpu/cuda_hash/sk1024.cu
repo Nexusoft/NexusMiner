@@ -8,17 +8,19 @@
 #include "hash_helper.cuh"
 
 #include <LLC/hash/SK.h>
-
+#include <gpu/cuda_memory.hpp>
 
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 
 #define ROL64(x, n) (((x) << (n)) | ((x) >> (64 - (n))))
 
-uint64_t* h_sknonce[GPU_MAX];
-uint64_t* d_SKNonce[GPU_MAX];
-uint64_t* d_SKLowerHash[GPU_MAX];
+// RAII-managed CUDA memory arrays
+nexusminer::gpu::cuda_host_unique_ptr<uint64_t> h_sknonce[GPU_MAX];
+nexusminer::gpu::cuda_unique_ptr<uint64_t> d_SKNonce[GPU_MAX];
+nexusminer::gpu::cuda_unique_ptr<uint64_t> d_SKLowerHash[GPU_MAX];
 uint32_t nBestHeight = 0;
 
 const uint64_t cpu_SKEIN1024_IV_1024[16] =
@@ -560,34 +562,43 @@ __global__ void  sk1024_gpu_hash(int threads, uint64_t startNonce, uint64_t* res
 __host__ uint64_t sk1024_cpu_hash(uint32_t thr_id, uint32_t threads, uint64_t startNonce, uint32_t threadsperblock)
 {
 	uint64_t result = 0xFFFFFFFFFFFFFFFF;
-	cudaMemset(d_SKNonce[thr_id], 0xFF, sizeof(uint64_t));
-	cudaMemset(d_SKLowerHash[thr_id], result, sizeof(uint64_t));
+	cudaMemset(d_SKNonce[thr_id].get(), 0xFF, sizeof(uint64_t));
+	cudaMemset(d_SKLowerHash[thr_id].get(), result, sizeof(uint64_t));
 
 	//dim3 grid(threads / threadsperblock);
 	dim3 block(threadsperblock);
 	dim3 grid((threads + block.x - 1) / block.x);
 
 
-	sk1024_gpu_hash << <grid, block >> > (threads, startNonce, d_SKNonce[thr_id], d_SKLowerHash[thr_id]);
-	cudaMemcpy(h_sknonce[thr_id], d_SKNonce[thr_id], sizeof(uint64_t), cudaMemcpyDeviceToHost);
+	sk1024_gpu_hash << <grid, block >> > (threads, startNonce, d_SKNonce[thr_id].get(), d_SKLowerHash[thr_id].get());
+	cudaMemcpy(h_sknonce[thr_id].get(), d_SKNonce[thr_id].get(), sizeof(uint64_t), cudaMemcpyDeviceToHost);
 
-	result = *h_sknonce[thr_id];
+	result = *h_sknonce[thr_id].get();
 
 	return result;
 }
 
 __host__ void cuda_sk1024_init(uint32_t thr_id)
 {
-	cudaMalloc(&d_SKNonce[thr_id], sizeof(uint64_t));
-	cudaMalloc(&d_SKLowerHash[thr_id], sizeof(uint64_t));
-	cudaMallocHost(&h_sknonce[thr_id], 1 * sizeof(uint64_t));
+	uint64_t* d_nonce = nullptr;
+	uint64_t* d_lower_hash = nullptr;
+	uint64_t* h_nonce = nullptr;
+	
+	cudaMalloc(&d_nonce, sizeof(uint64_t));
+	cudaMalloc(&d_lower_hash, sizeof(uint64_t));
+	cudaMallocHost(&h_nonce, sizeof(uint64_t));
+	
+	d_SKNonce[thr_id].reset(d_nonce);
+	d_SKLowerHash[thr_id].reset(d_lower_hash);
+	h_sknonce[thr_id].reset(h_nonce);
 }
 
 __host__ void cuda_sk1024_free(uint32_t thr_id)
 {
-	cudaFree(d_SKNonce[thr_id]);
-	cudaFree(d_SKLowerHash[thr_id]);
-	cudaFreeHost(h_sknonce[thr_id]);
+	// Smart pointers automatically free memory when reset or destroyed
+	d_SKNonce[thr_id].reset();
+	d_SKLowerHash[thr_id].reset();
+	h_sknonce[thr_id].reset();
 }
 
 
@@ -752,7 +763,8 @@ extern bool cuda_sk1024_hash(
 	uint64_t* hashes_done,
 	uint32_t throughput,
 	uint32_t threadsPerBlock,
-	uint32_t nHeight)
+	uint32_t nHeight,
+	uint32_t* keccak_mismatches)
 {
 	uint64_t* ptarget = (uint64_t*)&TheTarget;
 
@@ -787,9 +799,21 @@ extern bool cuda_sk1024_hash(
 		}
 		else
 		{
-			std::cout << "GPU # " << thr_id << ": result for nonce " <<  foundNonce << " does not validate on CPU!" << std::endl;
-
-			std::cout << std::hex << std::setw(16) << std::setfill('0') << keccak[15] << " > " << std::setw(16) << std::setfill('0') << Htarg << std::endl;
+			// Stone — bug #8 fix.  GPU-reported winner failed CPU revalidation.
+			// This is a hardware fault on the device (bit-flip, marginal clocks,
+			// thermal throttle in flight).  Previously this printed to std::cout
+			// and fell through to the throughput-credit path, silently inflating
+			// hashes_done for a faulty window.  Now: report via the out-counter
+			// and DO NOT credit the suspect window to *hashes_done.  Worker_hash
+			// will route the count through spdlog and treat repeated mismatches
+			// as a hardware fault that takes the worker offline.
+			if (keccak_mismatches != nullptr)
+				*keccak_mismatches += 1;
+			*hashes_done = 0;
+			// Do NOT advance the data buffer's nonce here either — the next
+			// call from Worker_hash::run() will retry with the same window
+			// (which is what the operator wants while diagnosing the fault).
+			return false;
 		}
 
 
@@ -799,7 +823,15 @@ extern bool cuda_sk1024_hash(
 
 	uint64_t doneNonce = ((uint64_t*)TheData)[26];
 
-	if (doneNonce < 18446744072149270489lu)
+	// PR #681 follow-up §4(3): replace the magic constant
+	// 18446744072149270489lu (= 2^64 - throughput - 1 for the throughput the
+	// kernel was originally tested with) with an explicit unsigned-overflow
+	// check.  With per-worker nonce sharding (Worker_hash bug #7 fix, gpu
+	// worker_hash.cpp:135) each worker only owns 2^48 of nonce space so this
+	// branch is essentially unreachable in production, but the magic constant
+	// was a footgun for any callsite that bumps `throughput` past the value
+	// it was hand-tuned for.  Overflow check is correct for any throughput.
+	if (doneNonce >= first_nonce)
 		*hashes_done = doneNonce - first_nonce + 1;
 
 	return false;

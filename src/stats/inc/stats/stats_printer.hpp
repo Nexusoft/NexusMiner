@@ -31,7 +31,13 @@ public:
         ss << std::setprecision(2) << std::fixed;
         ss << "Hours elapsed: " << stats_collector.get_elapsed_time_seconds().count() / 3600.0;
         ss << " Blocks accepted: " << global_stats.m_accepted_blocks
-            << " rejected: " << global_stats.m_rejected_blocks;
+            << " rejected: " << global_stats.m_rejected_blocks
+            // discarded = solved blocks that never reached SUBMIT_BLOCK on the
+            // wire (stale session epoch, submit-height mismatch, missing
+            // template, encryption failure, ...). Always printed (even when
+            // 0) so operators can confirm "no silent block loss" at a
+            // glance without grepping logs — see Solo::submit_block().
+            << " discarded: " << global_stats.m_discarded_blocks;
         ss << " Connection retries: " << global_stats.m_connection_retries << std::endl;
 
         return ss.str();

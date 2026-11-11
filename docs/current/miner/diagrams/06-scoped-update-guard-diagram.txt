@@ -1,0 +1,17 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 06. SCOPED UPDATE GUARD / STAGED MERGE MODEL                        ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  Stage changes under lock                                            ║
+║        │                                                             ║
+║        ▼                                                             ║
+║  ╔══════════════════════╗     validate once     ╔══════════════════╗ ║
+║  ║ pending reward/lane  ║ ───────────────────► ║ consistency PASS?║ ║
+║  ╚══════════════════════╝                       ╚══════════════════╝ ║
+║        │ yes                                                    │ no║
+║        ▼                                                        ▼   ║
+║  commit staged state                                     rollback    ║
+║        │                                                        │   ║
+║        └──────────── authoritative container stays coherent ────┘   ║
+║                                                                      ║
+║ Goal: avoid multi-step partial updates leaking into packet paths.    ║
+╚══════════════════════════════════════════════════════════════════════╝

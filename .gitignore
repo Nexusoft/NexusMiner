@@ -10,6 +10,9 @@ miner_profile
 *.vscode
 Makefile
 build/
+build_check/
+build_test/
+.cpm-cache/
 .vs/
 CMakeSettings.json
 out/
@@ -18,3 +21,9 @@ include/gmp.h
 include/gmpxx.h
 *.exe
 *.log
+_codeql_detected_source_root
+_codeql_build_dir/
+test_nchannel
+test_nchannel_fix.cpp
+*.md.legacy
+build-prime/

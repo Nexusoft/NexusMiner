@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.19)
-
 add_library(TAO STATIC  
 src/TAO/Ledger/difficulty.cpp
 )

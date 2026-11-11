@@ -1,107 +1,114 @@
 # NexusMiner
 
-Mining software for Nexus supporting GPU, FPGA, prime, hash, pool and solo mining. 
+Solo mining software for [Nexus](https://nexus.io) — GPU, FPGA, CPU, and RISC-V supported, with Falcon-1024 post-quantum authentication and ChaCha20-Poly1305 session encryption.
 
-## Windows Quickstart
-Have an Nvidia GPU and a windows machine?  Start mining in 3 steps. 
-1. Download NexusMiner.exe and miner.conf from the [latest release](https://github.com/Nexusoft/NexusMiner/releases). 
-2. Edit miner.conf and add your Nexus wallet address
-3. Run NexusMiner.exe
+---
 
-## FPGA Mining
-FPGAs are the most efficient hardware for mining the Nexus Hash channel.  Blackminer users see [these instructions](docs/blackminer_instructions.md).  Other users see the list of supported [FPGA boards](docs/fpga_support.md). 
+## Quick Start
 
-## GPU Mining
-GPUs are the most efficient hardware for mining the Nexus Prime channel.  Supported GPUs are Nvidia GTX/RTX 10x0, 20x0, and 30x0 series, and Radeon RX6000 series.  Nvidia RTX 20x0 and 30x0 GPUs have the best performance.  Hash channel mining with Nvidia GPUs is also supported. 
+1. Choose the binary for your OS: a **CPU Prime** build for channel 1, or an
+   **NVIDIA CUDA hash-only** build for channel 2. Hash-only builds do not
+   support Prime. GPU mining requires hardware testing.
+2. Run a synchronized Nexus node with mining enabled, then choose the matching
+   config: `configs/cpu-prime-solo.config` or `configs/gpu-hash-solo.config`.
+3. Copy the template to `miner.config`, add your wallet genesis and Falcon
+   keys, and start the miner. The [mining setup guide](configs/README.md)
+   gives the complete Linux, macOS, and Windows steps.
 
-## Pools
-* [primepool.nexus.io](https://primepool.nexus.io)
-* [hashpool.nexus.io](http://hashpool.nexus.io)  
-Connect to either pool on port 50000
+To build from source instead, see [BUILD.md](BUILD.md).
 
-## Prime Pool
-To use the prime pool, set the following address and port in miner.conf:
-```
-    "wallet_ip" : "primepool.nexus.io",
-    "port" : 50000,
+**RISC-V cross-compile:**
+
+```bash
+cmake --preset riscv && cmake --build --preset riscv -j$(nproc)
 ```
 
- ## miner.conf Configuration File
+---
 
-  Some important config options in miner.conf
+## Hardware Support
 
-  ```
-    "wallet_ip"             // the ip the NXS wallet (solo mining) or ip address/dns name of Pool  
-    "wallet_port"           // port of the NXS wallet (solo mining) or port of the Pool  
-    "mining_mode"           // mine the HASH or PRIME channel  
-    "pool"                  // Pool option group, if present then pool mining is active  
-        "username"          // NXS address  
-        "display_name"      // display_name for the pool website  
+| Hardware | Channel | Status |
+|----------|---------|--------|
+| NVIDIA CUDA GPUs | Prime & Hash | Prime and Hash require a CUDA-enabled build; GPU hardware testing is needed |
+| AMD Radeon RX6000 | Prime | ⚠️ Experimental ROCm/HIP; AMD Hash is not implemented |
+| Blackminer FPGA | Hash | ✅ |
+| CPU (any x86-64, ARM64) | Prime | ✅ |
+| RISC-V (RVV 1.0, rv64gcv\_zk) | Hash & Prime | ✅ |
+
+See [docs/hardware/HARDWARE.md](docs/hardware/HARDWARE.md) for GPU power controls,
+multi-core configs, Windows build steps, and FPGA board list.  
+See [docs/riscv/RISCV-OVERVIEW.md](docs/riscv/RISCV-OVERVIEW.md) for RISC-V
+extension map, performance tables, and ecosystem status.
+
+---
+
+## Security Summary
+
+| Layer | Algorithm | Notes |
+|-------|-----------|-------|
+| Authentication | Falcon-1024 | 256-bit post-quantum, session disposable |
+| Session encryption | ChaCha20-Poly1305 | Always-on, hardware-accelerated on RISC-V (Zbkb/Zbkc) and optimized on x86 via SSSE3/AVX2 implementations |
+| Remote transport | Secure tunnel required | Mining connections do not use the configured TLS settings |
+| Quantum resistance | Falcon-512 / 1024 | Falcon-1024 default (2× stronger) |
+
+See [docs/current/security/security-overview.md](docs/current/security/security-overview.md).
+
+---
+
+## Documentation
+
+| Category | Link | Description |
+|----------|------|-------------|
+| **Protocol Reference** | [docs/reference/block-formats.md](docs/reference/block-formats.md) | 216-byte Tritium vs 220-byte Legacy block wire formats |
+| **Build** | [BUILD.md](BUILD.md) | All-platform build guide |
+| **Hardware** | [docs/hardware/HARDWARE.md](docs/hardware/HARDWARE.md) | GPU/FPGA/CPU detail & power controls |
+| **RISC-V** | [docs/riscv/RISCV-OVERVIEW.md](docs/riscv/RISCV-OVERVIEW.md) | RISC-V extensions, performance, ecosystem |
+| **RISC-V Build** | [docs/riscv/BUILD-RISCV.md](docs/riscv/BUILD-RISCV.md) | Cross-compile & native build guide |
+| **RISC-V Diagrams** | [docs/riscv/RISCV-DIAGRAMS.md](docs/riscv/RISCV-DIAGRAMS.md) | 12 Mermaid architecture diagrams |
+| **Config reference** | [docs/reference/nexus.conf.md](docs/reference/nexus.conf.md) | All config options |
+| **Authentication** | [docs/current/authentication/falcon-integration.md](docs/current/authentication/falcon-integration.md) | Falcon-1024 setup |
+| **Security** | [docs/current/security/chacha20-encryption.md](docs/current/security/chacha20-encryption.md) | ChaCha20-Poly1305 details |
+| **TLS** | [docs/current/security/tls-https.md](docs/current/security/tls-https.md) | Historical TLS design; not wired into mining connections |
+| **Stateless protocol** | [docs/current/mining-protocols/stateless-mining.md](docs/current/mining-protocols/stateless-mining.md) | Modern push-notification protocol |
+| **Miner architecture** | [docs/current/miner/README.md](docs/current/miner/README.md) | Current session-container architecture, roadmap, diagrams, and tests |
+| **Diagrams** | [docs/diagrams/](docs/diagrams/) | Mermaid architecture diagrams |
+| **Troubleshooting** | [docs/current/troubleshooting.md](docs/current/troubleshooting.md) | Common issues & solutions |
+| **Upgrade guide** | [docs/upgrade-guides/legacy-to-stateless.md](docs/upgrade-guides/legacy-to-stateless.md) | Legacy → stateless migration |
+| **Full docs index** | [docs/README.md](docs/README.md) | Complete documentation index |
+
+---
+
+## Command-Line Options
+
+```
+./NexusMiner [config_file]         Default config: miner.conf
+  -c --check                       Check JSON config, then start mining
+  -v --version                     Print version
+  --create-keys                    Generate Falcon keypair
+  --create-falcon-config           Generate JSON Falcon SOLO config
+  --create-falcon-config-with-privkey  Generate config with embedded privkey
 ```
 
-## Command line option arguments
-```
-    <miner_config_file> Default=miner.conf
-    -c --check          run config file check before miner startup
-    -v --version        Show NexusMiner version
-```
+The miner parses filenames ending in `.config` as TOML-style configuration;
+other extensions, including the default `miner.conf`, are parsed as JSON.
+`-c` does not validate `.config` files and is not a check-only mode.
 
-  `./NexusMiner ../../myownminer.conf -c`
-  
-## Solo Mining Wallet Setup
-For solo mining use the latest wallet daemon release 5.0.5 or greater and ensure the wallet has been unlocked for mining.
+---
+
+## Wallet Setup (Solo Mining)
+
+Requires Nexus wallet daemon ≥ 5.0.5, unlocked for mining:
 
 ```
-    -llpallowip=<ip-port>   ex: -llpallowip=192.168.0.1:9325 
-                            note: this is not needed if you mine to localhost (127.0.0.1). This is primarily used for a local-area-network setup
-
-    -mining                 Ensure mining LLP servers are initialized.
-```
-## Building NexusMiner (Cmake) 
-Optional cmake build options are
-* `WITH_GPU_CUDA`       to enable Nvidia gpu mining. CUDA Toolkit required
-* `WITH_GPU_AMD`        to enable AMD (Radeon) gpu mining (see below). 
-* `WITH_PRIME`          to enable PRIME channel mining. GMP and boost required
-Example commands to build NexusMiner for Nvidia GPUs: 
-```
-git clone https://github.com/Nexusoft/NexusMiner.git
-cd NexusMiner
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DWITH_GPU_CUDA=On -DWITH_PRIME=On ..
-make -j4
-```
-Before running `NexusMiner` copy miner.conf to the build folder and edit it with your settings.
-
-## AMD GPU Build 
-Prime mining with Radeon RX6000 series GPUs is supported on Linux systems.  The [Rocm](https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html) toolkit is required. Rocm uses a special version of clang who's path must be passed to cmake. Example cmake command for Radeon support:  
-`cmake -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ -DCMAKE_BUILD_TYPE=Release -DWITH_GPU_AMD=On -DWITH_PRIME=On ..`
-
-When using Arch linux you may have to run a build using the following:
-```
-cmake -DOPENSSL_ROOT_DIR=/usr \
-      -DOPENSSL_SSL_LIBRARY=/usr/lib/libssl.so \
-      -DOPENSSL_CRYPTO_LIBRARY=/usr/lib/libcrypto.so \
-      -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DWITH_GPU_AMD=On \
-      -DWITH_PRIME=On ..
+-mining                          Enable mining LLP servers
 ```
 
-### Windows Build Dependencies
-* OpenSSL: 
-    * Download and run OpenSSL [installer](https://slproweb.com/products/Win32OpenSSL.html)
-* [MPIR](http://www.mpir.org/) (required for WITH_PRIME):
-    * Download and build.  Copy gmp*.lib and mpir.lib to NexusMiner/libs
-* [boost](https://www.boost.org/users/download/) (required for WITH_PRIME):
-    * Download and extract to C:\boost
-### Ubuntu/Debian Dependencies
-* OpenSSL:
-    * `sudo apt-get install libssl-dev`
-* gmp (required for WITH_PRIME):  
-    * `sudo apt-get install libgmp-dev`
-* boost (required for WITH_PRIME):
-    * `sudo apt-get install libboost-all-dev`
-## Support
-* [Nexus Miners](https://t.me/NexusMiners) on telegram.
+For remote miners, configure node access and networking according to your
+node's documentation. See [docs/PROTOCOL_LANES.md](docs/PROTOCOL_LANES.md)
+for lane details (stateless port 9323 / legacy port 8323).
 
+---
+
+## License
+
+[MIT](COPYING)

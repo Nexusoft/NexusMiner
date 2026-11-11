@@ -20,8 +20,10 @@ class Prime
 {
 public:
 	Prime();
+	~Prime(); // Add destructor for proper cleanup
 
 	void InitializePrimes();
+	bool is_initialized() const { return primes != nullptr && inverses != nullptr; }
 	unsigned int SetBits(double nDiff);
 	double GetPrimeDifficulty(LLC::CBigNum prime, int checks, std::vector<unsigned int>& vPrimes);
 	double GetSieveDifficulty(LLC::CBigNum next, unsigned int clusterSize);
@@ -37,8 +39,9 @@ public:
 private:
 
 	std::shared_ptr<spdlog::logger> m_logger;
-	unsigned int* primes;
-	unsigned int* inverses;
+	// Use unique_ptr with custom deleter for C-style arrays
+	std::unique_ptr<unsigned int[], void(*)(void*)> primes;
+	std::unique_ptr<unsigned int[], void(*)(void*)> inverses;
 
 	unsigned int nBitArray_Size;
 	boost::multiprecision::cpp_int zPrimorial;

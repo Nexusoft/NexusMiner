@@ -1,0 +1,22 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 01. SHARED SESSIONBINDING VALUE OBJECT                             ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ Instead of passing identity fields piecemeal:                      ║
+║                                                                      ║
+║   session_id   reward_hash   genesis_hash   lane   fingerprint       ║
+║        │            │             │           │          │            ║
+║        └────────────┴─────────────┴───────────┴──────────┘            ║
+║                           travel together                            ║
+║                                                                      ║
+║                  ╔══════════════════════════════╗                    ║
+║                  ║        SessionBinding        ║                    ║
+║                  ╠══════════════════════════════╣                    ║
+║                  ║ SessionId                    ║                    ║
+║                  ║ SessionGenesisHash           ║                    ║
+║                  ║ RewardHash                   ║                    ║
+║                  ║ SessionFingerprint           ║                    ║
+║                  ║ ActiveLane                   ║                    ║
+║                  ╚══════════════════════════════╝                    ║
+║                                                                      ║
+║ Result: reconnect, reward, submit, and diagnostics share one bundle.║
+╚══════════════════════════════════════════════════════════════════════╝

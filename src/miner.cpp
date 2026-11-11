@@ -37,17 +37,39 @@ namespace nexusminer
 		m_signals->add(SIGQUIT);
 #endif 
 
-		m_signals->async_wait([this](auto, auto)
+		m_signals->async_wait([this](const asio::error_code& ec, int signal_number)
 		{
-			m_logger->info("Shutting down NexusMiner");
-			m_worker_manager->stop();
+			if (ec) return;
+			m_logger->info("Shutting down NexusMiner (signal={})", signal_number);
+			// Stop the watchdog first so a deliberate, graceful shutdown is
+			// never mistaken for an io_context stall while we tear down.
+			if (m_liveness_watchdog)
+			{
+				m_liveness_watchdog->stop();
+			}
+			// Stop the io_context FIRST so Miner::run()'s io_context->run() returns
+			// immediately, no matter what recovery/re-auth/reconnect state the
+			// Worker_manager is currently in (e.g. mid SESSION_RECOVERY, awaiting a
+			// GET_BLOCK, or a queued reconnect timer). Previously, the heavier
+			// enter_terminal_degraded_mode() teardown ran first on this same
+			// io_context thread; if any recovery-path bookkeeping took a while (or a
+			// future change made it block), CTRL+C would appear to hang rather than
+			// exiting promptly. Stopping first guarantees the process can always
+			// exit on signal, independent of recovery state.
 			m_io_context->stop();
-			exit(1);
+			if (m_worker_manager)
+			{
+				m_worker_manager->enter_terminal_degraded_mode(signal_number);
+			}
 		});
 	}
 
 	Miner::~Miner()
 	{
+		if (m_liveness_watchdog)
+		{
+			m_liveness_watchdog->stop();
+		}
 		m_io_context->stop();
 	}
 
@@ -70,7 +92,7 @@ namespace nexusminer
 	bool Miner::init(std::string const& miner_config_file)
 	{
 		// print header
-		std::cout << "NexusMiner Version " << NexusMiner_VERSION_MAJOR << "." << NexusMiner_VERSION_MINOR << "\n" << std::endl;
+		std::cout << "NexusMiner Version " << NexusMiner_VERSION << "\n" << std::endl;
 
 		if (!m_config.read_config(miner_config_file))
 		{
@@ -96,11 +118,24 @@ namespace nexusminer
 		// timer initialisation
 		chrono::Timer_factory::Sptr timer_factory = std::make_shared<chrono::Timer_factory>(m_io_context);
 
-		// network initialisation
-		m_network_component = network::create_component(m_io_context);
+		// Independent liveness watchdog for the shared io_context thread (see
+		// liveness_watchdog.hpp). Uses its own dedicated timer so a stall
+		// elsewhere on the io_context cannot be masked by shared timer state.
+		m_liveness_watchdog = std::make_unique<LivenessWatchdog>(
+			timer_factory, m_logger);
 
+		// network initialisation
+		m_logger->debug("Initializing network component");
+		m_network_component = network::create_component(m_io_context);
+		
+		m_logger->debug("Getting local IP address");
 		auto const local_endpoint = get_local_ip();
-		m_worker_manager = std::make_unique<Worker_manager>(m_io_context, m_config, timer_factory, 
+		std::string local_addr;
+		local_endpoint.address(local_addr);
+		m_logger->debug("Local endpoint: {}:{}", local_addr, local_endpoint.port());
+		
+		m_logger->debug("Creating worker manager");
+		m_worker_manager = std::make_shared<Worker_manager>(m_io_context, m_config, timer_factory, 
 			m_network_component->get_socket_factory()->create_socket(local_endpoint));
 		
 		return true;
@@ -111,23 +146,53 @@ namespace nexusminer
 		auto const ip_address = m_config.get_wallet_ip();
 		auto const port = m_config.get_port();
 		
+		m_logger->info("=== NexusMiner Port Configuration ===");
+		m_logger->info("Configured wallet IP: {}", ip_address);
+		m_logger->info("Configured LLP port: {} (from miner.conf)", port);
+		m_logger->info("Note: This is the miningport in LLL-TAO's nexus.conf");
+		m_logger->info("=====================================");
+		
 		network::Endpoint wallet_endpoint{network::Transport_protocol::tcp, ip_address, port};
 		if(wallet_endpoint.transport_protocol() == network::Transport_protocol::none)
 		{
 			// resolve dns name
+			m_logger->info("Resolving DNS name: {}", ip_address);
 			wallet_endpoint = resolve_dns(ip_address, port);
 			if(wallet_endpoint.transport_protocol() == network::Transport_protocol::none)
 			{
 				m_logger->error("Failed to resolve DNS name: {}", ip_address);
 				return;
 			}
+			m_logger->info("DNS resolved to: {}", wallet_endpoint.to_string());
 		}
 
+		if (!m_worker_manager)
+		{
+			m_logger->error("Worker manager is not initialized");
+			return;
+		}
+		
 		auto result = m_worker_manager->connect(wallet_endpoint);
 		if (!result)
 		{
 			m_logger->error("Failed to initialise socket. Result: {}", result);
 			return;
+		}
+
+		// NodeSession now stays on the configured primary node/lane.
+		// Optional secondary-node failover is handled by Worker_manager retry logic.
+		if (m_config.get_enable_sim_link())
+		{
+			m_logger->info("[SIM Link] ENABLED — reconnect/re-auth stays on the configured primary lane");
+		}
+		else
+		{
+			m_logger->info("[SIM Link] DISABLED (single lane-scoped node session)");
+		}
+
+		if (m_liveness_watchdog)
+		{
+			m_liveness_watchdog->start();
 		}
 
 		m_io_context->run();
@@ -141,6 +206,7 @@ namespace nexusminer
 		auto endpoint = resolver.resolve(dns_name, std::string{std::to_string(port)}, ec);
 		if(ec) 
 		{
+			m_logger->error("DNS resolution failed for '{}:{}': {}", dns_name, port, ec.message());
 			return network::Endpoint{};
 		}
 
@@ -150,34 +216,29 @@ namespace nexusminer
 	network::Endpoint Miner::get_local_ip()
 	{
 		std::string local_ip = m_config.get_local_ip();
-		std::for_each(local_ip.begin(), local_ip.end(), [](char& c) { c = ::tolower(c); });
+		std::for_each(local_ip.begin(), local_ip.end(),
+			[](char& c) { c = static_cast<char>(::tolower(static_cast<unsigned char>(c))); });
 
 		if (local_ip == "auto")
 		{
-			try 
+			// Short-circuit for localhost mining — no DNS lookup needed
+			if (m_config.is_localhost_mining())
 			{
-				asio::error_code error;
-				asio::ip::udp::resolver resolver(*m_io_context);
-				auto results = resolver.resolve("google.com", "80", error);
-				for (auto const& endpoint : results)
-				{
-					asio::ip::udp::socket socket(*m_io_context);
-					socket.connect(endpoint);
-					asio::ip::address addr = socket.local_endpoint().address();
-					return network::Endpoint{ network::Transport_protocol::tcp, addr.to_string(), 0 };
-				}
-
-				m_logger->error("Failed to resolve address google.com. Fallback to 127.0.0.1.");
+				m_logger->info("Local IP: localhost mining detected — binding to 127.0.0.1 (no DNS lookup needed)");
 				return network::Endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0 };
 			}
-			catch (std::exception& e) 
-			{
-				m_logger->error("Failed to set local_ip with auto mode. Fallback to 127.0.0.1. Exception: {}", e.what());
-				return network::Endpoint{ network::Transport_protocol::tcp, "127.0.0.1", 0};
-			}
+
+			// Bind to the unspecified address (0.0.0.0) and let the OS choose
+			// the source IP at connect() time based on the routing table.  This
+			// is the canonical way to "auto" pick a local IP without depending
+			// on an external DNS lookup, which is brittle in offline / private
+			// environments.
+			m_logger->debug("Local IP: 'auto' — binding to 0.0.0.0 and letting the OS pick the source address");
+			return network::Endpoint{ network::Transport_protocol::tcp, "0.0.0.0", 0 };
 		}
 		else
 		{
+			m_logger->debug("Using configured local IP: {}", m_config.get_local_ip());
 			return network::Endpoint{ network::Transport_protocol::tcp, m_config.get_local_ip(), 0 };
 		}
 	}

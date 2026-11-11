@@ -58,23 +58,11 @@ bool Validator::check(std::string const& config_file)
             // check content of mining_mode
             mining_mode = j["mining_mode"];
             std::for_each(mining_mode.begin(), mining_mode.end(), [](char & c) {
-                c = ::tolower(c);
+                c = static_cast<char>(::tolower(static_cast<unsigned char>(c)));
     	    });
             if(mining_mode != "prime" && mining_mode != "hash")
             {
                 m_mandatory_fields.push_back(Validator_error{"mining_mode", "Not 'prime' or 'hash'"});
-            }
-        }
-
-        if(j.count("pool") != 0)
-        {
-            if(j.count("pool")["username"] == 0)
-            {
-                m_mandatory_fields.push_back(Validator_error{"pool/username", ""});
-            }
-            if (j.count("pool")["display_name"] == 0)
-            {
-                m_mandatory_fields.push_back(Validator_error{ "pool/display_name", "" });
             }
         }
 

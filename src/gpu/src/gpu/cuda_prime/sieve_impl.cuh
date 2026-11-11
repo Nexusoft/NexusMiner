@@ -3,6 +3,7 @@
 
 #include "sieve.hpp"
 #include "cuda_chain.cuh"
+#include <gpu/cuda_memory.hpp>
 #include <stdint.h>
 namespace nexusminer {
 	namespace gpu {
@@ -35,43 +36,49 @@ namespace nexusminer {
 			void synchronize();
 			void init_sieve_size(int device, Cuda_sieve::Cuda_sieve_properties& sieve_properties);
 
+			// Update the per-session target T mirrored into m_sieve_properties.
+			// Called by Cuda_sieve::set_target_length(); kept here so the
+			// kernel-arg copy of properties (which Cuda_sieve_impl owns) tracks
+			// the same value the public Cuda_sieve sees.
+			void set_target_length(int target_length);
+
 
 		private:
 			int m_device = 0;
 			Cuda_sieve::Cuda_sieve_properties m_sieve_properties;
-			//device memory pointers
-			uint32_t* d_sieving_primes;  //medium sieving primes
-			uint32_t* d_starting_multiples;
-			Prime_plus_multiple_32* d_medium_primes;
-			uint32_t* d_large_primes;
-			uint32_t* d_large_prime_starting_multiples;
-			uint16_t* d_small_prime_offsets;
-			uint32_t* d_medium_small_primes;
-			uint32_t* d_medium_small_prime_starting_multiples;
-			uint32_t* d_small_prime_masks;
-			uint8_t* d_small_primes;
+			//device memory pointers - using RAII smart pointers
+			cuda_unique_ptr<uint32_t> d_sieving_primes;  //medium sieving primes
+			cuda_unique_ptr<uint32_t> d_starting_multiples;
+			cuda_unique_ptr<Prime_plus_multiple_32> d_medium_primes;
+			cuda_unique_ptr<uint32_t> d_large_primes;
+			cuda_unique_ptr<uint32_t> d_large_prime_starting_multiples;
+			cuda_unique_ptr<uint16_t> d_small_prime_offsets;
+			cuda_unique_ptr<uint32_t> d_medium_small_primes;
+			cuda_unique_ptr<uint32_t> d_medium_small_prime_starting_multiples;
+			cuda_unique_ptr<uint32_t> d_small_prime_masks;
+			cuda_unique_ptr<uint8_t> d_small_primes;
 			//temporary storage for sorting large primes used in large prime bucket sieve
-			uint32_t* d_large_prime_buckets;
-			uint32_t* d_bucket_indices;
+			cuda_unique_ptr<uint32_t> d_large_prime_buckets;
+			cuda_unique_ptr<uint32_t> d_bucket_indices;
 			//the full sieve
-			Cuda_sieve::sieve_word_t* d_sieve;
+			cuda_unique_ptr<Cuda_sieve::sieve_word_t> d_sieve;
 			//temporary storage for the next multiple of the sieving primes
-			uint32_t* d_multiples;
+			cuda_unique_ptr<uint32_t> d_multiples;
 			//array of chains
-			CudaChain* d_chains;
-			uint32_t* d_last_chain_index;
+			cuda_unique_ptr<CudaChain> d_chains;
+			cuda_unique_ptr<uint32_t> d_last_chain_index;
 			//array of winners
-			CudaChain* d_long_chains;
-			uint32_t* d_last_long_chain_index;
+			cuda_unique_ptr<CudaChain> d_long_chains;
+			cuda_unique_ptr<uint32_t> d_last_long_chain_index;
 			//count of 1s in the sieve
-			unsigned long long* d_prime_candidate_count;
+			cuda_unique_ptr<unsigned long long> d_prime_candidate_count;
 			//temporary holding spot for unbusted chains during sorting
-			uint32_t* d_good_chain_index;
-			CudaChain* d_good_chains;
+			cuda_unique_ptr<uint32_t> d_good_chain_index;
+			cuda_unique_ptr<CudaChain> d_good_chains;
 			//histogram of confirmed fermat chains
-			uint32_t* d_chain_histogram;
+			cuda_unique_ptr<uint32_t> d_chain_histogram;
 			//chain stats
-			unsigned long long* d_chain_stat_count;
+			cuda_unique_ptr<unsigned long long> d_chain_stat_count;
 			
 
 		};

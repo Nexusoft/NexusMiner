@@ -1,6 +1,7 @@
 #ifndef NEXUSMINER_GPU_CHAIN_HPP
 #define NEXUSMINER_GPU_CHAIN_HPP
 
+#include <cstdint>
 #include <string>
 #include <vector>
 //#include "sieve_utils.hpp"
@@ -14,6 +15,15 @@ namespace nexusminer {
 		class Chain
 		{
 		public:
+			// Stone — once the chain has accumulated this many proven Fermat
+			// primes, is_there_still_hope() returns true unconditionally so
+			// the histogram's upper buckets keep growing.  Mirrors the GPU
+			// device-side cuda_chain.cu behaviour ("if we've already found
+			// 4, keep counting regardless") and the CPU Chain in
+			// src/cpu/src/cpu/prime/chain_sieve.hpp.  Public so any future
+			// test can lock down the value without duplicating the magic.
+			static constexpr int kHopeKeepaliveThreshold = 4;
+
 			enum class Chain_state {
 				open, //immature chain empty or in process of being built
 				closed, //chain is complete and available for fermat testing

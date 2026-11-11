@@ -1,0 +1,110 @@
+Julia Bridge Architecture
+=========================
+
+Status
+------
+- This document is the formal interface spec for the Julia-backed QTV research bridge.
+- It defines the authoritative boundary, backend selection policy, and fallback rules.
+- C++ remains the production authority.  Julia remains an opt-in research backend.
+
+1. Goals
+--------
+- Keep one authoritative Julia integration boundary for QTV research.
+- Make backend selection deterministic and explicit.
+- Define safe fallback behavior that never leaks Julia requirements into production miner flow.
+- Support parity testing between the C++ and Julia implementations.
+
+2. Non-goals
+------------
+- No direct Julia calls from packet, session, auth, submit, or other live runtime control flow.
+- No automatic runtime switching based on heuristics, benchmarks, or transient failures.
+- No Julia-specific types crossing broad codebase boundaries.
+
+3. Core architecture
+--------------------
+Application Layer
+    |
+    v
+QTV Engine Facade
+    |
+    v
+QTV Julia Bridge (single adapter boundary)
+    |
+    v
+Julia fixture/parity hooks
+
+Mapping to current repository files:
+- Public backend policy surface: `include/qtv/QTVBackendKind.hpp`
+- Public capability/fallback surface: `include/qtv/QTVCapabilities.hpp`
+- Narrow C++ Julia adapter: `src/protocol/inc/protocol/qtv_julia_bridge.hpp`
+- Swappable engine facade: `src/protocol/inc/protocol/qtv_engine.hpp`
+
+4. Public interface
+-------------------
+4.1 Backend enum
+
+`include/qtv/QTVBackendKind.hpp`
+
+```cpp
+enum class QTVBackendKind : std::uint8_t {
+    Auto = 0,
+    Cpp = 1,
+    Julia = 2,
+    Null = 3,
+};
+```
+
+Semantics:
+- `Auto`: deterministic preference order for callers that want the best safe backend.
+- `Cpp`: explicit production-authoritative backend request.
+- `Julia`: explicit research backend request through the single bridge boundary.
+- `Null`: intentionally disable research execution.
+
+4.2 Capability model
+
+`include/qtv/QTVCapabilities.hpp`
+
+The capability model is a plain C++ struct with explicit booleans only:
+- `cpp_backend_available`
+- `julia_bridge_available`
+- `julia_fixture_available`
+- `julia_parity_available`
+- `production_cpp_authority`
+
+Selection API:
+- `julia_backend_available()`
+- `supports(QTVBackendKind requested_backend)`
+- `select_backend(QTVBackendKind requested_backend)`
+
+5. Backend selection policy
+---------------------------
+Rules:
+1. `Null` always resolves to `Null`.
+2. `Cpp` resolves to `Cpp` when available, otherwise `Null`.
+3. `Julia` resolves to `Julia` only when the bridge and both deterministic research hooks are available.
+4. If `Julia` is requested but unavailable, fall back to `Cpp` when possible, otherwise `Null`.
+5. `Auto` prefers `Cpp` first to preserve C++ as the production authority.
+6. `Auto` falls back to `Julia` only when C++ is unavailable and the full Julia research surface is available.
+7. `Auto` falls back to `Null` when neither usable backend is available.
+
+The selection policy is deterministic because it depends only on explicit requested mode plus explicit capabilities.
+
+6. Fallback behavior
+--------------------
+- Production flow must never require Julia.
+- Lack of Julia hooks is not an error for production mode; it is a normal capability state.
+- Partial Julia availability is treated as unsupported for backend selection.
+- Explicit `Julia` requests degrade to `Cpp` or `Null`; they do not trigger retries or dynamic probing.
+- `Null` is the safe terminal fallback when no executable backend is available.
+
+7. Testing expectations
+-----------------------
+- Parity tests should be able to exercise `Cpp`, `Julia`, and `Null` through a common facade.
+- Selection/fallback behavior should be validated with focused header-level tests.
+- Existing deterministic fixture parity remains the authoritative cross-language correctness check.
+
+8. Production boundary
+----------------------
+- C++ session/auth/runtime logic remains outside this bridge.
+- Julia-backed QTV work is research-only unless and until a future C++ implementation adopts the findings.
+- This boundary is intentionally small so that Julia can be enabled for fixture/parity work without becoming a runtime dependency of the miner or node.

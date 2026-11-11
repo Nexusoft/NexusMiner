@@ -1,0 +1,14 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 11. SUBMIT SNAPSHOT LIFECYCLE                                        ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  created  ──►  sent  ──►  accepted / rejected  ──►  consumed         ║
+║     │           │                 │                        │          ║
+║     │           │                 └──────────────┐         │          ║
+║     │           │                                ▼         ▼          ║
+║     │           └──────── template may rotate ─ invalidated           ║
+║     │                                                                  ║
+║ Snapshot fields: nonce, prev_hash, height, channel                    ║
+║                                                                      ║
+║ Rule: accept/reject handling uses the snapshot, not a potentially     ║
+║ replaced live template.                                              ║
+╚══════════════════════════════════════════════════════════════════════╝

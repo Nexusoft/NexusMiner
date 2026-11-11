@@ -1,0 +1,16 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 10. FIRST-MINED-BLOCK ACCEPTANCE HARNESS                            ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ AUTH ──► REWARD BIND ──► SET_CHANNEL ──► TEMPLATE ──► MINE          ║
+║   │          │                │              │          │            ║
+║   ▼          ▼                ▼              ▼          ▼            ║
+║ session   reward ok       ready_for_get  valid tmpl   winning nonce ║
+║   │          │                │              │          │            ║
+║   └──────────────────────────────────────────────────────┬───────────║
+║                                                          ▼           ║
+║                           SUBMIT ──► ACCEPT / GOOD_BLOCK             ║
+║                                                          │           ║
+║                                                          ▼           ║
+║                              consume accepted-submission               ║
+║                                      snapshot                          ║
+╚══════════════════════════════════════════════════════════════════════╝

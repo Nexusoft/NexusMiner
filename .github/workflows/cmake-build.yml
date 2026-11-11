@@ -1,0 +1,119 @@
+name: CMake Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop, MINER ]
+  pull_request:
+    branches: [ main, develop, MINER ]
+
+env:
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {
+              name: "Ubuntu GCC",
+              os: ubuntu-latest,
+              preset: "debug",
+              cc: "gcc",
+              cxx: "g++"
+            }
+          - {
+              name: "Ubuntu Release",
+              os: ubuntu-latest,
+              preset: "release",
+              cc: "gcc",
+              cxx: "g++"
+            }
+          - {
+              name: "macOS Clang",
+              os: macos-latest,
+              preset: "macos",
+              cc: "clang",
+              cxx: "clang++"
+            }
+          - {
+              name: "Windows MSVC",
+              os: windows-2022,
+              preset: "windows-msvc",
+              cc: "cl",
+              cxx: "cl"
+            }
+          - {
+              name: "Ubuntu GPU host-stubs",
+              os: ubuntu-latest,
+              preset: "gpu-host-stubs",
+              cc: "gcc",
+              cxx: "g++"
+            }
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Ninja (Ubuntu/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y ninja-build
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install ninja
+          fi
+
+      - name: Setup Ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
+
+      - name: Install OpenSSL (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev libboost-all-dev
+
+      - name: Install OpenSSL (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl@3
+
+      - name: Install OpenSSL (Windows)
+        if: runner.os == 'Windows'
+        run: choco install openssl
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CPM_SOURCE_CACHE }}
+          key: ${{ runner.os }}-cpm-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            ${{ runner.os }}-cpm-
+
+      - name: Configure CMake
+        env:
+          CC: ${{ matrix.config.cc }}
+          CXX: ${{ matrix.config.cxx }}
+        run: cmake --preset ${{ matrix.config.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.config.preset }}
+
+      - name: Run tests
+        if: matrix.config.preset == 'debug' || matrix.config.preset == 'release' || matrix.config.preset == 'gpu-host-stubs'
+        run: ctest --preset ${{ matrix.config.preset }} --output-on-failure
+
+      - name: Upload build artifacts
+        if: matrix.config.preset == 'release' || matrix.config.preset == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexusMiner-${{ runner.os }}
+          path: |
+            build/*/NexusMiner*
+            !build/**/*.o
+            !build/**/*.obj

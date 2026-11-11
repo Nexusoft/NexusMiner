@@ -1,0 +1,14 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 12. FAST VS FULL VALIDATION MODES                                    ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ FAST MODE                           FULL MODE                        ║
+║ ╔══════════════════════╗          ╔══════════════════════════════╗    ║
+║ ║ lane ok?             ║          ║ full container consistency   ║    ║
+║ ║ auth/session ready?  ║          ║ rich diagnostics             ║    ║
+║ ║ reward-ready?        ║          ║ reconnect conflict checks    ║    ║
+║ ║ template minimally ok║          ║ event journal correlation    ║    ║
+║ ╚══════════════════════╝          ╚══════════════════════════════╝    ║
+║                                                                      ║
+║ Use fast mode for hot paths; use full mode for recovery, harnesses,  ║
+║ and any path that needs explainable failure output.                  ║
+╚══════════════════════════════════════════════════════════════════════╝

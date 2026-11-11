@@ -1,0 +1,13 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 08. MULTI-MINER / MULTI-SESSION COLLISION TEST MODEL                ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ Miner A                    Node                     Miner B             ║
+║ ╔══════════════╗      ╔════════════════════╗      ╔══════════════╗     ║
+║ ║ Session A    ║─────►║ Session table      ║◄─────║ Session B    ║     ║
+║ ║ RewardHash A ║      ║  A != B            ║      ║ RewardHash B ║     ║
+║ ║ Submit A     ║      ║  lane A != lane B? ║      ║ Submit B     ║     ║
+║ ╚══════════════╝      ╚════════════════════╝      ╚══════════════╝     ║
+║                                                                      ║
+║ Pass condition: A’s reconnect, reward bind, submit snapshot, and     ║
+║ accept/reject events never satisfy or corrupt B’s session state.     ║
+╚══════════════════════════════════════════════════════════════════════╝

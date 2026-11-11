@@ -1,0 +1,17 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 02. CANONICAL VALIDATECONSISTENCY()                                 ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                  ╔══════════════════════════════╗                    ║
+║                  ║    ValidateConsistency()     ║                    ║
+║                  ╚══════════════════════════════╝                    ║
+║                     ▲        ▲        ▲        ▲                     ║
+║                     │        │        │        │                     ║
+║         ╔═══════════╝   ╔════╝   ╔════╝   ╔════╝════╗                ║
+║         ║               ║        ║        ║         ║                ║
+║   Auth / Login     Reconnect   Reward    Submit   Diagnostics        ║
+║         │               │        │        │         │                ║
+║         └───────────────┴────────┴────────┴─────────┘                ║
+║                                                                      ║
+║ One reusable validator keeps every entry path aligned with the       ║
+║ authoritative session container and produces one diagnostic story.   ║
+╚══════════════════════════════════════════════════════════════════════╝

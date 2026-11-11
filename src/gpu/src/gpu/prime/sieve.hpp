@@ -12,6 +12,7 @@
 #include "../cuda_prime/fermat_prime/fermat_prime.hpp"
 #include "../cuda_prime/sieve.hpp"
 #include "gpu/prime_common.hpp"
+#include "mining/mining_constants.hpp"
 
 namespace nexusminer {
 	namespace gpu
@@ -83,6 +84,15 @@ namespace nexusminer {
 			Cuda_sieve::Cuda_sieve_properties get_sieve_properties();
 			void generate_trial_divisors();
 
+			// Stone — per-session SSOT plumbing for Cunningham chain length T.
+			// Forwards to Cuda_sieve::set_target_length() AND mirrors the
+			// clamped value into this->m_min_chain_length so host-side stats
+			// code (e.g. expected_chain_density) sees the same T as the
+			// kernels.  Worker_prime calls this from the worker thread on
+			// every set_block() before the next sieve loop iteration.
+			void set_target_length(int target_length);
+			int  get_target_length() const noexcept { return m_min_chain_length; }
+
 		private:
 			//mod 30 wheel using primorial 2*3*5 = 30.  Each bit represents a possible prime location in the wheel {1,7,11,13,17,19,23,29} 
 			static constexpr int sieve30_offsets[]{ 1,7,11,13,17,19,23,29 };  // each bit in the sieve30 represets an offset from the base mod 30
@@ -90,8 +100,6 @@ namespace nexusminer {
 			static constexpr int sieve30_index[]{ -1,0,-1,-1,-1,-1,-1, 1, -1, -1, -1, 2, -1, 3, -1, -1, -1, 4, -1, 5, -1, -1, -1, 6, -1, -1, -1, -1, -1, 7 };  //reverse lookup table (offset mod 30 to index)
 
 		public:
-			
-			//const uint32_t sieve_size_bytes = Cuda_sieve::m_kernel_sieve_size_bytes;  //size of the sieve in bytes
 			//const uint32_t sieve_size_words = Cuda_sieve::m_kernel_sieve_size_words;  //size of the sieve in words
 			//const uint32_t sieve_size = Cuda_sieve::m_kernel_sieve_size_words;  
 			static constexpr uint32_t m_sieve_range_per_word = Cuda_sieve::m_sieve_word_range;  
@@ -106,11 +114,19 @@ namespace nexusminer {
 			uint32_t m_large_prime_limit;
 			uint32_t m_trial_division_prime_limit;
 			std::vector<Cuda_sieve::sieve_word_t> m_sieve_results;  //accumulated results of sieving
-			static constexpr int m_fermat_test_batch_size = 200000;
-			static constexpr int m_fermat_test_batch_size_max = 1000000;
+			static constexpr int m_fermat_test_batch_size = mining::GPU_FERMAT_BATCH_SIZE_DEFAULT;
+			static constexpr int m_fermat_test_batch_size_max = mining::GPU_FERMAT_BATCH_SIZE_MAX;
 			static constexpr int m_segment_batch_size = Cuda_sieve::m_kernel_segments_per_block * Cuda_sieve::m_num_blocks; //number of segments to sieve in one batch
 			uint64_t m_sieve_range;
-			static constexpr int m_min_chain_length = 8;
+			// Stone — per-session target Cunningham chain length T.  Was previously
+			// `static constexpr int = mining::MIN_CHAIN_LENGTH (=8)`; now an
+			// instance field so Worker_prime can drive it per session via
+			// set_target_length() (mirroring the CPU Sieve::set_target_length()
+			// SSOT).  Default mirrors mining::MIN_CHAIN_LENGTH so any caller that
+			// never invokes set_target_length() preserves legacy behaviour.
+			// Read-only host-side; kept in lockstep with m_cuda_sieve.m_min_chain_length
+			// (the kernel-arg value) by Sieve::set_target_length().
+			int m_min_chain_length = mining::MIN_CHAIN_LENGTH;
 			static constexpr uint32_t large_prime_count = 0;
 
 			//stats
@@ -143,6 +159,23 @@ namespace nexusminer {
 
 			std::vector<uint8_t>m_small_primes;
 			std::vector<uint16_t>m_small_prime_offsets;
+			// GPU sieve layout review (vs. CPU AoS in chain_sieve.hpp):
+			// The CPU sieve was refactored from SoA to AoS (m_primes_aos) for cache-line
+			// locality in its hot sieve_segment() loop, which runs entirely on the CPU.
+			//
+			// The GPU sieve intentionally retains SoA (separate prime and multiple arrays)
+			// because:
+			//   1. CUDA kernels read each array in a warp-stride pattern — SoA provides
+			//      contiguous per-field access that maps to coalesced global-memory loads.
+			//      AoS would interleave fields and break coalescing, increasing memory
+			//      transaction count per warp.
+			//   2. Cuda_sieve::load_sieve() / init_sieve() require separate raw pointers
+			//      for primes and multiples; the CUDA API cannot take an AoS pointer.
+			//   3. The CPU-side calculate_starting_multiples() that writes these arrays is
+			//      a one-time per-block setup call, not a hot path, so any per-call
+			//      cache-line overhead is negligible.
+			//
+			// Conclusion: the GPU SoA layout is correct and should NOT be converted to AoS.
 			std::vector<uint32_t> m_sieving_primes;
 			std::vector<uint32_t> m_multiples;
 			std::vector<Prime_plus_multiple_32> m_medium_primes_plus_multiples;

@@ -4,6 +4,7 @@
 #include "fermat_prime.hpp"
 #include "cump.cuh"
 #include "../cuda_chain.cuh"
+#include <gpu/cuda_memory.hpp>
 #include <stdint.h>
 #include <gmp.h>
 
@@ -44,32 +45,32 @@ namespace nexusminer {
 
 
         private:
-            //device memory
+            //device memory - using RAII smart pointers
             
             //intputs to the fermat test
-            uint64_t* d_offsets;  //64 bit offsets from the 1024 bit base integer
-            uint64_t* d_offset_count; 
-            Cump<1024>* d_base_int; //the 1024 bit base integer
+            cuda_unique_ptr<uint64_t> d_offsets;  //64 bit offsets from the 1024 bit base integer
+            cuda_unique_ptr<uint64_t> d_offset_count; 
+            cuda_unique_ptr<Cump<1024>> d_base_int; //the 1024 bit base integer
 
             //results of the fermat test
-            uint8_t* d_results;
+            cuda_unique_ptr<uint8_t> d_results;
 
             //trial division
-            trial_divisors_uint32_t* d_trial_divisors;
-            uint32_t* d_trial_divisor_count;
-            unsigned long long* d_trial_division_test_count;
-            unsigned long long* d_trial_division_composite_count;
+            cuda_unique_ptr<trial_divisors_uint32_t> d_trial_divisors;
+            cuda_unique_ptr<uint32_t> d_trial_divisor_count;
+            cuda_unique_ptr<unsigned long long> d_trial_division_test_count;
+            cuda_unique_ptr<unsigned long long> d_trial_division_composite_count;
             
             //test vectors
-            Cump<1024>* d_test_a;
-            Cump<1024>* d_test_b;
-            Cump<1024>* d_test_results;
-            uint64_t* d_test_vector_size;
+            cuda_unique_ptr<Cump<1024>> d_test_a;
+            cuda_unique_ptr<Cump<1024>> d_test_b;
+            cuda_unique_ptr<Cump<1024>> d_test_results;
+            cuda_unique_ptr<uint64_t> d_test_vector_size;
 
-            unsigned long long* d_fermat_test_count;
-            unsigned long long* d_fermat_pass_count;
+            cuda_unique_ptr<unsigned long long> d_fermat_test_count;
+            cuda_unique_ptr<unsigned long long> d_fermat_pass_count;
 
-            //array of chain candidates
+            //array of chain candidates - these are not owned, just pointers
             CudaChain* d_chains;
             uint32_t* d_chain_count;
 

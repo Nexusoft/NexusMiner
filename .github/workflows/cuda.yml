@@ -1,0 +1,127 @@
+# PR #681 follow-up §1 — Self-hosted CUDA runner gate.
+#
+# Purpose
+# -------
+# `cmake-build.yml` exercises the host-only build matrix (Ubuntu / macOS /
+# Windows on hosted runners) but never builds with `WITH_GPU_CUDA=ON` —
+# nvcc isn't available on hosted runners and we don't want to pay for it
+# unless a PR actually touches GPU code.  This workflow runs the
+# `gpu-cuda-prime` preset on a self-hosted runner with a real NVIDIA GPU
+# (T4 / sm_75 expected; pinned via -DCMAKE_CUDA_ARCHITECTURES=75 below).
+#
+# Trust boundary
+# --------------
+# This is a self-hosted runner on a public repo.  By default we only run
+# on PRs from same-repo branches (the `if:` condition on the build job),
+# which prevents fork PRs from executing arbitrary code on the runner box.
+# Maintainers can still trigger a CUDA run on a fork PR via
+# `workflow_dispatch` after reviewing the diff.
+#
+# Cost / reliability
+# ------------------
+#   * Path filter: only runs when CUDA-relevant files change (no doc-only
+#     PRs).
+#   * concurrency-cancel: a new push to a PR cancels the in-flight build.
+#   * timeout-minutes: a stuck build cannot drain the budget.
+#   * Continue-on-error during the warm-up period: this workflow is
+#     informational for now (not a required check) so flakes from
+#     driver/spot-interruption noise don't block CPU-side work.  Promote
+#     to required after ~2 weeks of clean runs.
+#
+# Self-hosted runner provisioning
+# -------------------------------
+# See `infra/runner/cloud-init.yaml` for the AWS g4dn.xlarge spot bring-up
+# script that provisions the runner with the labels expected below.
+
+name: CUDA Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '**/*.cu'
+      - '**/*.cuh'
+      - 'src/gpu/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
+      - 'CMakeLists.txt'
+      - '.github/workflows/cuda.yml'
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**/*.cu'
+      - '**/*.cuh'
+      - 'src/gpu/**'
+      - 'cmake/**'
+      - 'CMakePresets.json'
+      - 'CMakeLists.txt'
+
+concurrency:
+  group: cuda-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/.cpm-cache
+
+jobs:
+  cuda-build:
+    name: CUDA (gpu-cuda-prime, sm_75)
+    # Same-repo PRs only by default.  Fork PRs can be opted into via
+    # `workflow_dispatch` after a maintainer reviews the diff.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, linux, x64, gpu, cuda]
+    timeout-minutes: 45
+    # Informational while the harness stabilises — flip to false to make
+    # this a required status check.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: GPU sanity (nvidia-smi)
+        run: |
+          nvidia-smi
+          nvcc --version
+          ninja --version
+
+      - name: Cache CPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CPM_SOURCE_CACHE }}
+          key: ${{ runner.os }}-cuda-cpm-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            ${{ runner.os }}-cuda-cpm-
+
+      - name: Configure CMake (gpu-cuda-prime, sm_75)
+        # Pin to sm_75 (T4) so the build is deterministic on the runner.
+        # Other contributors can use the default CMAKE_CUDA_ARCHITECTURES
+        # list from the top-level CMakeLists.txt or supply their own.
+        run: |
+          cmake --preset gpu-cuda-prime \
+            -DCMAKE_CUDA_ARCHITECTURES=75
+
+      - name: Build
+        run: cmake --build --preset gpu-cuda-prime
+
+      - name: Run host-runnable tests
+        # Run all registered ctest tests that the gpu-cuda-prime preset
+        # produces.  This includes the host-only gpu_chain_test and
+        # gpu_hash_kernel_contract_test plus the WITH_PRIME CPU tests.
+        # Real on-device kernel tests would be added under a future
+        # `--label-regex gpu` filter once the kernel-side test harness
+        # exists.
+        run: ctest --preset gpu-cuda-prime --output-on-failure
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuda-test-logs
+          path: |
+            build/gpu-cuda-prime/Testing/**/*.log
+            build/gpu-cuda-prime/Testing/**/*.xml
+          if-no-files-found: ignore

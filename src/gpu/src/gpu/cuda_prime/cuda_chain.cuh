@@ -17,8 +17,22 @@ namespace nexusminer {
 		public:
 			
 			static constexpr int m_max_chain_length = 32;  //the longest chain we can represent. 
-			static constexpr int m_min_chain_length = 8;
-			static constexpr int m_min_chain_report_length = 5;
+			// Per-session target Cunningham chain length.  Was previously
+			// `static constexpr int = 8`; now an instance field initialised
+			// per-chain by cuda_chain_open() from the live per-session T
+			// (= sieve_properties.m_min_chain_length).  Defaults preserve
+			// the prior compile-time values for any caller that constructs
+			// a CudaChain without calling cuda_chain_open(), and for the
+			// short window between the chain being default-constructed on
+			// the kernel stack and cuda_chain_open() initialising it.
+			//
+			// is_there_still_hope() and get_next_fermat_candidate() in
+			// cuda_chain.cu read m_min_chain_length per-chain.
+			// filter_busted_chains in find_chain.cu reads m_min_chain_report_length
+			// per-chain — that is what makes the per-session T propagate to
+			// the long-chain dispatch gate without changing kernel signatures.
+			int m_min_chain_length = 8;
+			int m_min_chain_report_length = 5;
 			uint64_t m_base_offset = 0;
 			uint16_t m_offsets[m_max_chain_length]; //offsets including 0
 			Fermat_test_status m_fermat_test_status[m_max_chain_length];

@@ -1,0 +1,13 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 13. PER-SESSION EVENT JOURNAL / RING BUFFER                         ║
+╠══════════════════════════════════════════════════════════════════════╣
+║  [AuthStart] [AuthOk] [SessionStart] [RewardSend] [RewardOk]        ║
+║  [LaneSet]   [TemplateRx] [Submit] [Accept] [Reconnect] ...         ║
+║                                                                      ║
+║            ╔════════════════════════════════════╗                    ║
+║            ║ SessionEventJournal (ring buffer)  ║                    ║
+║            ╚════════════════════════════════════╝                    ║
+║                                                                      ║
+║ Snapshot diagnostics tell what is true now.  The journal explains    ║
+║ how the session reached that state.                                  ║
+╚══════════════════════════════════════════════════════════════════════╝

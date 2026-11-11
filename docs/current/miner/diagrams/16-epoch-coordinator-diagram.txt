@@ -1,0 +1,118 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 16. EPOCH COORDINATOR — SINGLE SOURCE OF TRUTH FOR EPOCH COUNTERS  ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  BEFORE (5 independent counters — desync possible):                 ║
+║                                                                      ║
+║  Worker_manager          SessionManager          Solo               ║
+║  ┌─────────────────┐     ┌──────────────────┐   ┌───────────────┐  ║
+║  │ RecoveryContext │     │ SessionInfo      │   │ m_session_    ║  ║
+║  │  .epoch = 0     │ ≠   │  .session_epoch  │ ≠ │   epoch = ?   ║  ║
+║  └─────────────────┘     │     = 1          │   └───────────────┘  ║
+║                           └──────────────────┘                      ║
+║                                    ≠                                 ║
+║  HeightTracker                 MiningTemplateInterface               ║
+║  ┌──────────────────┐         ┌───────────────────────┐             ║
+║  │ m_session_epoch  │    ≠    │ m_session_epoch = ?   │             ║
+║  │      = ?         │         └───────────────────────┘             ║
+║  └──────────────────┘                                                ║
+║                                                                      ║
+║  Result: GET_BLOCK sent on recovery epoch 0 while session at 1      ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  AFTER (EpochCoordinator — single source of truth):                 ║
+║                                                                      ║
+║  Worker_manager                                                       ║
+║   owns ──────────────────────────────────────────────────────────┐  ║
+║                                                                   │  ║
+║              ╔═══════════════════════════════════╗               │  ║
+║              ║        EpochCoordinator           ║◄──────────────┘  ║
+║              ╠═══════════════════════════════════╣                  ║
+║              ║  session_epoch    (monotonic ↑)   ║                  ║
+║              ║  recovery_epoch   (monotonic ↑)   ║                  ║
+║              ║  global_epoch = max(both)          ║                  ║
+║              ╚══════════════╤════════════════════╝                  ║
+║                             │ shared_ptr passed to:                 ║
+║               ┌─────────────┼──────────────────────┐               ║
+║               ▼             ▼                       ▼               ║
+║        NodeSession    SessionManager          Solo (stored)         ║
+║               │             │                                        ║
+║               └─────────────┘                                        ║
+║           delegates to SessionManager::set_epoch_coordinator()       ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  EPOCH ADVANCE FLOWS:                                                ║
+║                                                                      ║
+║  Authentication:                                                     ║
+║    SessionManager::transition_to_authenticated_locked()              ║
+║      → coordinator.advance_session_epoch("authenticated")            ║
+║      → session_epoch: N → N+1  (NEVER resets to 0)                  ║
+║                                                                      ║
+║  Session clear (clear_runtime_session_locked):                       ║
+║    m_session = SessionInfo{}   ← would reset to 0                   ║
+║    THEN: m_session.session_epoch = coordinator.session_epoch()       ║
+║          ← restores the correct monotonic value                      ║
+║                                                                      ║
+║  Recovery phase entry (non-HEALTHY):                                 ║
+║    Worker_manager::transition_to(WAITING_TEMPLATE or RECONNECTING)   ║
+║      → coordinator.advance_recovery_epoch(reason)                    ║
+║      → recovery_epoch: M → M+1 (NEVER resets to 0 on HEALTHY)       ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  COORDINATOR DURABILITY ACROSS RECONNECT / REAUTH:                  ║
+║                                                                      ║
+║  TCP reconnect:                                                      ║
+║    retry_connect() → m_primary_node_session->reset()                 ║
+║      → NodeSession::reset() → SessionManager::end_session()          ║
+║        → clear_for_disconnect() → clear_runtime_session_locked()     ║
+║                                                                      ║
+║  clear_runtime_session_locked() ONLY resets m_session = SessionInfo{}║
+║  It does NOT touch m_epoch_coordinator (separate SessionManager field)║
+║                                                                      ║
+║  After reconnect: transition_to_authenticated_locked() calls         ║
+║    m_epoch_coordinator->advance_session_epoch()  ← SAME coordinator  ║
+║                                                                      ║
+║  Result: NO re-wiring needed after reconnect or reauth               ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  HEIGHTTRACKER AND MININGTEMPLATE PROPAGATION (ACCEPTED RESIDUAL):   ║
+║                                                                      ║
+║  EpochCoordinator                                                    ║
+║    → SessionManager.m_session.session_epoch  (immediate)             ║
+║      → Solo::m_session_epoch   (next refresh_cached_session_state())  ║
+║        → HeightTracker::set_session_epoch()  (in refresh call)       ║
+║        → MiningTemplateInterface::set_session_epoch()  (on auth sync)║
+║                                                                      ║
+║  Lag: ends at first packet ingress after epoch advance               ║
+║  Impact: NONE — both epoch fields are diagnostic-only; not used      ║
+║          for packet framing, submit decisions, or wire protocol       ║
+║                                                                      ║
+║  This is an ACCEPTED RESIDUAL — same pattern as session_id /         ║
+║  auth state propagation via refresh_cached_session_state().          ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  OBSERVER NOTIFICATION:                                              ║
+║                                                                      ║
+║  coordinator.add_observer(fn)                                        ║
+║      │                                                               ║
+║      │ called OUTSIDE mutex (deadlock prevention)                    ║
+║      │ signature: fn(domain, old_val, new_val)                       ║
+║      │ domain = "session" | "recovery"                               ║
+║      ▼                                                               ║
+║  Subscribers can react to epoch advances without polling             ║
+║                                                                      ║
+╠══════════════════════════════════════════════════════════════════════╣
+║                                                                      ║
+║  KEY INVARIANTS:                                                     ║
+║  • session_epoch   NEVER decreases (monotonic)                       ║
+║  • recovery_epoch  NEVER decreases (monotonic)                       ║
+║  • global_epoch    = max(session_epoch, recovery_epoch)              ║
+║  • All reads/writes protected by internal mutex (thread-safe)        ║
+║  • Epoch 0 means "no advance yet" — valid only before first auth     ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝

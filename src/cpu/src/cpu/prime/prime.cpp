@@ -26,11 +26,30 @@ unsigned long sqrtld(unsigned long N)
 
 unsigned int* make_primes(unsigned int prime_limit)
 {
-	unsigned int* primes;
+	unsigned int* primes = nullptr;
 	unsigned long       i, j;
 	unsigned long       s = sqrtld(prime_limit);
 	unsigned long       n = 0;
-	bool* bit_array_sieve = (bool*)malloc((prime_limit + 1) * sizeof(bool));
+	
+	// Validate input size
+	if (prime_limit == 0 || prime_limit > 100000000) {
+		fprintf(stderr, "make_primes: Invalid prime_limit %u (must be 0 < limit <= 100000000)\n", prime_limit);
+		return nullptr;
+	}
+	
+	// Calculate allocation size for bit_array_sieve
+	size_t bit_array_size = (prime_limit + 1) * sizeof(bool);
+	
+	// Allocate bit_array_sieve with error checking
+	std::unique_ptr<bool[]> bit_array_sieve;
+	try {
+		bit_array_sieve.reset(new bool[prime_limit + 1]);
+	} catch (const std::bad_alloc& e) {
+		fprintf(stderr, "make_primes: Failed to allocate %zu bytes for bit_array_sieve: %s\n", 
+		        bit_array_size, e.what());
+		return nullptr;
+	}
+	
 	bit_array_sieve[0] = 0;
 	bit_array_sieve[1] = 0;
 	for (i = 2; i <= prime_limit; i++) bit_array_sieve[i] = 1;
@@ -49,14 +68,25 @@ unsigned int* make_primes(unsigned int prime_limit)
 		}
 	}
 	for (i = 2; i <= prime_limit; i++) if (bit_array_sieve[i] == 1) n += 1;
-	primes = (unsigned int*)malloc((n + 1) * sizeof(unsigned long));
+	
+	// Calculate allocation size for primes array
+	size_t primes_size = (n + 1) * sizeof(unsigned long);
+	
+	// Allocate primes array with error checking
+	primes = (unsigned int*)malloc(primes_size);
+	if (!primes) {
+		fprintf(stderr, "make_primes: Failed to allocate %zu bytes for primes array (%lu primes)\n", 
+		        primes_size, n);
+		return nullptr;
+	}
+	
 	primes[0] = n;
 	j = 1;
 	for (i = 2; i <= prime_limit; i++) if (bit_array_sieve[i] == 1) {
 		primes[j] = i;
 		j++;
 	}
-	free(bit_array_sieve);
+	// bit_array_sieve automatically freed by unique_ptr
 	return primes;
 }
 
@@ -64,6 +94,8 @@ unsigned int* make_primes(unsigned int prime_limit)
 
 Prime::Prime()
 	: m_logger{ spdlog::get("logger") }
+	, primes(nullptr, free)  // Initialize with free as deleter
+	, inverses(nullptr, free)  // Initialize with free as deleter
 	, nBitArray_Size{ 1024 * 1024 * 16}
 	, prime_limit{ 71378571 }
 	, nPrimeLimit{ 4194304 }
@@ -95,63 +127,144 @@ Prime::Prime()
 {
 }
 
+Prime::~Prime()
+{
+	try {
+		// Log cleanup start for debugging
+		if (m_logger) {
+			m_logger->debug("Prime destructor: Starting cleanup");
+		}
+		
+		// Check if primes were allocated before cleanup
+		if (primes) {
+			if (m_logger) {
+				m_logger->debug("Prime destructor: Releasing primes array ({} primes)", primes[0]);
+			}
+			primes.reset();  // Explicitly reset to trigger deleter
+		}
+		
+		// Check if inverses were allocated before cleanup
+		if (inverses) {
+			if (m_logger) {
+				m_logger->debug("Prime destructor: Releasing inverses array");
+			}
+			inverses.reset();  // Explicitly reset to trigger deleter
+		}
+		
+		if (m_logger) {
+			m_logger->debug("Prime destructor: Cleanup complete");
+		}
+	} catch (const std::exception& e) {
+		// Log exceptions but don't propagate from destructor
+		if (m_logger) {
+			m_logger->error("Prime destructor: Exception during cleanup: {}", e.what());
+		} else {
+			fprintf(stderr, "Prime destructor: Exception during cleanup: %s\n", e.what());
+		}
+	} catch (...) {
+		// Catch all other exceptions
+		if (m_logger) {
+			m_logger->error("Prime destructor: Unknown exception during cleanup");
+		} else {
+			fprintf(stderr, "Prime destructor: Unknown exception during cleanup\n");
+		}
+	}
+}
+
 void Prime::InitializePrimes()
 {
-	m_logger->info("Generating primes...");
-	// generate prime table
-
-	primes = make_primes(prime_limit);
-
-	printf("\n%d primes generated\n", primes[0]);
-
-	//mpz_init(zPrimorial);
-	zPrimorial = 1;
-	//mpz_set_ui(zPrimorial, 1);
-
-	for (int i = 1; i < nPrimorialEndPrime; i++)
-	{
-		//mpz_mul_ui(zPrimorial, zPrimorial, primes[i]);
-		zPrimorial *= primes[i];
-	}
-
-	m_logger->debug("Primorial: " + zPrimorial.str());
-	//printf("\n"); mpz_out_str(stdout, 10, zPrimorial); printf("\n");
-
-	m_logger->debug("Last Primorial Prime = {}", primes[nPrimorialEndPrime - 1]);
-	m_logger->debug("First Sieving Prime = {}", primes[nPrimorialEndPrime]);
-
-
-	//int nSize = mpz_sizeinbase(zPrimorial, 2);
-	int nSize = boost::multiprecision::msb(zPrimorial) + 1;
-	m_logger->debug("Primorial Size = {}-bit", nSize);
-
-	inverses = (unsigned int*)malloc((nPrimeLimit + 1) * sizeof(unsigned int));
-	memset(inverses, 0, (nPrimeLimit + 1) * sizeof(unsigned int));
-
-	//mpz_t zPrime, zInverse, zResult;
-
-	//mpz_init(zPrime);
-	//mpz_init(zInverse);
-	//mpz_init(zResult);
-	boost::multiprecision::cpp_int zPrime, zInverse, zResult;
-	
-
-	for (unsigned int i = nPrimorialEndPrime; i <= nPrimeLimit; i++)
-	{
-		//mpz_set_ui(zPrime, primes[i]);
-		zPrime = primes[i];
-		//int	inv = mpz_invert(zResult, zPrimorial, zPrime);
-		zResult = boost::integer::mod_inverse(zPrimorial, zPrime);
-
-		if (zResult == 0)
-		{
-			m_logger->critical("No Inverse at position {}", i);
-			exit(1);
+	try {
+		m_logger->info("Generating primes...");
+		m_logger->debug("InitializePrimes: prime_limit={}, nPrimeLimit={}", prime_limit, nPrimeLimit);
+		
+		// Validate configuration before allocation
+		if (prime_limit == 0 || nPrimeLimit == 0) {
+			m_logger->error("InitializePrimes: Invalid configuration - prime_limit={}, nPrimeLimit={}", 
+			                prime_limit, nPrimeLimit);
+			throw std::runtime_error("Invalid prime configuration");
 		}
-		else
-		{
-			inverses[i] = zResult.convert_to<unsigned int>();
+		
+		// Generate prime table with error checking
+		unsigned int* raw_primes = make_primes(prime_limit);
+		if (!raw_primes) {
+			m_logger->error("InitializePrimes: Failed to generate primes table (prime_limit={})", prime_limit);
+			throw std::runtime_error("Failed to allocate memory for primes table");
 		}
+		
+		primes.reset(raw_primes);
+		m_logger->info("{} primes generated", primes[0]);
+		printf("\n%d primes generated\n", primes[0]);
+
+		// Calculate primorial
+		zPrimorial = 1;
+		
+		for (int i = 1; i < nPrimorialEndPrime; i++)
+		{
+			zPrimorial *= primes[i];
+		}
+
+		m_logger->debug("Primorial: " + zPrimorial.str());
+
+		m_logger->debug("Last Primorial Prime = {}", primes[nPrimorialEndPrime - 1]);
+		m_logger->debug("First Sieving Prime = {}", primes[nPrimorialEndPrime]);
+
+		int nSize = boost::multiprecision::msb(zPrimorial) + 1;
+		m_logger->debug("Primorial Size = {}-bit", nSize);
+
+		// Allocate inverses array with error checking and smart pointer
+		size_t inverses_size = (nPrimeLimit + 1) * sizeof(unsigned int);
+		m_logger->debug("InitializePrimes: Allocating {} bytes for inverses array", inverses_size);
+		
+		unsigned int* raw_inverses = (unsigned int*)malloc(inverses_size);
+		if (!raw_inverses) {
+			m_logger->error("InitializePrimes: Failed to allocate {} bytes for inverses array", inverses_size);
+			throw std::runtime_error("Failed to allocate memory for inverses array");
+		}
+		
+		memset(raw_inverses, 0, inverses_size);
+		inverses.reset(raw_inverses);
+
+		boost::multiprecision::cpp_int zPrime, zInverse, zResult;
+
+		// Calculate inverses with progress logging
+		m_logger->debug("InitializePrimes: Calculating inverses for {} primes", nPrimeLimit - nPrimorialEndPrime + 1);
+		
+		for (unsigned int i = nPrimorialEndPrime; i <= nPrimeLimit; i++)
+		{
+			zPrime = primes[i];
+			zResult = boost::integer::mod_inverse(zPrimorial, zPrime);
+
+			if (zResult == 0)
+			{
+				m_logger->critical("No Inverse at position {}", i);
+				throw std::runtime_error("Failed to compute modular inverse");
+			}
+			else
+			{
+				inverses[i] = zResult.convert_to<unsigned int>();
+			}
+		}
+		
+		m_logger->info("InitializePrimes: Completed successfully");
+		
+	} catch (const std::bad_alloc& e) {
+		m_logger->error("InitializePrimes: Memory allocation failed: {}", e.what());
+		// Clean up any partially allocated resources
+		primes.reset();
+		inverses.reset();
+		throw;
+	} catch (const std::exception& e) {
+		m_logger->error("InitializePrimes: Exception occurred: {}", e.what());
+		// Clean up any partially allocated resources
+		primes.reset();
+		inverses.reset();
+		throw;
+	} catch (...) {
+		m_logger->error("InitializePrimes: Unknown exception occurred");
+		// Clean up any partially allocated resources
+		primes.reset();
+		inverses.reset();
+		throw;
 	}
 }
 

@@ -9,6 +9,7 @@
 #include <cmath>
 #include "../cuda_prime/fermat_prime/fermat_prime.hpp"
 #include <random>
+#include <memory>
 
 
 namespace nexusminer
@@ -319,10 +320,10 @@ namespace gpu
 		generator1024_type gen1024;
 		gen1024.seed(time(0));
 		
-		mpz_t* a = new mpz_t[batch_size];
-		mpz_t* b = new mpz_t[batch_size];
-		mpz_t* c = new mpz_t[batch_size];
-		mpz_t* results = new mpz_t[batch_size];
+		auto a = std::make_unique<mpz_t[]>(batch_size);
+		auto b = std::make_unique<mpz_t[]>(batch_size);
+		auto c = std::make_unique<mpz_t[]>(batch_size);
+		auto results = std::make_unique<mpz_t[]>(batch_size);
 
 		boost::multiprecision::uint1024_t a1, b1;
 
@@ -437,8 +438,8 @@ namespace gpu
 		Fermat_prime big_int;
 		big_int.test_init(batch_size, 0);
 		m_logger->info("Loading test vectors to GPU RAM.");
-		big_int.set_input_a(a, batch_size);
-		big_int.set_input_b(b, batch_size);
+		big_int.set_input_a(a.get(), batch_size);
+		big_int.set_input_b(b.get(), batch_size);
 		m_logger->info("Running aritmetic/logic operation under test.");
 		auto start = std::chrono::steady_clock::now();
 		big_int.logic_test();
@@ -446,7 +447,7 @@ namespace gpu
 		auto end = std::chrono::steady_clock::now();
 		auto add_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		m_logger->info("Copying results to CPU RAM.");
-		big_int.get_test_results(results);
+		big_int.get_test_results(results.get());
 		big_int.test_free();
 		uint64_t passes = 0;
 		uint64_t attempts = 0;
@@ -542,10 +543,7 @@ namespace gpu
 			mpz_clear(results[i]);
 		}
 
-		delete[] a;
-		delete[] b;
-		delete[] c;
-		delete[] results;
+		// unique_ptr handles deallocation — no explicit delete[] needed
 
 		std::stringstream ss;
 		if (cpu_verify)

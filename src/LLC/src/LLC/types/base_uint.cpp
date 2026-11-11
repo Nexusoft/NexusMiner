@@ -573,7 +573,7 @@ std::string base_uint<BITS>::GetHex() const
 {
     char psz[sizeof(pn) * 2 + 1];
     for (uint32_t i = 0; i < sizeof(pn); ++i)
-        sprintf(psz + i * 2, "%02x", ((uint8_t*)pn)[sizeof(pn) - i - 1]);
+        snprintf(psz + i * 2, sizeof(psz) - i * 2, "%02x", ((uint8_t*)pn)[sizeof(pn) - i - 1]);
 
     return std::string(psz, psz + sizeof(pn) * 2);
 }

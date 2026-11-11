@@ -10,6 +10,7 @@
 #endif
 
 #include "cuda_chain.cuh"
+#include "mining/mining_constants.hpp"
 #include <stdint.h>
 #include <memory>
 #include <cmath>
@@ -56,6 +57,15 @@ namespace nexusminer {
 				uint64_t m_sieve_range;
 				uint64_t m_bucket_ram_budget;
 				int m_large_prime_bucket_size;
+				// Per-session target Cunningham chain length T.  Drives both
+				// find_chain.cu's popcount_window_floor() early-exit and its
+				// close_chain_min() quality gate via mining/prime_thresholds.hpp.
+				// Default mirrors mining::MIN_CHAIN_LENGTH (=8) so a caller that
+				// never invokes set_target_length() preserves legacy behaviour
+				// (the prior fixed value was 9; see Cuda_sieve::m_min_chain_length
+				// note below).  Updated in lockstep with Cuda_sieve::m_min_chain_length
+				// so the kernel argument always sees the live session T.
+				int m_min_chain_length;
 			};
 			Cuda_sieve_properties m_sieve_properties;
 			
@@ -69,8 +79,24 @@ namespace nexusminer {
 
 			static constexpr int m_estimated_chains_per_million = 4;
 			static constexpr uint32_t m_max_chains = 2 * Cuda_sieve::m_estimated_chains_per_million * Cuda_sieve::m_sieve_max_range / 1e6;
-			static constexpr uint32_t m_max_long_chains = 32;
-			static constexpr int m_min_chain_length = 9;
+			// Testnet difficulty produces far more reportable chains per batch than
+			// mainnet.  32 overflowed the long-chain buffer (atomicInc then wrote
+			// one past the end and wrapped onto slot 0).  Overflow is now dropped
+			// instead of wrapping; 4096 keeps low-difficulty batches from silently
+			// discarding winners.  ~1 MiB at CudaChain size.
+			static constexpr uint32_t m_max_long_chains = 4096;
+			// Per-session target Cunningham chain length.  This was previously a
+			// fixed `static constexpr int = 9`, which silently dropped length-7/8
+			// winners at pool difficulty < 9 (the GPU "ignores difficulty" bug).
+			// The default mirrors mining::MIN_CHAIN_LENGTH (=8) so any caller
+			// that never invokes set_target_length() preserves the legacy
+			// Worker_prime non-engine behaviour.  Worker_prime now derives T
+			// per session from `ceil(nbits / 1e7)` and pushes it via
+			// Cuda_sieve::set_target_length() before find_chains() runs.  The
+			// value is mirrored into m_sieve_properties.m_min_chain_length so
+			// it propagates into the find_chain kernels by-value through the
+			// existing Cuda_sieve_properties argument.
+			int m_min_chain_length = nexusminer::mining::MIN_CHAIN_LENGTH;
 			static constexpr int m_start_prime = 7;
 			static constexpr int m_small_prime_count = 14; //61 is the 15th prime starting at 7.  61 is first prime that hits each sieve word no more than 1 time.
 			//If you change the small_prime_count, make sure you also change the hardcoded list of primes in the small prime sieve in sieve_impl.cu
@@ -81,7 +107,10 @@ namespace nexusminer {
 			static constexpr int m_large_prime_count = 32 * GPU_LARGE_PRIME_COUNT;
 			static constexpr int m_trial_division_prime_count = 0;
 
-			static constexpr int chain_histogram_max = 10;  
+			// Bucket count is chain_histogram_max+1 and must match
+			// stats::kPrimeHistogramBuckets (12).  A max of 10 dropped length-11
+			// chains from the GPU stats path after the CPU histogram was widened.
+			static constexpr int chain_histogram_max = 11;  
 			//static const uint64_t m_bucket_ram_budget = 4.5e9;  //bytes avaialble for storing bucket data
 			//static const int m_large_prime_bucket_size = m_large_prime_count == 0 ? 1 : m_bucket_ram_budget/(m_num_blocks * m_kernel_segments_per_block)/4;
 			
@@ -108,6 +137,17 @@ namespace nexusminer {
 			void get_prime_candidate_count(uint64_t& prime_candidate_count);
 			void get_stats(uint32_t chain_histogram[], uint64_t& chain_count);
 			void synchronize();
+
+			// Stone — set the per-session target Cunningham chain length T
+			// driving both `popcount_window_floor(T)` and `close_chain_min(T)`
+			// (see mining/prime_thresholds.hpp).  Values < kMinTargetChainLength
+			// are clamped to kMinTargetChainLength.  Updates m_min_chain_length
+			// AND m_sieve_properties.m_min_chain_length AND the impl's mirrored
+			// properties so the next find_chains() launch sees the new T via
+			// the existing Cuda_sieve_properties kernel argument.  Safe to call
+			// before or after load_sieve()/init_sieve().  Idempotent.
+			void set_target_length(int target_length);
+			int  get_target_length() const noexcept { return m_min_chain_length; }
 
 		private:
 			std::unique_ptr<Cuda_sieve_impl> m_impl;

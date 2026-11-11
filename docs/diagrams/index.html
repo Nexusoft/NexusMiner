@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Mining Staleness Logic — Interactive Training</title>
+<link rel="stylesheet" href="style.css">
+<style>
+body { background: var(--bg); overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="index-hero">
+  <h1>⛏️ Nexus Mining Staleness Logic</h1>
+  <p>Interactive Training: Correct vs incorrect <code>hashBestChain</code> staleness detection and
+     ProofHash integrity across Legacy and Stateless mining lanes.<br>
+     Aligned with merged PR&nbsp;#169&nbsp;/&nbsp;#170 — unified <code>block.nHeight</code> semantics.</p>
+  <a class="hero-btn" href="training.html">Open Full Training App →</a>
+</div>
+
+<!-- Scenario Grid -->
+<div class="card-grid" id="cardGrid"></div>
+
+<!-- Master Reference Card -->
+<div class="ref-section">
+  <h2>📋 Master Reference Card</h2>
+
+  <div class="rule-card">
+    <span class="rule-num">RULE 1</span><span class="rule-text">hashPrevBlock is the PRIMARY staleness anchor</span>
+    <div class="rule-sub">template.block.hashPrevBlock != node.hashBestChain → stale, discard immediately (StakeMinter pattern)</div>
+  </div>
+  <div class="rule-card">
+    <span class="rule-num">RULE 2</span><span class="rule-text">block.nHeight = UNIFIED blockchain height (tStateBest.nHeight + 1)</span>
+    <div class="rule-sub">ProofHash() hashes nVersion→nBits range which includes nHeight at bytes [200-203]. NEVER overwrite with channel height.</div>
+  </div>
+  <div class="rule-card">
+    <span class="rule-num">RULE 3</span><span class="rule-text">nChannelHeight is METADATA ONLY — for staleness detection, never in block bytes</span>
+    <div class="rule-sub">HeightTracker::Snapshot::is_template_stale() = channel_height &ge; channel_target (single source of truth)</div>
+  </div>
+  <div class="rule-card">
+    <span class="rule-num">RULE 4</span><span class="rule-text">ValidateTemplate() performs dual height check</span>
+    <div class="rule-sub">template.nHeight == nNodeUnified + 1 AND template.nChannelHeight == nNodeChannel + 1</div>
+  </div>
+  <div class="rule-card">
+    <span class="rule-num">RULE 5</span><span class="rule-text">Submission audit aborts if block.nHeight looks like channel height</span>
+    <div class="rule-sub">prepare_block_submission(): if (nHeight &lt; last_unified/2) → ABORT — nHeight was corrupted</div>
+  </div>
+  <div class="rule-card">
+    <span class="rule-num">RULE 6</span><span class="rule-text">hashMerkleRoot MUST be rebuilt whenever producer is touched</span>
+    <div class="rule-sub">After every UpdateProducerTimestamp() + Sign() call, rebuild merkle tree before submitting</div>
+  </div>
+
+  <h2>📐 StakeMinter Reference Pattern (Canonical)</h2>
+  <pre class="ascii-diagram"><span class="cmt">// Guard 1 — Continuous during mining (stake_minter.cpp:534)</span>
+<span class="kw">while</span>(!StakeMinter::fStop.load() &amp;&amp; !config::fShutdown.load()
+    &amp;&amp; hashLastBlock == TAO::Ledger::ChainState::hashBestChain.load())
+
+<span class="cmt">// Guard 2 — Final pre-submission check (stake_minter.cpp:674)</span>
+<span class="kw">if</span>(block.hashPrevBlock != TAO::Ledger::ChainState::hashBestChain.load())
+{
+    debug::<span class="fn">log</span>(<span class="num">0</span>, FUNCTION, <span class="str">"Generated block is stale"</span>);
+    <span class="kw">return false</span>;
+}</pre>
+
+  <h2>📦 216-byte Tritium Block Serialization (Bytes in ProofHash range)</h2>
+  <pre class="ascii-diagram">[  0-  3]  nVersion      (4 bytes)
+[  4-131]  hashPrevBlock (128 bytes)  ← PRIMARY staleness anchor
+[132-195]  hashMerkleRoot(64 bytes)   ← must be rebuilt after producer update
+[196-199]  nChannel      (4 bytes)
+[200-203]  nHeight       (4 bytes)   ← UNIFIED height (tStateBest.nHeight+1) — NEVER channel height!
+[204-207]  nBits         (4 bytes)
+[208-215]  nNonce        (8 bytes)
+           Total: 216 bytes
+
+ProofHash() for Prime = SK1024(BEGIN(nVersion), END(nBits))
+                       = hashes bytes [0..207], which INCLUDES nHeight @ [200-203]</pre>
+
+  <h2>🔗 References</h2>
+  <div class="rule-card">
+    <div class="rule-text">Issue <a href="https://github.com/NamecoinGithub/NexusMiner/issues/171">#171</a> — Keep Channel Tracking Defensive, Use Unified Height for Prime ProofHash</div>
+    <div class="rule-sub">PR #169 / #170 — Align nHeight unified-height semantics, ValidateTemplate, defensive guards, submission audit</div>
+  </div>
+</div>
+
+<script>
+const SCENARIOS = [
+  { n:'01', title:'Legacy Lane Node: Integer vs Hash Staleness',           files:'src/LLP/miner.cpp' },
+  { n:'02', title:'Stateless Lane Node: Missing hashBestChain Guard',      files:'src/LLP/stateless_miner_connection.cpp' },
+  { n:'03', title:'Miner Legacy: Channel Height Integer Staleness',        files:'NexusMiner/src/protocol/solo.cpp' },
+  { n:'04', title:'Miner Stateless: No Final Submit Guard',                files:'NexusMiner/src/protocol/mining_template_interface.cpp' },
+  { n:'05', title:'nHeight Identity: Unified vs Channel Height',           files:'src/mining/client_block.h\nsrc/mining/client_channel_manager.h' },
+  { n:'06', title:'ProofHash Corruption via nHeight Overwrite',            files:'NexusMiner/worker_prime.cpp\nsrc/TAO/Ledger/block.cpp' },
+  { n:'07', title:'Block Cache Reorg Race (tBlockCache)',                  files:'src/TAO/Ledger/create.cpp' },
+  { n:'08', title:'UpdateTime() Without Merkle Rebuild',                   files:'src/TAO/Ledger/create.cpp' },
+  { n:'09', title:'Push Notification nHeight Injection',                   files:'src/protocol/push_notification_handler.cpp' },
+  { n:'10', title:'Submit-After-Advance Race (~1ms Fatal Gap)',             files:'NexusMiner/worker_prime.cpp\nsrc/LLP/stateless_miner_connection.cpp' },
+  { n:'11', title:'BONUS: MiningContext.nHeight vs block.nHeight Confusion', files:'src/LLP/stateless_miner.cpp' },
+  { n:'12', title:'BONUS: Full System Correct vs Wrong Side-by-Side',      files:'All components' },
+];
+
+const grid = document.getElementById('cardGrid');
+SCENARIOS.forEach(s => {
+  const card = document.createElement('div');
+  card.className = 'scenario-grid-card';
+  card.innerHTML = `
+    <div class="card-header">
+      <span class="card-num">S${s.n}</span>
+      <span class="card-title">${s.title}</span>
+    </div>
+    <div class="card-files">${s.files.replace(/\n/g,'<br>')}</div>
+    <div class="card-footer">
+      <span class="card-status">🔴 Not yet reviewed</span>
+      <a class="card-link" href="scenario_${s.n}.html">Open →</a>
+    </div>`;
+  grid.appendChild(card);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 07. REWARD ADDRESS STRING VS DECODED REWARD HASH                    ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ User/config input                                                    ║
+║   "Nexus reward address..."                                         ║
+║             │                                                        ║
+║             ▼                                                        ║
+║   ╔══════════════════════════════╗                                   ║
+║   ║ reward_address_string        ║  human-readable / diagnostics     ║
+║   ╚══════════════════════════════╝                                   ║
+║             │ decode base58                                           ║
+║             ▼                                                        ║
+║   ╔══════════════════════════════╗                                   ║
+║   ║ RewardHash[32]               ║  canonical packet/crypto bytes    ║
+║   ╚══════════════════════════════╝                                   ║
+║             │                                                        ║
+║             ▼                                                        ║
+║       MINER_SET_REWARD / encrypted send path                         ║
+║                                                                      ║
+║ Keep both values.  Never throw away the string or recompute the      ║
+║ canonical bytes from an unrelated source later.                     ║
+╚══════════════════════════════════════════════════════════════════════╝

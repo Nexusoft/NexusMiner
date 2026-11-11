@@ -1,0 +1,22 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║ 14. PACKET-INGRESS PREFLIGHT GATE                                   ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ Incoming packet                                                      ║
+║      │                                                               ║
+║      ▼                                                               ║
+║ update connection metadata                                           ║
+║      │                                                               ║
+║      ▼                                                               ║
+║ resync cached session state                                          ║
+║      │                                                               ║
+║      ▼                                                               ║
+║ lane / framing validation                                            ║
+║      │                                                               ║
+║      ▼                                                               ║
+║ fetch authoritative context + validate                               ║
+║      │                                                               ║
+║      ▼                                                               ║
+║ packet-specific handler                                               ║
+║                                                                      ║
+║ Goal: no handler processes packet semantics before session preflight.║
+╚══════════════════════════════════════════════════════════════════════╝
