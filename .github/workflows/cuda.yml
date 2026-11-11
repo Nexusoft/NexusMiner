@@ -98,8 +98,8 @@ jobs:
 
       - name: Configure CMake (gpu-cuda-prime, sm_75)
         # Pin to sm_75 (T4) so the build is deterministic on the runner.
-        # Other contributors with different cards still use the default
-        # CUDA_ARCHITECTURES list from src/gpu/CMakeLists.txt:17.
+        # Other contributors can use the default CMAKE_CUDA_ARCHITECTURES
+        # list from the top-level CMakeLists.txt or supply their own.
         run: |
           cmake --preset gpu-cuda-prime \
             -DCMAKE_CUDA_ARCHITECTURES=75

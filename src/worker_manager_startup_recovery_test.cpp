@@ -13,6 +13,7 @@
 #include <cassert>
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 
 namespace nexusminer {
 class DeadWorker final : public Worker {
@@ -205,6 +206,19 @@ private:
     std::vector<network::Connection::Handler> handlers;
 };
 
+void wait_for_connections(asio::io_context& io, const PendingConnectSocket& socket,
+                          size_t expected)
+{
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (socket.connections.size() < expected && std::chrono::steady_clock::now() < deadline) {
+        io.restart();
+        io.run_one_for(std::chrono::milliseconds(20));
+    }
+    if (socket.connections.size() != expected) {
+        throw std::runtime_error("Timed out waiting for the scheduled test connection");
+    }
+}
+
 void test_stalled_connect_recovery(config::Config& config)
 {
     auto io = std::make_shared<asio::io_context>();
@@ -236,7 +250,7 @@ void test_stalled_connect_recovery(config::Config& config)
     manager->check_template_health();
     assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 1);
 
-    io->poll();
+    wait_for_connections(*io, *socket, 2);
     assert(socket->connections.size() == 2);
     assert(session->has_pending_connect());
     socket->emit_connect_result(0, network::Result::connection_ok);
@@ -255,8 +269,7 @@ void test_stalled_connect_recovery(config::Config& config)
     assert(Worker_manager_recovery_test_access::connection_retries(*manager) == 2);
     assert(Worker_manager_recovery_test_access::retry_scheduled(*manager));
 
-    io->restart();
-    io->poll();
+    wait_for_connections(*io, *socket, 3);
     assert(socket->connections.size() == 3);
     socket->emit_connect_result(2, network::Result::connection_ok);
     auto solo = session->get_primary_protocol();

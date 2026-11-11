@@ -24,11 +24,11 @@ sudo apt-get install -y libboost-all-dev libgmp-dev
 ### Windows
 
 * **OpenSSL**: Download and run [OpenSSL installer](https://slproweb.com/products/Win32OpenSSL.html)
-* **MPIR** (required for WITH_PRIME): Download and build from [http://www.mpir.org/](http://www.mpir.org/). Copy gmp*.lib and mpir.lib to NexusMiner/libs
+* **GMP or MPIR** (required for WITH_PRIME): Install GMP with vcpkg, or download and build [MPIR](http://www.mpir.org/). For MPIR, copy gmp*.lib and mpir.lib to NexusMiner/libs
 * **boost** (required for WITH_PRIME): Download from [https://www.boost.org/users/download/](https://www.boost.org/users/download/) and extract to C:\boost
 * **Visual Studio** or **MinGW** with CMake
 
-**Note:** Windows builds require MPIR instead of GMP for Prime mining. NOMINMAX and _CRT_SECURE_NO_WARNINGS are set automatically by the build system.
+**Note:** The release workflow uses vcpkg's GMP with MSVC. NOMINMAX and _CRT_SECURE_NO_WARNINGS are set automatically by the build system.
 
 ## Clone and Checkout
 
@@ -62,10 +62,10 @@ than driver-bundling metapackages if the machine has no GPU.
 
 On a GPU-less NVIDIA build host, specify an architecture at configure time so
 CMake does not need to detect a GPU, for example
-`-DCMAKE_CUDA_ARCHITECTURES=75`. The `gpu` target currently builds for CUDA
-architectures 61, 75, 80, 86, 89 and 90 regardless of that setting, so the
-installed CUDA toolkit must support all of them. AMD builds may likewise need
-an explicit target architecture supported by the installed ROCm compiler.
+`-DCMAKE_CUDA_ARCHITECTURES=75`. The default CUDA architecture list is 61, 75,
+80, 86, 89 and 90; the installed toolkit must support every selected target.
+All CUDA targets, including the final device link, use the configured list.
+AMD builds may likewise need an explicit target architecture supported by the installed ROCm compiler.
 AMD Prime support remains experimental; AMD hash mining is not supported.
 
 Compilation and host-only tests do **not** demonstrate GPU mining works. To
@@ -194,3 +194,28 @@ For Falcon authentication setup (required for solo mining), see the main [README
 ```bash
 ./NexusMiner --create-falcon-config
 ```
+
+## Preparing release artifacts
+
+Run **Release artifacts** from the repository's Actions tab, selecting the
+branch or tag to build. The workflow also runs for relevant pull requests and
+version tags. It uploads separate CPU Prime archives for Linux x86-64, macOS
+ARM64, macOS x86-64, and Windows x86-64, and an NVIDIA CUDA Prime/hash archive
+for Linux x86-64. Each artifact includes a SHA-256 checksum, configuration
+examples, third-party notices, and the source commit. Prime builds also record
+the primesieve revision, which is currently fetched from its `master` branch.
+Artifacts are not automatically published as a GitHub release.
+
+Linux binaries are built on Ubuntu 24.04 and require compatible glibc,
+libstdc++, OpenSSL 3, and GMP libraries. The NVIDIA build uses CUDA 12.8 and
+targets architectures 61, 75, 80, 86, 89 and 90; it requires a compatible
+NVIDIA GPU and driver. macOS CPU archives include the GMP dynamic library and
+statically link OpenSSL.
+Windows CPU archives include the vcpkg runtime DLLs and require the MSVC
+runtime. Check the runner OS version and architecture before distributing
+each archive.
+
+The workflow builds kernels and runs host tests, but has no GPU hardware and
+does not validate mining. Treat GPU builds as experimental until tested on
+the intended hardware and pool or node. AMD GPU and non-Linux GPU artifacts
+are not produced by this workflow.

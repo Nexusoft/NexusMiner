@@ -38,7 +38,7 @@ class Sieve;         // forward decl — per-pool-thread sieve owner (Stone 6.8 
 //
 //   * Subscribes to WorkerTemplateFeed via a single consumer thread.
 //   * On every new TemplateEpoch, builds an immutable EngineSession and
-//     publishes it through std::atomic<std::shared_ptr<const EngineSession>>.
+//     publishes it through atomic shared_ptr operations.
 //   * Owns one Shared_segment_allocator (the cooperative cursor) that Stone 6
 //     pool threads will pull segment offsets from.  reset() runs on the
 //     consumer thread before each new session is published; pool threads only
@@ -163,13 +163,13 @@ public:
     // create_workers_locked() (no thread is reading m_registered yet).
     void register_worker(std::shared_ptr<Worker_prime> worker);
 
-    // ── Read-only accessors (lock-free, suitable for hot paths) ────────────
+    // ── Read-only accessors ──────────────────────────────────────────────
 
     // Latest published session, or nullptr if no template has arrived yet.
     // Pool threads (Stone 6) call this at the top of every segment.
     std::shared_ptr<const EngineSession> current_session() const
     {
-        return m_session.load(std::memory_order_acquire);
+        return std::atomic_load_explicit(&m_session, std::memory_order_acquire);
     }
 
     // The shared cursor.  Owned by the engine; Stone 6 pool threads call
@@ -341,9 +341,9 @@ private:
     // polymorphic for tests that want to inject a fake.
     std::unique_ptr<Segment_allocator>     m_segment_allocator;
 
-    // Currently-active session.  C++20 typed atomic shared_ptr so
-    // current_session() is wait-free for pool threads.
-    std::atomic<std::shared_ptr<const EngineSession>> m_session;
+    // Use shared_ptr atomic operations for standard libraries without the
+    // C++20 atomic<shared_ptr> specialization.
+    std::shared_ptr<const EngineSession> m_session;
 
     // Worker_prime instances registered with the engine.  Read-only after
     // create_workers_locked() returns; Stone 7 uses these for stats fan-in.

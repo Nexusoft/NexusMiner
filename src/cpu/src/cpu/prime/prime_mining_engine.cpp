@@ -243,7 +243,7 @@ PrimeMiningEngine::Engine_stats_snapshot PrimeMiningEngine::snapshot_stats() con
     snap.pool_chunk_segments  = m_pool_chunk_segments;
     snap.best_difficulty      = m_best_difficulty.load(std::memory_order_relaxed);
 
-    if (auto session = m_session.load(std::memory_order_acquire))
+    if (auto session = current_session())
     {
         snap.nbits = session->nbits;
     }
@@ -382,7 +382,7 @@ void PrimeMiningEngine::run_consumer()
         // (i.e. on every Merkle rotation) because the sieve's starting-
         // multiples depend on the exact base_hash.  Only the cooperative cursor
         // (nonce-space offset) is preserved here, not the sieve state.
-        const auto previous = m_session.load(std::memory_order_acquire);
+        const auto previous = current_session();
         const bool same_base =
             previous
             && previous->block_data.previous_hash == session->block_data.previous_hash
@@ -421,7 +421,9 @@ void PrimeMiningEngine::run_consumer()
         // Publish the new session.  Release-store pairs with the acquire-load
         // in current_session() so any pool thread observing the new session
         // also observes the cursor reset above (when same_base is false).
-        m_session.store(session, std::memory_order_release);
+        std::atomic_store_explicit(&m_session,
+                                   std::shared_ptr<const EngineSession>(session),
+                                   std::memory_order_release);
 
         {
             std::lock_guard<std::mutex> lock(m_publish_mtx);
@@ -606,7 +608,7 @@ void PrimeMiningEngine::run_pool_thread(std::uint32_t pool_index)
                 m_pool_cv.wait_for(lock, std::chrono::milliseconds{50}, [&] {
                     if (m_shutdown.load(std::memory_order_acquire))
                         return true;
-                    auto s = m_session.load(std::memory_order_acquire);
+                    auto s = current_session();
                     return s && !s->is_consumed();
                 });
                 continue;

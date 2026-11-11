@@ -3,6 +3,7 @@
 
 //tool to generate precomputed masks used by the small prime sieve
 
+#include <cstdint>
 #include <vector>
 //#include "sieve_utils.hpp"
 

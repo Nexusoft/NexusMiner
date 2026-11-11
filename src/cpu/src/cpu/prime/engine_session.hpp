@@ -22,7 +22,7 @@ namespace cpu {
 //   * where to send a found block (on_found + internal_id_for_solution)
 //
 // Sessions are immutable once published.  The engine swaps them atomically
-// (std::atomic<std::shared_ptr<const EngineSession>>) when WorkerTemplateFeed
+// (atomic shared_ptr operations) when WorkerTemplateFeed
 // advances; pool threads load a session at the top of every segment and rebind
 // when its epoch_id differs from the one they're currently mining.
 //

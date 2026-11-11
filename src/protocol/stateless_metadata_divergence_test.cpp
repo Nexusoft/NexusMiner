@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "spdlog/spdlog.h"
@@ -29,6 +30,17 @@
 
 using namespace nexusminer::protocol;
 using Payload = std::vector<uint8_t>;
+
+struct OwningOstreamSink
+{
+    explicit OwningOstreamSink(std::shared_ptr<std::ostringstream> stream)
+        : m_stream(std::move(stream)), sink(*m_stream)
+    {
+    }
+
+    std::shared_ptr<std::ostringstream> m_stream;
+    spdlog::sinks::ostream_sink_mt sink;
+};
 
 // ── Test infrastructure ──────────────────────────────────────────────────────
 
@@ -139,7 +151,8 @@ static std::pair<std::unique_ptr<MiningTemplateInterface>,
 make_capturing_mti(uint8_t channel = 2)
 {
     auto oss  = std::make_shared<std::ostringstream>();
-    auto sink = std::make_shared<spdlog::sinks::ostream_sink_mt>(*oss);
+    auto owner = std::make_shared<OwningOstreamSink>(oss);
+    auto sink = std::shared_ptr<spdlog::sinks::ostream_sink_mt>(owner, &owner->sink);
     sink->set_level(spdlog::level::debug);
     auto logger = std::make_shared<spdlog::logger>("test_capture", sink);
     logger->set_level(spdlog::level::debug);
