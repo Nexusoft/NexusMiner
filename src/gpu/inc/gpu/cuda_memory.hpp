@@ -3,8 +3,6 @@
 
 #include <memory>
 #include <cuda_runtime.h>
-#include <spdlog/spdlog.h>
-#include "gpu_helper.hpp"
 
 namespace nexusminer {
 namespace gpu {
@@ -14,39 +12,7 @@ namespace gpu {
  * Enhanced with error handling and logging for debugging segfaults
  */
 struct CudaDeleter {
-    void operator()(void* ptr) const {
-        if (!ptr) {
-            return;  // Nothing to free
-        }
-        
-        try {
-            // Get logger if available
-            auto logger = spdlog::get("logger");
-            
-            // Log memory deallocation for debugging
-            if (logger) {
-                logger->debug("CudaDeleter: Freeing CUDA device memory at {}", ptr);
-            }
-            
-            cudaError_t err = cudaFree(ptr);
-            
-            if (err != cudaSuccess) {
-                // Log the error but don't throw - destructors should be noexcept
-                if (logger) {
-                    logger->error("CudaDeleter: Failed to free CUDA memory at {}: {} ({})", 
-                                  ptr, cudaGetErrorString(err), static_cast<int>(err));
-                } else {
-                    fprintf(stderr, "CudaDeleter: Failed to free CUDA memory at %p: %s (%d)\n", 
-                            ptr, cudaGetErrorString(err), static_cast<int>(err));
-                }
-            }
-        } catch (const std::exception& e) {
-            // Catch any exceptions during cleanup to prevent termination
-            fprintf(stderr, "CudaDeleter: Exception during CUDA memory cleanup: %s\n", e.what());
-        } catch (...) {
-            fprintf(stderr, "CudaDeleter: Unknown exception during CUDA memory cleanup\n");
-        }
-    }
+    void operator()(void* ptr) const;
 };
 
 /**
@@ -54,39 +20,7 @@ struct CudaDeleter {
  * Enhanced with error handling and logging for debugging segfaults
  */
 struct CudaHostDeleter {
-    void operator()(void* ptr) const {
-        if (!ptr) {
-            return;  // Nothing to free
-        }
-        
-        try {
-            // Get logger if available
-            auto logger = spdlog::get("logger");
-            
-            // Log memory deallocation for debugging
-            if (logger) {
-                logger->debug("CudaHostDeleter: Freeing CUDA pinned host memory at {}", ptr);
-            }
-            
-            cudaError_t err = cudaFreeHost(ptr);
-            
-            if (err != cudaSuccess) {
-                // Log the error but don't throw - destructors should be noexcept
-                if (logger) {
-                    logger->error("CudaHostDeleter: Failed to free CUDA host memory at {}: {} ({})", 
-                                  ptr, cudaGetErrorString(err), static_cast<int>(err));
-                } else {
-                    fprintf(stderr, "CudaHostDeleter: Failed to free CUDA host memory at %p: %s (%d)\n", 
-                            ptr, cudaGetErrorString(err), static_cast<int>(err));
-                }
-            }
-        } catch (const std::exception& e) {
-            // Catch any exceptions during cleanup to prevent termination
-            fprintf(stderr, "CudaHostDeleter: Exception during CUDA host memory cleanup: %s\n", e.what());
-        } catch (...) {
-            fprintf(stderr, "CudaHostDeleter: Unknown exception during CUDA host memory cleanup\n");
-        }
-    }
+    void operator()(void* ptr) const;
 };
 
 /**

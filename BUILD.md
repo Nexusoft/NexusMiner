@@ -206,8 +206,13 @@ examples, third-party notices, and the source commit. Prime builds also record
 the primesieve revision, which is currently fetched from its `master` branch.
 Artifacts are not automatically published as a GitHub release.
 
+Run **NVIDIA hash release artifacts** for standalone channel 2 hash-only
+archives for Linux and Windows x86-64. These builds disable Prime support,
+including CPU Prime. They can be used with `configs/gpu-hash-solo.config`
+and require an NVIDIA GPU and compatible driver.
+
 Linux binaries are built on Ubuntu 24.04 and require compatible glibc,
-libstdc++, OpenSSL 3, and GMP libraries. The NVIDIA build uses CUDA 12.8 and
+libstdc++, and OpenSSL 3; Prime builds also require GMP. The NVIDIA builds use CUDA 12.8 and
 targets architectures 61, 75, 80, 86, 89 and 90; it requires a compatible
 NVIDIA GPU and driver. macOS CPU archives include the GMP dynamic library and
 statically link OpenSSL.
@@ -217,5 +222,5 @@ each archive.
 
 The workflow builds kernels and runs host tests, but has no GPU hardware and
 does not validate mining. Treat GPU builds as experimental until tested on
-the intended hardware and pool or node. AMD GPU and non-Linux GPU artifacts
-are not produced by this workflow.
+the intended hardware and pool or node. AMD GPU and macOS GPU artifacts are
+not produced by these workflows.

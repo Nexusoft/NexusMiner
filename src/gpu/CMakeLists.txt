@@ -1,6 +1,6 @@
 if (WITH_GPU_CUDA)
     add_definitions(-DGPU_CUDA_ENABLED)
-    add_library(gpu STATIC "src/gpu/worker_hash.cpp" "src/gpu/cuda_hash/util.cu" "src/gpu/cuda_hash/constants.cu" "src/gpu/cuda_hash/sk1024.cu")
+    add_library(gpu STATIC "src/gpu/worker_hash.cpp" "src/gpu/cuda_memory.cpp" "src/gpu/cuda_hash/util.cu" "src/gpu/cuda_hash/constants.cu" "src/gpu/cuda_hash/sk1024.cu")
     if(WITH_PRIME)
         target_sources(gpu PRIVATE src/gpu/worker_prime.cpp src/gpu/prime/prime.cpp src/gpu/prime/prime_tests.cpp
             src/gpu/prime/chain.cpp src/gpu/prime/sieve.cpp
@@ -14,6 +14,9 @@ if (WITH_GPU_CUDA)
     endif()
 
     set_target_properties(gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    if(MSVC)
+        set_target_properties(gpu PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+    endif()
     set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info")
     include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}) 
     include_directories(${CUDA_HOME}/samples/common/inc/)

@@ -71,7 +71,9 @@ if(OPENSSL_FOUND)
         if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
             target_compile_options(NexusMiner_platform INTERFACE -Wno-deprecated-declarations)
         elseif(MSVC)
-            target_compile_options(NexusMiner_platform INTERFACE /wd4996)
+            target_compile_options(NexusMiner_platform INTERFACE
+                $<$<COMPILE_LANGUAGE:C,CXX>:/wd4996>
+                $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/wd4996>)
         endif()
     else()
         message(STATUS "OpenSSL 1.1.1 detected - using legacy API")
